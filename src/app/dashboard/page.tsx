@@ -1,4 +1,4 @@
-import { UserInfo } from "@/components/user-info";
+//import { UserInfo } from "@/components/user-info";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ChartAreaInteractive } from "@/components/chart-area-interactive";
 import { DataTable } from "@/components/data-table";
