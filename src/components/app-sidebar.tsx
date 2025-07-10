@@ -8,6 +8,8 @@ import {
   IconSettings,
 } from "@tabler/icons-react";
 import Link from "next/link";
+import { UserButton } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 
 const sidebarItems = [
   {
@@ -39,6 +41,7 @@ const sidebarItems = [
 
 
 export function AppSidebar() {
+  const { user, isSignedIn, isLoaded } = useUser();
   return (
     <aside className="flex flex-col h-full w-60 bg-white border-r">
       <div className="px-4 py-4 text-xs font-bold tracking-widest text-gray-700">
@@ -60,8 +63,11 @@ export function AppSidebar() {
           ))}
         </ul>
       </nav>
-      <div className="mt-auto p-4">
-        {/* <NavUser user={{ name: "Username", email: "", avatar: "" }} /> */}
+      <div className="mt-auto p-4 flex items-center gap-2">
+        <UserButton afterSignOutUrl="/sign-in" />
+        {isLoaded && isSignedIn && (
+          <span className="text-sm font-medium">Hola, {user.firstName}</span>
+        )}
       </div>
     </aside>
   );
