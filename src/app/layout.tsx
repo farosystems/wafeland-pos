@@ -1,50 +1,22 @@
-import {
-  ClerkProvider,
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  UserButton,
-} from "@clerk/nextjs";
-import { dark } from "@clerk/themes";
-import { Geist, Geist_Mono } from "next/font/google";
-import { type Metadata } from "next";
+import { AppSidebar } from "@/components/app-sidebar";
+import { ClerkProvider, UserButton } from "@clerk/nextjs";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import "./globals.css";
 
-const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
-const geistMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-geist-mono",
-});
-
-export const metadata: Metadata = {
-  title: "POS App",
-  description: "Sistema Punto de Venta",
-};
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider appearance={{ baseTheme: dark }}>
-      <html lang="es" className={`${geistSans.variable} ${geistMono.variable}`}>
-        <body>
-          <header
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              padding: 20,
-            }}
-          >
-            <SignedIn>
-              <UserButton />
-            </SignedIn>
-            <SignedOut>
-              <SignInButton />
-            </SignedOut>
-          </header>
-          {children}
+    <ClerkProvider>
+      <html lang="es">
+        <body className="flex h-screen">
+          <SidebarProvider>
+            <AppSidebar />
+            <div className="flex flex-col flex-1 min-h-0">
+              <header className="flex items-center justify-end h-16 px-6 border-b bg-white">
+                <UserButton afterSignOutUrl="/sign-in" />
+              </header>
+              <main className="flex-1 overflow-y-auto bg-gray-50">{children}</main>
+            </div>
+          </SidebarProvider>
         </body>
       </html>
     </ClerkProvider>
