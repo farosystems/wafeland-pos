@@ -8,7 +8,7 @@ export function UserInfo() {
   if (!isLoaded) return null;
   return isSignedIn ? (
     <div className="flex items-center gap-4">
-      <p className="text-sm font-medium">Hola, {user.firstName}</p>
+      <p className="text-sm font-medium">Hola, {user.lastName}</p>
     </div>
   ) : null;
 }

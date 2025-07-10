@@ -39,6 +39,7 @@ const sidebarItems = [
 ];
 
 export function AppSidebar() {
+export function AppSidebar() {
   return (
     <aside className="flex flex-col h-full w-60 bg-white border-r">
       <div className="px-4 py-4 text-xs font-bold tracking-widest text-gray-700">
