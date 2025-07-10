@@ -9,6 +9,8 @@ import { dark } from "@clerk/themes";
 import { Geist, Geist_Mono } from "next/font/google";
 import { type Metadata } from "next";
 import "./globals.css";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
 
 const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 const geistMono = Geist_Mono({
@@ -30,21 +32,14 @@ export default function RootLayout({
     <ClerkProvider appearance={{ baseTheme: dark }}>
       <html lang="es" className={`${geistSans.variable} ${geistMono.variable}`}>
         <body>
-          <header
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              padding: 20,
-            }}
-          >
-            <SignedIn>
-              <UserButton />
-            </SignedIn>
-            <SignedOut>
-              <SignInButton />
-            </SignedOut>
-          </header>
-          {children}
+          <SidebarProvider>
+            <AppSidebar />
+
+            <main>
+              <SidebarTrigger />
+              {children}
+            </main>
+          </SidebarProvider>
         </body>
       </html>
     </ClerkProvider>

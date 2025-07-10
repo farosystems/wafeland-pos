@@ -13,7 +13,7 @@ export default async function HomePage() {
   // Página pública si no está logueado
   return (
     <>
-      <main className="flex flex-col items-center justify-center min-h-screen px-4 text-center">
+      <div className="flex flex-col items-center justify-center min-h-screen px-4 text-center">
         <h1 className="text-4xl font-bold mb-4">
           Sistema de Punto de Venta (POS)
         </h1>
@@ -29,7 +29,7 @@ export default async function HomePage() {
             <Button variant="outline">Registrarse</Button>
           </Link>
         </div>
-      </main>
+      </div>
     </>
   );
 }
