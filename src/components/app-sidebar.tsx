@@ -8,7 +8,6 @@ import {
   IconSettings,
 } from "@tabler/icons-react";
 import Link from "next/link";
-import { NavUser } from "@/components/nav-user";
 
 const sidebarItems = [
   {
@@ -38,7 +37,7 @@ const sidebarItems = [
   },
 ];
 
-export function AppSidebar() {
+
 export function AppSidebar() {
   return (
     <aside className="flex flex-col h-full w-60 bg-white border-r">
@@ -62,8 +61,9 @@ export function AppSidebar() {
         </ul>
       </nav>
       <div className="mt-auto p-4">
-        <NavUser user={{ name: "Username", email: "", avatar: "" }} />
+        {/* <NavUser user={{ name: "Username", email: "", avatar: "" }} /> */}
       </div>
     </aside>
   );
-}
+ }
+
