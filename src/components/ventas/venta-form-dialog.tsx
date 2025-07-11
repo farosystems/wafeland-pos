@@ -422,7 +422,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                             autoComplete="off"
                             ref={el => { inputRefs.current[idx] = el; }}
                             onFocus={() => d.input && setShowSugerencias(idx)}
-                            onBlur={e => setTimeout(() => setShowSugerencias(s => (s === idx ? null : s)), 120)}
+                            onBlur={() => setTimeout(() => setShowSugerencias(s => (s === idx ? null : s)), 120)}
                           />
                           {d.input && showSugerencias === idx && getSugerencias(d.input).length > 0 && (
                             <div className="absolute z-10 bg-white border rounded shadow w-full max-h-40 overflow-auto">
@@ -430,7 +430,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                                 <div
                                   key={a.id}
                                   className="px-2 py-1 hover:bg-gray-100 cursor-pointer flex justify-between"
-                                  onMouseDown={e => { e.preventDefault(); handleDetalleChange(idx, "articulo", a.id); }}
+                                  onClick={() => handleDetalleChange(idx, "articulo", a.id)}
                                 >
                                   <span>{a.descripcion}</span>
                                   <span className="text-xs text-muted-foreground">${a.precio_unitario}</span>
