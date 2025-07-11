@@ -15,21 +15,27 @@ import { getUsuarios } from "@/services/usuarios";
 import { getArticles } from "@/services/articles";
 import { getCuentasTesoreria } from "@/services/cuentasTesoreria";
 import { getTiposComprobantes } from "@/services/tiposComprobantes";
+import { Article } from "@/types/article";
+import { OrdenVentaDetalle, OrdenVentaMediosPago, OrdenVentaImpuestos } from "@/types/ordenVenta";
+import { Cliente } from "@/types/cliente";
+import { Usuario } from "@/types/usuario";
+import { CuentaTesoreria } from "@/types/cuentaTesoreria";
+import { TipoComprobante } from "@/types/tipoComprobante";
 
 export default function VentasPage() {
   const [ventas, setVentas] = useState<OrdenVenta[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
-  const [detalleVenta, setDetalleVenta] = useState<unknown[]>([]);
-  const [mediosPagoVenta, setMediosPagoVenta] = useState<unknown[]>([]);
-  const [impuestosVenta, setImpuestosVenta] = useState<unknown[]>([]);
+  const [detalleVenta, setDetalleVenta] = useState<OrdenVentaDetalle[]>([]);
+  const [mediosPagoVenta, setMediosPagoVenta] = useState<OrdenVentaMediosPago[]>([]);
+  const [impuestosVenta, setImpuestosVenta] = useState<OrdenVentaImpuestos[]>([]);
   const [ventaSeleccionada, setVentaSeleccionada] = useState<OrdenVenta | null>(null);
   const [openDetalle, setOpenDetalle] = useState(false);
-  const [clientes, setClientes] = useState<unknown[]>([]);
-  const [usuarios, setUsuarios] = useState<unknown[]>([]);
-  const [articulos, setArticulos] = useState<unknown[]>([]);
-  const [cuentas, setCuentas] = useState<unknown[]>([]);
-  const [tiposComprobantes, setTiposComprobantes] = useState<unknown[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [articulos, setArticulos] = useState<Article[]>([]);
+  const [cuentas, setCuentas] = useState<CuentaTesoreria[]>([]);
+  const [tiposComprobantes, setTiposComprobantes] = useState<TipoComprobante[]>([]);
 
   useEffect(() => {
     fetchVentas();
