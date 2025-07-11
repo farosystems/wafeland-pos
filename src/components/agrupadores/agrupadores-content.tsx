@@ -13,6 +13,8 @@ import {
 import { AgrupadoresTable } from "@/components/agrupadores/agrupadores-table";
 import { AgrupadorForm } from "@/components/agrupadores/agrupador-form";
 import { useAgrupadores } from "@/hooks/use-agrupadores";
+import { Agrupador } from "@/types/agrupador";
+import { CreateAgrupadorData, UpdateAgrupadorData } from "@/types/agrupador";
 
 export function AgrupadoresContent() {
   const {
@@ -23,7 +25,7 @@ export function AgrupadoresContent() {
   } = useAgrupadores();
 
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [editingAgrupador, setEditingAgrupador] = React.useState<unknown | undefined>();
+  const [editingAgrupador, setEditingAgrupador] = React.useState<Agrupador | undefined>();
   const [isLoading, setIsLoading] = React.useState(false);
 
   const openCreateDialog = () => {
@@ -31,7 +33,7 @@ export function AgrupadoresContent() {
     setIsDialogOpen(true);
   };
 
-  const openEditDialog = (agrupador: unknown) => {
+  const openEditDialog = (agrupador: Agrupador) => {
     setEditingAgrupador(agrupador);
     setIsDialogOpen(true);
   };
@@ -67,12 +69,15 @@ export function AgrupadoresContent() {
             </DialogHeader>
             <AgrupadorForm
               agrupador={editingAgrupador}
-              onSubmit={async (data) => {
+              onSubmit={async (data: CreateAgrupadorData | UpdateAgrupadorData) => {
                 setIsLoading(true);
                 if (editingAgrupador) {
-                  await editAgrupador(editingAgrupador.id, data);
+                  // Solo pasa 'nombre' si existe y es string
+                  const updateData: UpdateAgrupadorData = {};
+                  if (typeof data.nombre === 'string') updateData.nombre = data.nombre;
+                  await editAgrupador(editingAgrupador.id, updateData);
                 } else {
-                  await addAgrupador(data);
+                  await addAgrupador({ nombre: String((data as CreateAgrupadorData).nombre) });
                 }
                 setIsLoading(false);
                 closeDialog();
