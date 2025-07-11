@@ -5,6 +5,8 @@ export interface Article {
   fk_id_agrupador: number;
   activo: boolean;
   porcentaje_iva: number;
+  stock: number; // Nuevo campo para stock
+  agrupador_nombre?: string; // Nombre del agrupador (opcional, para joins)
 }
 
 export interface CreateArticleData {
@@ -13,6 +15,7 @@ export interface CreateArticleData {
   fk_id_agrupador: number;
   activo: boolean;
   porcentaje_iva: number;
+  stock: number; // Nuevo campo para stock
 }
 
 export interface UpdateArticleData {
@@ -21,4 +24,5 @@ export interface UpdateArticleData {
   fk_id_agrupador?: number;
   activo?: boolean;
   porcentaje_iva?: number;
+  stock?: number; // Nuevo campo para stock
 } 

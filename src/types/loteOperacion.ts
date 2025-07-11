@@ -9,6 +9,7 @@ export interface LoteOperacion {
   fecha_cierre: string; // ISO
   hora_cierre: string | null;
   observaciones: string | null;
+  saldo_inicial: number; // Saldo inicial de la caja
 }
 
 export interface CreateLoteOperacionData extends Omit<LoteOperacion, 'id_lote'> {}

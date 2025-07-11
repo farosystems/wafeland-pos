@@ -24,6 +24,7 @@ const articleSchema = z.object({
   fk_id_agrupador: z.union([z.string(), z.number()]).transform(Number).refine(val => !isNaN(val) && val >= 1, { message: "El agrupador es requerido" }),
   activo: z.boolean(),
   porcentaje_iva: z.union([z.string(), z.number()]).transform(Number).refine(val => !isNaN(val) && val >= 0, { message: "El IVA debe ser mayor o igual a 0" }),
+  stock: z.union([z.string(), z.number()]).transform(Number).refine(val => !isNaN(val) && val >= 0, { message: "El stock debe ser mayor o igual a 0" }),
 });
 
 type ArticleFormValues = z.infer<typeof articleSchema>;
@@ -45,6 +46,7 @@ export function ArticleForm({ article, onSubmit, onCancel, isLoading = false }: 
       fk_id_agrupador: article?.fk_id_agrupador || 1,
       activo: article?.activo ?? true,
       porcentaje_iva: article?.porcentaje_iva || 0,
+      stock: article?.stock ?? 0,
     },
   });
 
@@ -54,6 +56,7 @@ export function ArticleForm({ article, onSubmit, onCancel, isLoading = false }: 
       precio_unitario: Number(values.precio_unitario),
       fk_id_agrupador: Number(values.fk_id_agrupador),
       porcentaje_iva: Number(values.porcentaje_iva),
+      stock: Number(values.stock),
     });
   };
 
@@ -146,6 +149,22 @@ export function ArticleForm({ article, onSubmit, onCancel, isLoading = false }: 
               </FormControl>
               <FormDescription>
                 Porcentaje de IVA aplicado
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="stock"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Stock</FormLabel>
+              <FormControl>
+                <Input type="number" min={0} step="1" placeholder="0" {...field} />
+              </FormControl>
+              <FormDescription>
+                Stock inicial del artículo
               </FormDescription>
               <FormMessage />
             </FormItem>

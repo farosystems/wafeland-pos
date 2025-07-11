@@ -4,10 +4,15 @@ import { Article, CreateArticleData, UpdateArticleData } from "@/types/article";
 export async function getArticles() {
   const { data, error } = await supabase
     .from("articulos")
-    .select("*")
+    .select("*, agrupadores:fk_id_agrupador(nombre)")
     .order("id", { ascending: false });
   if (error) throw error;
-  return data as Article[];
+  // Mapear agrupador_nombre
+  const mapped = (data as any[]).map(a => ({
+    ...a,
+    agrupador_nombre: a.agrupadores?.nombre || '',
+  }));
+  return mapped as Article[];
 }
 
 export async function createArticle(article: CreateArticleData) {

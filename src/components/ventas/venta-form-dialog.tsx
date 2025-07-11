@@ -28,6 +28,7 @@ import { Article } from "@/types/article";
 import { cn } from "@/lib/utils";
 import { useUser } from "@clerk/nextjs";
 import { format } from "date-fns";
+import { updateArticle } from "@/services/articles";
 
 interface VentaFormDialogProps {
   open: boolean;
@@ -240,6 +241,11 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   // Estado para error
   const [error, setError] = useState<string | null>(null);
   const [showLoteError, setShowLoteError] = useState(false);
+  const [toast, setToast] = useState<{ show: boolean, message: string }>({ show: false, message: "" });
+  function showToast(message: string) {
+    setToast({ show: true, message });
+    setTimeout(() => setToast({ show: false, message: "" }), 2500);
+  }
 
   // En handleGuardarVenta:
   async function handleGuardarVenta() {
@@ -274,6 +280,11 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
             cantidad: d.cantidad,
             precio_unitario: d.precio,
           });
+          // Descontar stock
+          if (typeof d.articulo.stock === 'number') {
+            const nuevoStock = Math.max(0, d.articulo.stock - d.cantidad);
+            await updateArticle(d.articulo.id, { stock: nuevoStock });
+          }
         }
       }
       // 3. Crear los medios de pago
@@ -299,6 +310,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
       if (onVentaGuardada) onVentaGuardada();
       // 6. Cerrar el popup y mostrar feedback
       onOpenChange(false);
+      showToast("Venta registrada con éxito");
       // Opcional: mostrar toast de éxito
     } catch (e: any) {
       console.error("Error al guardar la venta:", e);
@@ -688,6 +700,11 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
           </div>
         </DialogContent>
       </Dialog>
+      {toast.show && (
+        <div className="fixed top-6 right-6 z-50 bg-green-600 text-white px-6 py-3 rounded shadow-lg animate-fade-in">
+          {toast.message}
+        </div>
+      )}
     </Dialog>
   );
 } 

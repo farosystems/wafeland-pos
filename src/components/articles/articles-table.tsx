@@ -72,9 +72,9 @@ export function ArticlesTable({ data, onEdit }: ArticlesTableProps) {
       },
     },
     {
-      accessorKey: "fk_id_agrupador",
-      header: "ID Agrupador",
-      cell: ({ row }) => <div>{row.getValue("fk_id_agrupador")}</div>,
+      accessorKey: "agrupador_nombre",
+      header: "Agrupador",
+      cell: ({ row }) => <div>{row.getValue("agrupador_nombre")}</div>,
     },
     {
       accessorKey: "activo",
@@ -89,6 +89,12 @@ export function ArticlesTable({ data, onEdit }: ArticlesTableProps) {
       accessorKey: "porcentaje_iva",
       header: "IVA %",
       cell: ({ row }) => <div>{row.getValue("porcentaje_iva")}%</div>,
+    },
+    // Nueva columna para stock
+    {
+      accessorKey: "stock",
+      header: "Stock",
+      cell: ({ row }) => <div>{row.getValue("stock")}</div>,
     },
     {
       id: "actions",
@@ -128,6 +134,14 @@ export function ArticlesTable({ data, onEdit }: ArticlesTableProps) {
           value={(table.getColumn("descripcion")?.getFilterValue() as string) ?? ""}
           onChange={(event) =>
             table.getColumn("descripcion")?.setFilterValue(event.target.value)
+          }
+          className="max-w-sm mr-2"
+        />
+        <Input
+          placeholder="Filtrar por agrupador..."
+          value={(table.getColumn("agrupador_nombre")?.getFilterValue() as string) ?? ""}
+          onChange={(event) =>
+            table.getColumn("agrupador_nombre")?.setFilterValue(event.target.value)
           }
           className="max-w-sm"
         />

@@ -24,6 +24,7 @@ import { getOrdenesVentaMediosPago } from "@/services/ordenesVentaMediosPago";
 import { CuentaTesoreria } from "@/types/cuentaTesoreria";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { getLotesOperaciones } from "@/services/lotesOperaciones";
 
 interface AperturaCaja {
   caja: string;
@@ -56,6 +57,7 @@ export default function CajaPage() {
   const [saldoInicial, setSaldoInicial] = useState("");
   const [cajaAbierta, setCajaAbierta] = useState<string | null>(null);
   const [aperturaError, setAperturaError] = useState<string | null>(null);
+  const [observacionesApertura, setObservacionesApertura] = useState("");
 
   // CRUD de cajas de turno
   const [cajas, setCajas] = useState<Caja[]>([]);
@@ -77,6 +79,7 @@ export default function CajaPage() {
   const [resumen, setResumen] = useState<{ cuenta: string, ingresos: number, egresos: number }[]>([]);
   const [loadingCierre, setLoadingCierre] = useState(false);
   const [cuentasTesoreria, setCuentasTesoreria] = useState<CuentaTesoreria[]>([]);
+  const [toast, setToast] = useState<{ show: boolean, message: string }>({ show: false, message: "" });
 
   useEffect(() => {
     fetchCajas();
@@ -91,7 +94,7 @@ export default function CajaPage() {
       setCajaAbierta(lote.fk_id_caja);
       setAperturaActual({
         caja: cajas.find(c => c.id === lote.fk_id_caja)?.descripcion || lote.fk_id_caja,
-        saldoInicial: '', // Si quieres puedes guardar el saldo en el lote o buscarlo en el detalle
+        saldoInicial: lote.saldo_inicial?.toString() || '', // Obtener saldo del lote
         fechaApertura: lote.fecha_apertura?.slice(0, 10),
         horaApertura: lote.hora_apertura,
         fechaCierre: null,
@@ -139,9 +142,12 @@ export default function CajaPage() {
       horaApertura: format(now, "HH:mm"),
       fechaCierre: null,
       horaCierre: null,
+      // observaciones: observacionesApertura, // No corresponde aquí
     });
     setCajaSeleccionada("");
     setSaldoInicial("");
+    setObservacionesApertura("");
+    showToast("Caja abierta correctamente");
 
     // --- Lógica de lotes de operaciones ---
     try {
@@ -158,7 +164,8 @@ export default function CajaPage() {
         hora_apertura: format(now, "HH:mm"),
         fecha_cierre: hoy, // se actualiza al cerrar
         hora_cierre: null,
-        observaciones: null,
+        observaciones: observacionesApertura || null,
+        saldo_inicial: parseFloat(saldoInicial), // Agregar saldo inicial
       });
       // Crear detalle del lote
       await createDetalleLoteOperacion({
@@ -177,6 +184,8 @@ export default function CajaPage() {
   async function handleCerrarCaja() {
     if (!aperturaActual || !aperturaActual.id_lote) return;
     setLoadingCierre(true);
+    // Traer todos los movimientos reales del lote
+    const movimientos = await getDetalleLotesOperaciones(aperturaActual.id_lote);
     // Traer todas las ventas del lote abierto
     const ventas = await getOrdenesVenta();
     const ventasLote = ventas.filter(v => v.fk_id_lote === aperturaActual.id_lote);
@@ -192,15 +201,25 @@ export default function CajaPage() {
         pagosPorCuenta[m.fk_id_cuenta_tesoreria] += m.monto_pagado;
       }
     }
-    // Armar resumen para todas las cuentas
-    const resumenFinal = cuentasTesoreria.map(cuenta => ({
-      cuenta: cuenta.descripcion,
-      ingresos: pagosPorCuenta[cuenta.id] || 0,
-      egresos: 0,
-    }));
+    // Sumar ingresos y egresos por cuenta (movimientos + ventas)
+    let resumenPorCuenta: Record<number, { cuenta: string, ingresos: number, egresos: number }> = {};
+    for (const cuenta of cuentasTesoreria) {
+      resumenPorCuenta[cuenta.id] = { cuenta: cuenta.descripcion, ingresos: pagosPorCuenta[cuenta.id] || 0, egresos: 0 };
+    }
+    for (const mov of movimientos) {
+      if (resumenPorCuenta[mov.fk_id_cuenta_tesoreria]) {
+        if (mov.tipo === 'ingreso') {
+          resumenPorCuenta[mov.fk_id_cuenta_tesoreria].ingresos += Math.abs(mov.monto);
+        } else if (mov.tipo === 'egreso') {
+          resumenPorCuenta[mov.fk_id_cuenta_tesoreria].egresos += Math.abs(mov.monto);
+        }
+      }
+    }
+    const resumenFinal = Object.values(resumenPorCuenta);
     setResumen(resumenFinal);
     setShowCierreModal(true);
     setLoadingCierre(false);
+    showToast("Caja cerrada correctamente");
   }
 
   async function confirmarCierreCaja() {
@@ -209,10 +228,24 @@ export default function CajaPage() {
     setLoadingCierre(true);
     const now = new Date();
     const hoyCierre = format(now, "yyyy-MM-dd");
+    // Registrar saldo inicial como ingreso en efectivo al cierre
+    const saldoInicial = parseFloat(aperturaActual.saldoInicial || '0');
+    if (saldoInicial > 0 && cuentasTesoreria.length > 0) {
+      const cuentaEfectivo = cuentasTesoreria.find(c => c.descripcion.toLowerCase().includes('efectivo'));
+      if (cuentaEfectivo) {
+        await createDetalleLoteOperacion({
+          fk_id_lote: aperturaActual.id_lote,
+          fk_id_cuenta_tesoreria: cuentaEfectivo.id,
+          tipo: 'ingreso',
+          monto: saldoInicial,
+        });
+      }
+    }
     await cerrarLoteApertura(aperturaActual.id_lote, hoyCierre, format(now, "HH:mm"));
     setCajaAbierta(null);
     setAperturaActual(null);
     setLoadingCierre(false);
+    showToast("Cierre de caja confirmado");
   }
 
   function generarPDFCierreCaja() {
@@ -225,10 +258,11 @@ export default function CajaPage() {
     // Información de la caja
     doc.setFontSize(12);
     doc.text(`Caja: ${aperturaActual?.caja || "N/A"}`, 20, 35);
-    doc.text(`Fecha de apertura: ${aperturaActual?.fechaApertura || "N/A"}`, 20, 45);
-    doc.text(`Hora de apertura: ${aperturaActual?.horaApertura || "N/A"}`, 20, 55);
-    doc.text(`Fecha de cierre: ${format(new Date(), "yyyy-MM-dd")}`, 20, 65);
-    doc.text(`Hora de cierre: ${format(new Date(), "HH:mm")}`, 20, 75);
+    doc.text(`Saldo inicial: $${parseFloat(aperturaActual?.saldoInicial || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, 45);
+    doc.text(`Fecha de apertura: ${aperturaActual?.fechaApertura || "N/A"}`, 20, 55);
+    doc.text(`Hora de apertura: ${aperturaActual?.horaApertura || "N/A"}`, 20, 65);
+    doc.text(`Fecha de cierre: ${format(new Date(), "yyyy-MM-dd")}`, 20, 75);
+    doc.text(`Hora de cierre: ${format(new Date(), "HH:mm")}`, 20, 85);
     
     // Tabla de resumen
     const tableData = resumen.map(r => [
@@ -238,7 +272,7 @@ export default function CajaPage() {
     ]);
     
     autoTable(doc, {
-      startY: 90,
+      startY: 100, // Ajustar posición inicial de la tabla
       head: [["Cuenta Tesorería", "Total Ingresos", "Total Egresos"]],
       body: tableData,
       theme: "grid",
@@ -259,14 +293,16 @@ export default function CajaPage() {
     // Totales
     const totalIngresos = resumen.reduce((sum, r) => sum + r.ingresos, 0);
     const totalEgresos = resumen.reduce((sum, r) => sum + r.egresos, 0);
-    const saldoFinal = totalIngresos - totalEgresos;
+    const saldoInicial = parseFloat(aperturaActual?.saldoInicial || '0');
+    const saldoFinal = saldoInicial + totalIngresos - totalEgresos;
     
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text(`Total Ingresos: $${totalIngresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY);
-    doc.text(`Total Egresos: $${totalEgresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY + 10);
-    doc.text(`Saldo Final: $${saldoFinal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY + 20);
+    doc.text(`Saldo inicial: $${saldoInicial.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY);
+    doc.text(`Total Ingresos: $${totalIngresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY + 10);
+    doc.text(`Total Egresos: $${totalEgresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY + 20);
+    doc.text(`Saldo Final: $${saldoFinal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY + 30);
     
     // Pie de página
     doc.setFontSize(8);
@@ -275,6 +311,100 @@ export default function CajaPage() {
     
     // Descargar el PDF
     const fileName = `cierre_caja_${format(new Date(), "yyyy-MM-dd_HH-mm")}.pdf`;
+    doc.save(fileName);
+  }
+
+  // Imprimir cierre de caja para cualquier lote
+  async function imprimirCierreDeLote(id_lote: number) {
+    // Buscar el lote
+    const lotes = await getLotesOperaciones();
+    const lote = lotes.find(l => l.id_lote === id_lote);
+    if (!lote) return;
+    // Buscar caja
+    const caja = cajas.find(c => c.id === lote.fk_id_caja);
+    // Buscar movimientos
+    const movimientos = await getDetalleLotesOperaciones(id_lote);
+    // Buscar ventas y medios de pago
+    const ventas = await getOrdenesVenta();
+    const ventasLote = ventas.filter(v => v.fk_id_lote === id_lote);
+    let pagosPorCuenta: Record<number, number> = {};
+    for (const cuenta of cuentasTesoreria) {
+      pagosPorCuenta[cuenta.id] = 0;
+    }
+    for (const venta of ventasLote) {
+      const medios = await getOrdenesVentaMediosPago(venta.id);
+      for (const m of medios) {
+        if (pagosPorCuenta[m.fk_id_cuenta_tesoreria] === undefined) pagosPorCuenta[m.fk_id_cuenta_tesoreria] = 0;
+        pagosPorCuenta[m.fk_id_cuenta_tesoreria] += m.monto_pagado;
+      }
+    }
+    // Sumar ingresos y egresos por cuenta (movimientos + ventas)
+    let resumenPorCuenta: Record<number, { cuenta: string, ingresos: number, egresos: number }> = {};
+    for (const cuenta of cuentasTesoreria) {
+      resumenPorCuenta[cuenta.id] = { cuenta: cuenta.descripcion, ingresos: pagosPorCuenta[cuenta.id] || 0, egresos: 0 };
+    }
+    for (const mov of movimientos) {
+      if (resumenPorCuenta[mov.fk_id_cuenta_tesoreria]) {
+        if (mov.tipo === 'ingreso') {
+          resumenPorCuenta[mov.fk_id_cuenta_tesoreria].ingresos += Math.abs(mov.monto);
+        } else if (mov.tipo === 'egreso') {
+          resumenPorCuenta[mov.fk_id_cuenta_tesoreria].egresos += Math.abs(mov.monto);
+        }
+      }
+    }
+    const resumenFinal = Object.values(resumenPorCuenta);
+    // PDF
+    const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.text("CIERRE DE CAJA", 105, 20, { align: "center" });
+    doc.setFontSize(12);
+    doc.text(`Caja: ${caja?.descripcion || lote.fk_id_caja}` , 20, 35);
+    doc.text(`Saldo inicial: $${parseFloat(lote.saldo_inicial?.toString() || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, 45);
+    doc.text(`Fecha de apertura: ${lote.fecha_apertura?.slice(0, 10) || "N/A"}`, 20, 55);
+    doc.text(`Hora de apertura: ${lote.hora_apertura || "N/A"}`, 20, 65);
+    doc.text(`Fecha de cierre: ${lote.fecha_cierre?.slice(0, 10) || "N/A"}`, 20, 75);
+    doc.text(`Hora de cierre: ${lote.hora_cierre || "N/A"}`, 20, 85);
+    const tableData = resumenFinal.map(r => [
+      r.cuenta,
+      `$${r.ingresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      `$${r.egresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    ]);
+    autoTable(doc, {
+      startY: 100,
+      head: [["Cuenta Tesorería", "Total Ingresos", "Total Egresos"]],
+      body: tableData,
+      theme: "grid",
+      headStyles: {
+        fillColor: [66, 139, 202],
+        textColor: 255,
+        fontStyle: "bold"
+      },
+      styles: {
+        fontSize: 10
+      },
+      columnStyles: {
+        1: { halign: "right" },
+        2: { halign: "right" }
+      }
+    });
+    const totalIngresos = resumenFinal.reduce((sum, r) => sum + r.ingresos, 0);
+    const totalEgresos = resumenFinal.reduce((sum, r) => sum + r.egresos, 0);
+    // El saldo inicial ya está incluido en los ingresos, no sumarlo dos veces
+    // const saldoInicial = parseFloat(lote.saldo_inicial?.toString() || '0');
+    // const saldoFinal = saldoInicial + totalIngresos - totalEgresos;
+    const saldoInicial = parseFloat(lote.saldo_inicial?.toString() || '0');
+    const saldoFinal = totalIngresos - totalEgresos;
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Saldo inicial: $${saldoInicial.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY);
+    doc.text(`Total Ingresos: $${totalIngresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY + 10);
+    doc.text(`Total Egresos: $${totalEgresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY + 20);
+    doc.text(`Saldo Final: $${saldoFinal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY + 30);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Generado el ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 20, 280);
+    const fileName = `cierre_caja_lote_${id_lote}_${format(new Date(), "yyyy-MM-dd_HH-mm")}.pdf`;
     doc.save(fileName);
   }
 
@@ -335,6 +465,15 @@ export default function CajaPage() {
     }
   };
 
+  // Animación de presión y hover para botones
+  const pressClass = "active:scale-95 transition-transform duration-100 hover:scale-105 hover:shadow-lg";
+
+  // Mostrar toast de éxito
+  function showToast(message: string) {
+    setToast({ show: true, message });
+    setTimeout(() => setToast({ show: false, message: "" }), 2500);
+  }
+
   return (
     <div className="max-w-4xl mx-auto p-8">
       <h1 className="text-2xl font-bold mb-4">Gestión de Caja</h1>
@@ -344,7 +483,7 @@ export default function CajaPage() {
         {cajaAbierta ? (
           <div className="flex items-center gap-4">
             <span className="text-green-600 font-bold">Caja abierta: {cajaAbierta}</span>
-            <button className="bg-red-600 text-white px-4 py-2 rounded" onClick={handleCerrarCaja} disabled={loadingCierre}>
+            <button className={`bg-red-600 text-white px-4 py-2 rounded ${pressClass}`} onClick={handleCerrarCaja} disabled={loadingCierre}>
               Cerrar caja
             </button>
           </div>
@@ -379,10 +518,20 @@ export default function CajaPage() {
             <div className="flex items-end">
               <button
                 type="submit"
-                className="bg-blue-600 text-white px-4 py-2 rounded"
+                className={`bg-blue-600 text-white px-4 py-2 rounded ${pressClass}`}
               >
                 Abrir caja
               </button>
+            </div>
+            <div className="md:col-span-3">
+              <label className="block mb-1 font-medium">Observaciones</label>
+              <textarea
+                className="w-full border rounded px-2 py-1 min-h-[60px]"
+                value={observacionesApertura}
+                onChange={e => setObservacionesApertura(e.target.value)}
+                placeholder="Observaciones de apertura (opcional)"
+                maxLength={500}
+              />
             </div>
             {aperturaError && <div className="col-span-3 text-red-600 text-sm">{aperturaError}</div>}
           </form>
@@ -419,10 +568,10 @@ export default function CajaPage() {
         )}
       </div>
       {/* CRUD de cajas de turno */}
-      <div className="rounded-lg border bg-card p-6">
+      {/* <div className="rounded-lg border bg-card p-6">
         <h2 className="text-lg font-semibold mb-4">Cajas de turnos</h2>
         {/* Formulario crear/editar caja de turno */}
-        <div className="mb-4">
+        {/* <div className="mb-4">
           {editCaja ? (
             <form onSubmit={handleEditCaja} className="flex flex-wrap gap-4 items-end">
               <div>
@@ -482,9 +631,9 @@ export default function CajaPage() {
             </form>
           )}
           {crudError && <div className="text-red-600 text-sm mt-2">{crudError}</div>}
-        </div>
+        </div> */}
         {/* Tabla de cajas de turno */}
-        <div className="overflow-x-auto">
+        {/* <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
               <tr className="bg-gray-100">
@@ -527,9 +676,9 @@ export default function CajaPage() {
               )}
             </tbody>
           </table>
-        </div>
-      </div>
-      <LotesOperacionesContent key={refreshLotes} />
+        </div> */}
+      {/* </div> */}
+      <LotesOperacionesContent key={refreshLotes} onImprimirCierre={imprimirCierreDeLote} />
       {showCierreModal && (
         <Dialog open={showCierreModal} onOpenChange={setShowCierreModal}>
           <DialogContent className="max-w-2xl">
@@ -539,6 +688,9 @@ export default function CajaPage() {
                 A continuación se listan los ingresos y egresos por tipo de cuenta de tesorería.
               </DialogDescription>
             </DialogHeader>
+            <div className="mb-4 p-3 bg-gray-50 rounded">
+              <div className="text-sm font-medium">Saldo inicial: ${parseFloat(aperturaActual?.saldoInicial || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
             <table className="min-w-full text-sm border mb-4">
               <thead>
                 <tr className="bg-gray-100">
@@ -558,9 +710,9 @@ export default function CajaPage() {
               </tbody>
             </table>
             <div className="flex justify-end gap-2">
-              <button className="bg-gray-300 px-4 py-2 rounded" onClick={() => setShowCierreModal(false)}>Cancelar</button>
-              <button className="bg-blue-600 text-white px-4 py-2 rounded" onClick={confirmarCierreCaja}>Confirmar cierre</button>
-              <button className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2" onClick={generarPDFCierreCaja}>
+              <button className={`bg-gray-300 px-4 py-2 rounded ${pressClass}`} onClick={() => setShowCierreModal(false)}>Cancelar</button>
+              <button className={`bg-blue-600 text-white px-4 py-2 rounded ${pressClass}`} onClick={confirmarCierreCaja}>Confirmar cierre</button>
+              <button className={`bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 ${pressClass}`} onClick={generarPDFCierreCaja}>
                 <FileText className="h-4 w-4" />
                 Imprimir PDF
               </button>
@@ -568,9 +720,14 @@ export default function CajaPage() {
           </DialogContent>
         </Dialog>
       )}
-      <div className="mt-10">
+      {toast.show && (
+        <div className="fixed top-6 right-6 z-50 bg-green-600 text-white px-6 py-3 rounded shadow-lg animate-fade-in">
+          {toast.message}
+        </div>
+      )}
+      {/* <div className="mt-10">
         <CuentasTesoreriaContent />
-      </div>
+      </div> */}
     </div>
   );
 } 
