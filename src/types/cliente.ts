@@ -15,4 +15,6 @@ export interface Cliente {
     | "Sujeto no Categorizado";
 }
 
-export interface CreateClienteData extends Omit<Cliente, "id"> {} 
+export interface CreateClienteData extends Omit<Cliente, "id"> {
+  // Add specific properties here if needed
+} 

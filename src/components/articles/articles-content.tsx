@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Package, Edit } from "lucide-react";
+import { Plus, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,15 +21,13 @@ export function ArticlesContent() {
   const { isSignedIn } = useUser();
   const {
     articles,
-    loading,
     error,
     addArticle,
     editArticle,
-    removeArticle,
   } = useArticles();
 
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [editingArticle, setEditingArticle] = React.useState<any | undefined>();
+  const [editingArticle, setEditingArticle] = React.useState<unknown | undefined>();
   const [isLoading, setIsLoading] = React.useState(false);
 
   const openCreateDialog = () => {
@@ -37,7 +35,7 @@ export function ArticlesContent() {
     setIsDialogOpen(true);
   };
 
-  const openEditDialog = (article: any) => {
+  const openEditDialog = (article: unknown) => {
     setEditingArticle(article);
     setIsDialogOpen(true);
   };

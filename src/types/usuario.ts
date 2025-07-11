@@ -8,4 +8,6 @@ export interface Usuario {
   creado_el: string; // timestamp ISO
 }
 
-export interface CreateUsuarioData extends Omit<Usuario, 'id' | 'creado_el'> {} 
+export interface CreateUsuarioData extends Omit<Usuario, 'id' | 'creado_el'> {
+  // Add specific properties here if needed
+} 

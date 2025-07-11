@@ -18,8 +18,9 @@ export function useAgrupadores() {
     try {
       const data = await getAgrupadores();
       setAgrupadores(data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error) {
+      console.error("Error al cargar agrupadores:", error);
+      setError((error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -35,8 +36,9 @@ export function useAgrupadores() {
     try {
       const newAgrupador = await createAgrupador(data);
       setAgrupadores((prev) => [newAgrupador, ...prev]);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error) {
+      console.error("Error al crear agrupador:", error);
+      setError((error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -50,8 +52,9 @@ export function useAgrupadores() {
       setAgrupadores((prev) =>
         prev.map((a) => (a.id === id ? { ...a, ...updated } : a))
       );
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error) {
+      console.error("Error al editar agrupador:", error);
+      setError((error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -63,8 +66,9 @@ export function useAgrupadores() {
     try {
       await deleteAgrupador(id);
       setAgrupadores((prev) => prev.filter((a) => a.id !== id));
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error) {
+      console.error("Error al eliminar agrupador:", error);
+      setError((error as Error).message);
     } finally {
       setLoading(false);
     }

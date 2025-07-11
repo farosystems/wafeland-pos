@@ -15,21 +15,20 @@ import { TipoComprobante } from "@/types/tipoComprobante";
 
 export function TiposComprobantesContent() {
   const [tipos, setTipos] = React.useState<TipoComprobante[]>([]);
-  const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<TipoComprobante | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
 
   const fetchTipos = async () => {
-    setLoading(true); setError(null);
+    setError(null);
     try {
       const data = await getTiposComprobantes();
       setTipos(data);
-    } catch (e: any) {
+    } catch (error) {
+      console.error("Error al cargar tipos de comprobante:", error);
       setError("Error al cargar tipos de comprobante");
     }
-    setLoading(false);
   };
 
   React.useEffect(() => { fetchTipos(); }, []);
@@ -59,7 +58,8 @@ export function TiposComprobantesContent() {
       }
       await fetchTipos();
       closeDialog();
-    } catch (e: any) {
+    } catch (error) {
+      console.error("Error al guardar tipo de comprobante:", error);
       setError("Error al guardar");
     }
     setIsLoading(false);
@@ -71,7 +71,8 @@ export function TiposComprobantesContent() {
     try {
       await deleteTipoComprobante(id);
       await fetchTipos();
-    } catch (e: any) {
+    } catch (error) {
+      console.error("Error al eliminar tipo de comprobante:", error);
       setError("Error al eliminar");
     }
     setIsLoading(false);

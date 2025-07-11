@@ -12,7 +12,9 @@ export interface LoteOperacion {
   saldo_inicial: number; // Saldo inicial de la caja
 }
 
-export interface CreateLoteOperacionData extends Omit<LoteOperacion, 'id_lote'> {}
+export interface CreateLoteOperacionData extends Omit<LoteOperacion, 'id_lote'> {
+  // Add specific properties here if needed
+}
 
 export interface DetalleLoteOperacion {
   idd: number;
@@ -22,4 +24,6 @@ export interface DetalleLoteOperacion {
   monto: number;
 }
 
-export interface CreateDetalleLoteOperacionData extends Omit<DetalleLoteOperacion, 'idd'> {} 
+export interface CreateDetalleLoteOperacionData extends Omit<DetalleLoteOperacion, 'idd'> {
+  // Add specific properties here if needed
+} 

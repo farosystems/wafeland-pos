@@ -7,7 +7,6 @@ import {
   IconSearch,
   IconSettings,
   IconCash,
-  IconUsers,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";

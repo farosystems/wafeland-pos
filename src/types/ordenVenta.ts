@@ -8,7 +8,9 @@ export interface OrdenVenta {
   total: number;
   subtotal: number;
 }
-export interface CreateOrdenVentaData extends Omit<OrdenVenta, 'id'> {}
+export interface CreateOrdenVentaData extends Omit<OrdenVenta, 'id'> {
+  // Add specific properties here if needed
+}
 
 export interface OrdenVentaDetalle {
   idd: number;
@@ -18,7 +20,9 @@ export interface OrdenVentaDetalle {
   precio_unitario: number;
   subtotal: number;
 }
-export interface CreateOrdenVentaDetalleData extends Omit<OrdenVentaDetalle, 'idd' | 'subtotal'> {}
+export interface CreateOrdenVentaDetalleData extends Omit<OrdenVentaDetalle, 'idd' | 'subtotal'> {
+  // Add specific properties here if needed
+}
 
 export interface OrdenVentaImpuestos {
   idd: number;
@@ -27,7 +31,9 @@ export interface OrdenVentaImpuestos {
   base_gravada: number;
   monto_iva: number;
 }
-export interface CreateOrdenVentaImpuestosData extends Omit<OrdenVentaImpuestos, 'idd'> {}
+export interface CreateOrdenVentaImpuestosData extends Omit<OrdenVentaImpuestos, 'idd'> {
+  // Add specific properties here if needed
+}
 
 export interface OrdenVentaMediosPago {
   idd: number;
@@ -35,4 +41,6 @@ export interface OrdenVentaMediosPago {
   fk_id_cuenta_tesoreria: number;
   monto_pagado: number;
 }
-export interface CreateOrdenVentaMediosPagoData extends Omit<OrdenVentaMediosPago, 'idd'> {} 
+export interface CreateOrdenVentaMediosPagoData extends Omit<OrdenVentaMediosPago, 'idd'> {
+  // Add specific properties here if needed
+} 

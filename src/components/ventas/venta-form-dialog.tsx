@@ -47,7 +47,7 @@ interface DetalleLinea {
 }
 
 export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFormDialogProps) {
-  const { user } = useUser();
+  // const { user } = useUser();
   // Datos para selects
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -107,7 +107,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   const total = detalle.reduce((acc, d) => acc + (d.cantidad && d.precio ? d.cantidad * d.precio : 0), 0);
 
   // Función para manejar cambios en el detalle
-  function handleDetalleChange(idx: number, field: string, value: any) {
+  function handleDetalleChange(idx: number, field: string, value: string | number) {
     setDetalle(detalle => {
       const nuevo = [...detalle];
       if (field === "articulo") {

@@ -69,7 +69,10 @@ export function ClientesContent() {
   useEffect(() => { fetchAll(); }, []);
   async function fetchAll() {
     setLoading(true); setError(null);
-    try { setClientes(await getClientes()); } catch (e: any) { setError(e.message); }
+    try { setClientes(await getClientes()); } catch (error) { 
+      console.error("Error al cargar clientes:", error);
+      setError((error as Error).message); 
+    }
     setLoading(false);
   }
   function openNew() {
@@ -113,15 +116,19 @@ export function ClientesContent() {
       }
       setIsDialogOpen(false);
       await fetchAll();
-    } catch (e: any) {
-      setFormError(e.message);
+    } catch (error) {
+      console.error("Error al guardar cliente:", error);
+      setFormError((error as Error).message);
     }
     setLoading(false);
   }
   async function handleDelete(id: number) {
     if (!window.confirm("¿Eliminar cliente?")) return;
     setLoading(true);
-    try { await deleteCliente(id); await fetchAll(); } catch (e: any) { setError(e.message); }
+    try { await deleteCliente(id); await fetchAll(); } catch (error) { 
+      console.error("Error al eliminar cliente:", error);
+      setError((error as Error).message); 
+    }
     setLoading(false);
   }
   return (

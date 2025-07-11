@@ -18,8 +18,9 @@ export function useArticles() {
     try {
       const data = await getArticles();
       setArticles(data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error) {
+      console.error("Error al cargar artículos:", error);
+      setError((error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -35,8 +36,9 @@ export function useArticles() {
     try {
       const newArticle = await createArticle(data);
       setArticles((prev) => [newArticle, ...prev]);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error) {
+      console.error("Error al crear artículo:", error);
+      setError((error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -50,8 +52,9 @@ export function useArticles() {
       setArticles((prev) =>
         prev.map((a) => (a.id === id ? { ...a, ...updated } : a))
       );
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error) {
+      console.error("Error al editar artículo:", error);
+      setError((error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -63,8 +66,9 @@ export function useArticles() {
     try {
       await deleteArticle(id);
       setArticles((prev) => prev.filter((a) => a.id !== id));
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error) {
+      console.error("Error al eliminar artículo:", error);
+      setError((error as Error).message);
     } finally {
       setLoading(false);
     }

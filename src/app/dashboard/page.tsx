@@ -1,13 +1,3 @@
-import { UserInfo } from "@/components/user-info";
-import { UserButton } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
-import { AppSidebar } from "@/components/app-sidebar";
-import { ArticlesTable } from "@/components/articles/articles-table";
-import { SiteHeader } from "@/components/site-header";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { ArticlesContent } from "@/components/articles/articles-content";
-
 export default function DashboardPage() {
   return (
     <div className="p-8">

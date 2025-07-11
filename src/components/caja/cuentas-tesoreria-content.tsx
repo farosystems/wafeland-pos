@@ -6,18 +6,17 @@ import { CuentaTesoreria } from "@/types/cuentaTesoreria";
 
 export function CuentasTesoreriaContent() {
   const [cuentas, setCuentas] = React.useState<CuentaTesoreria[]>([]);
-  const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   const fetchCuentas = async () => {
-    setLoading(true); setError(null);
+    setError(null);
     try {
       const data = await getCuentasTesoreria();
       setCuentas(data);
-    } catch (e: any) {
+    } catch (error) {
+      console.error("Error al cargar cuentas de tesorería:", error);
       setError("Error al cargar cuentas de tesorería");
     }
-    setLoading(false);
   };
 
   React.useEffect(() => { fetchCuentas(); }, []);

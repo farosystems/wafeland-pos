@@ -8,4 +8,6 @@ export interface TipoComprobante {
   creado_el: string;
 }
 
-export interface CreateTipoComprobanteData extends Omit<TipoComprobante, 'id' | 'creado_el'> {} 
+export interface CreateTipoComprobanteData extends Omit<TipoComprobante, 'id' | 'creado_el'> {
+  // Add specific properties here if needed
+} 

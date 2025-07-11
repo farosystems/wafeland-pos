@@ -27,7 +27,7 @@ const articleSchema = z.object({
   stock: z.union([z.string(), z.number()]).transform(Number).refine(val => !isNaN(val) && val >= 0, { message: "El stock debe ser mayor o igual a 0" }),
 });
 
-type ArticleFormValues = z.infer<typeof articleSchema>;
+// type ArticleFormValues = z.infer<typeof articleSchema>;
 
 interface ArticleFormProps {
   article?: Article;
@@ -50,7 +50,7 @@ export function ArticleForm({ article, onSubmit, onCancel, isLoading = false }: 
     },
   });
 
-  const handleSubmit = (values: any) => {
+  const handleSubmit = (values: Record<string, unknown>) => {
     onSubmit({
       ...values,
       precio_unitario: Number(values.precio_unitario),

@@ -38,7 +38,10 @@ export function UsuariosContent() {
   useEffect(() => { fetchAll(); }, []);
   async function fetchAll() {
     setLoading(true); setError(null);
-    try { setUsuarios(await getUsuarios()); } catch (e: any) { setError(e.message); }
+    try { setUsuarios(await getUsuarios()); } catch (error) { 
+      console.error("Error al cargar usuarios:", error);
+      setError((error as Error).message); 
+    }
     setLoading(false);
   }
   function openNew() {
@@ -81,15 +84,19 @@ export function UsuariosContent() {
       }
       setIsDialogOpen(false);
       await fetchAll();
-    } catch (e: any) {
-      setFormError(e.message);
+    } catch (error) {
+      console.error("Error al guardar usuario:", error);
+      setFormError((error as Error).message);
     }
     setLoading(false);
   }
   async function handleDelete(id: number) {
     if (!window.confirm("¿Eliminar usuario?")) return;
     setLoading(true);
-    try { await deleteUsuario(id); await fetchAll(); } catch (e: any) { setError(e.message); }
+    try { await deleteUsuario(id); await fetchAll(); } catch (error) { 
+      console.error("Error al eliminar usuario:", error);
+      setError((error as Error).message); 
+    }
     setLoading(false);
   }
   return (

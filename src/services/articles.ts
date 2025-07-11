@@ -8,9 +8,9 @@ export async function getArticles() {
     .order("id", { ascending: false });
   if (error) throw error;
   // Mapear agrupador_nombre
-  const mapped = (data as any[]).map(a => ({
-    ...a,
-    agrupador_nombre: a.agrupadores?.nombre || '',
+  const mapped = (data as unknown[]).map(a => ({
+    ...(a as Record<string, unknown>),
+    agrupador_nombre: (a as { agrupadores?: { nombre: string } }).agrupadores?.nombre || '',
   }));
   return mapped as Article[];
 }

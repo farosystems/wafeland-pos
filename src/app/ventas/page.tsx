@@ -18,19 +18,18 @@ import { getTiposComprobantes } from "@/services/tiposComprobantes";
 
 export default function VentasPage() {
   const [ventas, setVentas] = useState<OrdenVenta[]>([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
-  const [detalleVenta, setDetalleVenta] = useState<any[]>([]);
-  const [mediosPagoVenta, setMediosPagoVenta] = useState<any[]>([]);
-  const [impuestosVenta, setImpuestosVenta] = useState<any[]>([]);
+  const [detalleVenta, setDetalleVenta] = useState<unknown[]>([]);
+  const [mediosPagoVenta, setMediosPagoVenta] = useState<unknown[]>([]);
+  const [impuestosVenta, setImpuestosVenta] = useState<unknown[]>([]);
   const [ventaSeleccionada, setVentaSeleccionada] = useState<OrdenVenta | null>(null);
   const [openDetalle, setOpenDetalle] = useState(false);
-  const [clientes, setClientes] = useState<any[]>([]);
-  const [usuarios, setUsuarios] = useState<any[]>([]);
-  const [articulos, setArticulos] = useState<any[]>([]);
-  const [cuentas, setCuentas] = useState<any[]>([]);
-  const [tiposComprobantes, setTiposComprobantes] = useState<any[]>([]);
+  const [clientes, setClientes] = useState<unknown[]>([]);
+  const [usuarios, setUsuarios] = useState<unknown[]>([]);
+  const [articulos, setArticulos] = useState<unknown[]>([]);
+  const [cuentas, setCuentas] = useState<unknown[]>([]);
+  const [tiposComprobantes, setTiposComprobantes] = useState<unknown[]>([]);
 
   useEffect(() => {
     fetchVentas();
@@ -42,14 +41,14 @@ export default function VentasPage() {
   }, []);
 
   async function fetchVentas() {
-    setLoading(true); setError(null);
+    setError(null);
     try {
       const data = await getOrdenesVenta();
       setVentas(data);
-    } catch (e: any) {
+    } catch (error) {
+      console.error("Error al cargar ventas:", error);
       setError("Error al cargar ventas");
     }
-    setLoading(false);
   }
 
   async function handleVerVenta(venta: OrdenVenta) {
@@ -114,9 +113,9 @@ export default function VentasPage() {
             <DialogTitle>Detalle de la venta N° {ventaSeleccionada?.id}</DialogTitle>
             <DialogDescription>
               Fecha: {ventaSeleccionada?.fecha?.slice(0, 10)}<br />
-              Cliente: {clientes.find(c => c.id === ventaSeleccionada?.fk_id_entidades)?.razon_social || ventaSeleccionada?.fk_id_entidades}<br />
-              Usuario: {usuarios.find(u => u.id === ventaSeleccionada?.fk_id_usuario)?.nombre || ventaSeleccionada?.fk_id_usuario}<br />
-              Tipo de comprobante: {tiposComprobantes.find(tc => tc.id === ventaSeleccionada?.fk_id_tipo_comprobante)?.descripcion || ventaSeleccionada?.fk_id_tipo_comprobante}<br />
+              Cliente: {(clientes.find(c => (c as any).id === ventaSeleccionada?.fk_id_entidades) as any)?.razon_social || ventaSeleccionada?.fk_id_entidades}<br />
+              Usuario: {(usuarios.find(u => (u as any).id === ventaSeleccionada?.fk_id_usuario) as any)?.nombre || ventaSeleccionada?.fk_id_usuario}<br />
+              Tipo de comprobante: {(tiposComprobantes.find(tc => (tc as any).id === ventaSeleccionada?.fk_id_tipo_comprobante) as any)?.descripcion || ventaSeleccionada?.fk_id_tipo_comprobante}<br />
               Total: ${ventaSeleccionada?.total?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </DialogDescription>
           </DialogHeader>

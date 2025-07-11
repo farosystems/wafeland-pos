@@ -17,15 +17,13 @@ import { useAgrupadores } from "@/hooks/use-agrupadores";
 export function AgrupadoresContent() {
   const {
     agrupadores,
-    loading,
     error,
     addAgrupador,
     editAgrupador,
-    removeAgrupador,
   } = useAgrupadores();
 
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [editingAgrupador, setEditingAgrupador] = React.useState<any | undefined>();
+  const [editingAgrupador, setEditingAgrupador] = React.useState<unknown | undefined>();
   const [isLoading, setIsLoading] = React.useState(false);
 
   const openCreateDialog = () => {
@@ -33,7 +31,7 @@ export function AgrupadoresContent() {
     setIsDialogOpen(true);
   };
 
-  const openEditDialog = (agrupador: any) => {
+  const openEditDialog = (agrupador: unknown) => {
     setEditingAgrupador(agrupador);
     setIsDialogOpen(true);
   };

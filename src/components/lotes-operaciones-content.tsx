@@ -8,7 +8,6 @@ import { Caja } from "@/types/caja";
 export function LotesOperacionesContent({ onImprimirCierre }: { onImprimirCierre?: (id_lote: number) => void }) {
   const [lotes, setLotes] = useState<LoteOperacion[]>([]);
   const [cajas, setCajas] = useState<Caja[]>([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filtroLote, setFiltroLote] = useState("");
   const [filtroCaja, setFiltroCaja] = useState("");
@@ -18,22 +17,22 @@ export function LotesOperacionesContent({ onImprimirCierre }: { onImprimirCierre
     fetchLotes();
     getCajas().then(setCajas);
     // Escuchar evento de impresión
-    const handler = (e: any) => {
-      if (onImprimirCierre && e.detail?.id_lote) onImprimirCierre(e.detail.id_lote);
+    const handler = (e: unknown) => {
+      if (onImprimirCierre && (e as CustomEvent).detail?.id_lote) onImprimirCierre((e as CustomEvent).detail.id_lote);
     };
     window.addEventListener('imprimir-cierre-caja', handler);
     return () => window.removeEventListener('imprimir-cierre-caja', handler);
   }, []);
 
   async function fetchLotes() {
-    setLoading(true); setError(null);
+    setError(null);
     try {
       const data = await getLotesOperaciones();
       setLotes(data);
-    } catch (e: any) {
+    } catch (error) {
+      console.error("Error al cargar lotes de operaciones:", error);
       setError("Error al cargar lotes de operaciones");
     }
-    setLoading(false);
   }
 
   function getCajaNombreTurno(id: number) {
