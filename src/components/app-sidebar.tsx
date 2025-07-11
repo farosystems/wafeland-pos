@@ -6,10 +6,13 @@ import {
   IconCalendar,
   IconSearch,
   IconSettings,
+  IconCash,
+  IconUsers,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { useUser } from "@clerk/nextjs";
+import { User } from "lucide-react";
 
 const sidebarItems = [
   {
@@ -28,6 +31,11 @@ const sidebarItems = [
     icon: IconCalendar,
   },
   {
+    label: "Usuarios",
+    href: "/usuarios",
+    icon: User,
+  },
+  {
     label: "Ventas",
     href: "/ventas",
     icon: IconSearch,
@@ -36,6 +44,11 @@ const sidebarItems = [
     label: "Informes",
     href: "/informes",
     icon: IconSettings,
+  },
+  {
+    label: "Caja",
+    href: "/caja",
+    icon: IconCash,
   },
 ];
 
