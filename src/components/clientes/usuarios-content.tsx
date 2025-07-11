@@ -58,13 +58,7 @@ export function UsuariosContent() {
   }
   function openEdit(usuario: Usuario) {
     setEditing(usuario);
-    setForm({
-      nombre: usuario.nombre,
-      email: usuario.email,
-      telefono: usuario.telefono,
-      password_hash: usuario.password_hash,
-      rol: usuario.rol,
-    });
+    setForm({ ...usuario });
     setFormError(null);
     setIsDialogOpen(true);
   }
@@ -78,9 +72,23 @@ export function UsuariosContent() {
     setLoading(true);
     try {
       if (editing) {
-        await updateUsuario(editing.id, form);
+        const updateData: Partial<CreateUsuarioData> = {};
+        if (typeof form.nombre === 'string') updateData.nombre = form.nombre;
+        if (typeof form.email === 'string') updateData.email = form.email;
+        if (typeof form.telefono === 'string') updateData.telefono = form.telefono;
+        if (typeof form.password_hash === 'string') updateData.password_hash = form.password_hash;
+        if (typeof form.rol === 'string') updateData.rol = form.rol;
+        await updateUsuario(editing.id, updateData);
       } else {
-        await createUsuario(form);
+        const allowedRoles = ["vendedor", "cobrador", "supervisor"] as const;
+        const createData: CreateUsuarioData = {
+          nombre: String(form.nombre),
+          email: String(form.email),
+          telefono: String(form.telefono),
+          password_hash: String(form.password_hash),
+          rol: allowedRoles.includes(form.rol as any) ? form.rol as typeof allowedRoles[number] : "vendedor",
+        };
+        await createUsuario(createData);
       }
       setIsDialogOpen(false);
       await fetchAll();

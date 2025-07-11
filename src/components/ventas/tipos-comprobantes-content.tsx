@@ -42,8 +42,6 @@ export function TiposComprobantesContent() {
     setIsLoading(true);
     const form = e.currentTarget;
     const formData = new FormData(form);
-    const nombre = formData.get("nombre") as string;
-    const codigo = formData.get("codigo") as string;
     const descripcion = formData.get("descripcion") as string;
     const descuenta_stock = formData.get("descuenta_stock") === "on";
     const admite_impuestos = formData.get("admite_impuestos") === "on";
@@ -52,9 +50,22 @@ export function TiposComprobantesContent() {
 
     try {
       if (editing) {
-        await updateTipoComprobante(editing.id, { nombre, codigo, descripcion, descuenta_stock, admite_impuestos, imprime_pdf, activo });
+        const updateData: Partial<TipoComprobante> = {};
+        if (typeof descripcion === 'string') updateData.descripcion = descripcion;
+        updateData.descuenta_stock = descuenta_stock;
+        updateData.admite_impuestos = admite_impuestos;
+        updateData.imprime_pdf = imprime_pdf;
+        updateData.activo = activo;
+        await updateTipoComprobante(editing.id, updateData);
       } else {
-        await createTipoComprobante({ nombre, codigo, descripcion, descuenta_stock, admite_impuestos, imprime_pdf, activo });
+        const createData = {
+          descripcion: String(descripcion),
+          descuenta_stock: descuenta_stock,
+          admite_impuestos: admite_impuestos,
+          imprime_pdf: imprime_pdf,
+          activo: activo,
+        };
+        await createTipoComprobante(createData);
       }
       await fetchTipos();
       closeDialog();
@@ -100,8 +111,6 @@ export function TiposComprobantesContent() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-              <input name="nombre" defaultValue={editing?.nombre || ""} placeholder="Nombre" className="border rounded px-2 py-1" required />
-              <input name="codigo" defaultValue={editing?.codigo || ""} placeholder="Código" className="border rounded px-2 py-1" required />
               <input name="descripcion" defaultValue={editing?.descripcion || ""} placeholder="Descripción" className="border rounded px-2 py-1" required />
               <label className="flex items-center gap-2">
                 <input type="checkbox" name="descuenta_stock" defaultChecked={!!editing?.descuenta_stock} />

@@ -124,7 +124,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
       } else if (field === "precio") {
         nuevo[idx].precio = Math.max(0, Number(value));
       } else if (field === "input") {
-        nuevo[idx].input = value;
+        nuevo[idx].input = String(value);
         setShowSugerencias(idx); // Abrir sugerencias al escribir
       }
       nuevo[idx].subtotal = nuevo[idx].cantidad * nuevo[idx].precio;

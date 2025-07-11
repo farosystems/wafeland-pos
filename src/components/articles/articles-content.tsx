@@ -16,6 +16,7 @@ import { ArticleForm } from "@/components/articles/article-form";
 import { useArticles } from "@/hooks/use-articles";
 import { useUser } from "@clerk/nextjs";
 import { AgrupadoresContent } from "@/components/agrupadores/agrupadores-content";
+import { Article, CreateArticleData, UpdateArticleData } from "@/types/article";
 
 export function ArticlesContent() {
   const { isSignedIn } = useUser();
@@ -27,7 +28,7 @@ export function ArticlesContent() {
   } = useArticles();
 
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [editingArticle, setEditingArticle] = React.useState<unknown | undefined>();
+  const [editingArticle, setEditingArticle] = React.useState<Article | undefined>();
   const [isLoading, setIsLoading] = React.useState(false);
 
   const openCreateDialog = () => {
@@ -35,7 +36,7 @@ export function ArticlesContent() {
     setIsDialogOpen(true);
   };
 
-  const openEditDialog = (article: unknown) => {
+  const openEditDialog = (article: Article) => {
     setEditingArticle(article);
     setIsDialogOpen(true);
   };
@@ -85,12 +86,28 @@ export function ArticlesContent() {
             </DialogHeader>
             <ArticleForm
               article={editingArticle}
-              onSubmit={async (data) => {
+              onSubmit={async (data: CreateArticleData | UpdateArticleData) => {
                 setIsLoading(true);
                 if (editingArticle) {
-                  await editArticle(editingArticle.id, data as any);
+                  // Solo pasa los campos requeridos si existen
+                  const updateData: UpdateArticleData = {};
+                  if (typeof data.descripcion === 'string') updateData.descripcion = data.descripcion;
+                  if (typeof data.precio_unitario === 'number') updateData.precio_unitario = data.precio_unitario;
+                  if (typeof data.fk_id_agrupador === 'number') updateData.fk_id_agrupador = data.fk_id_agrupador;
+                  if (typeof data.activo === 'boolean') updateData.activo = data.activo;
+                  if (typeof data.porcentaje_iva === 'number') updateData.porcentaje_iva = data.porcentaje_iva;
+                  if (typeof data.stock === 'number') updateData.stock = data.stock;
+                  await editArticle(editingArticle.id, updateData);
                 } else {
-                  await addArticle(data as any);
+                  // Forzar que los campos requeridos sean del tipo correcto
+                  await addArticle({
+                    descripcion: String((data as CreateArticleData).descripcion),
+                    precio_unitario: Number((data as CreateArticleData).precio_unitario),
+                    fk_id_agrupador: Number((data as CreateArticleData).fk_id_agrupador),
+                    activo: Boolean((data as CreateArticleData).activo),
+                    porcentaje_iva: Number((data as CreateArticleData).porcentaje_iva),
+                    stock: Number((data as CreateArticleData).stock),
+                  });
                 }
                 setIsLoading(false);
                 closeDialog();
