@@ -26,7 +26,6 @@ import { TipoComprobante } from "@/types/tipoComprobante";
 import { CuentaTesoreria } from "@/types/cuentaTesoreria";
 import { Article } from "@/types/article";
 import { cn } from "@/lib/utils";
-import { useUser } from "@clerk/nextjs";
 import { format } from "date-fns";
 import { updateArticle } from "@/services/articles";
 

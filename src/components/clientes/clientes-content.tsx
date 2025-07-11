@@ -44,8 +44,8 @@ function validarCuit(cuit: string) {
   const mult = [5,4,3,2,7,6,5,4,3,2];
   let suma = 0;
   for (let i = 0; i < 10; i++) suma += parseInt(cuit[i]) * mult[i];
-  let resto = suma % 11;
-  let digito = resto === 0 ? 0 : resto === 1 ? 9 : 11 - resto;
+  const resto = suma % 11;
+  const digito = resto === 0 ? 0 : resto === 1 ? 9 : 11 - resto;
   return digito === parseInt(cuit[10]);
 }
 

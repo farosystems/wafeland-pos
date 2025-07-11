@@ -8,7 +8,6 @@ import { createDetalleLoteOperacion } from "@/services/detalleLotesOperaciones";
 import { LotesOperacionesContent } from "@/components/lotes-operaciones-content";
 import { getLoteCajaAbiertaPorUsuario, cerrarLoteApertura } from "@/services/lotesOperaciones";
 import { getDetalleLotesOperaciones } from "@/services/detalleLotesOperaciones";
-import { DetalleLoteOperacion } from "@/types/loteOperacion";
 import {
   Dialog,
   DialogContent,
@@ -110,7 +109,7 @@ export default function CajaPage() {
     try {
       const data = await getCajas();
       setCajas(data);
-    } catch (err: any) {
+    } catch {
       // setCrudError("Error al cargar cajas");
     } finally {
       // setLoading(false);
@@ -172,9 +171,9 @@ export default function CajaPage() {
         monto: parseFloat(saldoInicial),
       });
       setRefreshLotes(x => x + 1);
-    } catch (err) {
+    } catch {
       // Silenciar error para no romper UI simulada
-      console.error("Error al crear lote:", err);
+      console.error("Error al crear lote:");
     }
     await fetchCajaAbierta();
   };
