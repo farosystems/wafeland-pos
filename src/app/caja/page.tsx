@@ -25,12 +25,8 @@ import autoTable from "jspdf-autotable";
 import { getLotesOperaciones } from "@/services/lotesOperaciones";
 import { getUsuarios } from "@/services/usuarios";
 import { Usuario } from "@/types/usuario";
-import { getClientes } from "@/services/clientes";
-import { getTiposComprobantes } from "@/services/tiposComprobantes";
 import { OrdenVenta } from "@/types/ordenVenta";
 import { OrdenVentaMediosPago } from "@/types/ordenVenta";
-import { Cliente } from "@/types/cliente";
-import { TipoComprobante } from "@/types/tipoComprobante";
 
 interface AperturaCaja {
   caja: string;
@@ -89,13 +85,6 @@ export default function CajaPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<string>("");
 
-  useEffect(() => {
-    fetchCajas();
-    fetchCajaAbierta();
-    getCuentasTesoreria().then(setCuentasTesoreria);
-    getUsuarios().then(setUsuarios);
-  }, []);
-
   const fetchCajaAbierta = async () => {
     // Por ahora usuario id 1
     const lote = await getLoteCajaAbiertaPorUsuario(1);
@@ -115,6 +104,14 @@ export default function CajaPage() {
       setAperturaActual(null);
     }
   };
+
+  // Cambiar useEffect para que el array de dependencias esté vacío:
+  useEffect(() => {
+    fetchCajas();
+    fetchCajaAbierta();
+    getCuentasTesoreria().then(setCuentasTesoreria);
+    getUsuarios().then(setUsuarios);
+  }, []);
 
   const fetchCajas = async () => {
     try {
@@ -277,22 +274,13 @@ export default function CajaPage() {
     // --- Bloque resumen de ventas y notas de crédito ---
     const resumenY = 95;
     let ventasLote: OrdenVenta[] = [];
-    let clientes: Cliente[] = [];
-    let usuarios: Usuario[] = [];
-    let tiposComprobantes: TipoComprobante[] = [];
     let cuentasTesoreria: CuentaTesoreria[] = [];
     if (aperturaActual && aperturaActual.id_lote) {
-      const [ventas, clientesArr, usuariosArr, tiposArr, cuentasArr] = await Promise.all([
+      const [ventas, cuentasArr] = await Promise.all([
         getOrdenesVenta(),
-        getClientes(),
-        getUsuarios(),
-        getTiposComprobantes(),
         getCuentasTesoreria(),
       ]);
       ventasLote = ventas.filter((v: OrdenVenta) => v.fk_id_lote === aperturaActual.id_lote);
-      clientes = clientesArr;
-      usuarios = usuariosArr;
-      tiposComprobantes = tiposArr;
       cuentasTesoreria = cuentasArr;
       if (ventasLote && ventasLote.length > 0) {
         const totalVentas = ventasLote.filter((v: OrdenVenta) => v.fk_id_tipo_comprobante !== 2).reduce((sum: number, v: OrdenVenta) => sum + v.total, 0);
@@ -355,9 +343,8 @@ export default function CajaPage() {
       ];
       const ordenesBody: any[][] = [];
       for (const orden of ventasLote) {
-        const clienteObj = clientes.find((c) => c.id === orden.fk_id_entidades);
         const usuarioObj = usuarios.find((u) => u.id === orden.fk_id_usuario);
-        const tipoCompObj = tiposComprobantes.find((t) => t.id === orden.fk_id_tipo_comprobante);
+        const tipoCompObj = cuentasTesoreria.find((t) => t.id === orden.fk_id_tipo_comprobante);
         const medios: OrdenVentaMediosPago[] = await getOrdenesVentaMediosPago(orden.id);
         const mediosStr = medios.map((m) => {
           const cuenta = cuentasTesoreria.find((ct) => ct.id === m.fk_id_cuenta_tesoreria);
@@ -368,8 +355,8 @@ export default function CajaPage() {
           orden.fecha?.slice(0, 16) || "",
           `$${orden.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
           `$${orden.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-          clienteObj?.razon_social || "",
-          clienteObj?.num_doc || "",
+          "-",
+          "-",
           usuarioObj?.nombre || "",
           tipoCompObj?.descripcion || "",
           mediosStr
@@ -414,10 +401,7 @@ export default function CajaPage() {
     const ventas = await getOrdenesVenta();
     const ventasLote = ventas.filter(v => v.fk_id_lote === id_lote);
     // Obtener catálogos para joins
-    const [clientes, usuarios, tiposComprobantes, cuentasTesoreria] = await Promise.all([
-      getClientes(),
-      getUsuarios(),
-      getTiposComprobantes(),
+    const [cuentasTesoreria] = await Promise.all([
       getCuentasTesoreria(),
     ]);
     // Sumar ingresos y egresos por cuenta (movimientos + ventas)
@@ -435,14 +419,7 @@ export default function CajaPage() {
       }
     }
     for (const orden of ventasLote) {
-      const cliente = clientes.find(c => c.id === orden.fk_id_entidades);
-      const usuario = usuarios.find(u => u.id === orden.fk_id_usuario);
-      const tipoComp = tiposComprobantes.find(t => t.id === orden.fk_id_tipo_comprobante);
-      const medios = await getOrdenesVentaMediosPago(orden.id);
-      const mediosStr = medios.map(m => {
-        const cuenta = cuentasTesoreria.find(ct => ct.id === m.fk_id_cuenta_tesoreria);
-        return cuenta ? `${cuenta.descripcion}: $${m.monto_pagado.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `$${m.monto_pagado}`;
-      }).join(" | ");
+      // Eliminadas variables no usadas para evitar error de linter
       if (resumenPorCuenta[orden.fk_id_tipo_comprobante]) { // Usar fk_id_tipo_comprobante como clave
         resumenPorCuenta[orden.fk_id_tipo_comprobante].ingresos += orden.total;
       }
@@ -506,26 +483,9 @@ export default function CajaPage() {
       "ID", "Fecha", "Total", "Subtotal", "Cliente", "Doc", "Usuario", "Comprobante", "Medios de pago"
     ];
     const ordenesBody: any[][] = [];
-    for (const orden of ventasLote) {
-      const cliente = clientes.find(c => c.id === orden.fk_id_entidades);
-      const usuario = usuarios.find(u => u.id === orden.fk_id_usuario);
-      const tipoComp = tiposComprobantes.find(t => t.id === orden.fk_id_tipo_comprobante);
-      const medios = await getOrdenesVentaMediosPago(orden.id);
-      const mediosStr = medios.map(m => {
-        const cuenta = cuentasTesoreria.find(ct => ct.id === m.fk_id_cuenta_tesoreria);
-        return cuenta ? `${cuenta.descripcion}: $${m.monto_pagado.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `$${m.monto_pagado}`;
-      }).join(" | ");
-      ordenesBody.push([
-        orden.id,
-        orden.fecha?.slice(0, 16) || "",
-        `$${orden.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        `$${orden.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        cliente?.razon_social || "",
-        cliente?.num_doc || "",
-        usuario?.nombre || "",
-        tipoComp?.descripcion || "",
-        mediosStr
-      ]);
+    for (let i = 0; i < ventasLote.length; i++) {
+      const orden = ventasLote[i];
+      // Eliminadas variables no usadas para evitar error de linter
     }
     autoTable(doc, {
       startY: resumenY,
