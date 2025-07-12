@@ -6,7 +6,7 @@ export interface LoteOperacion {
   tipo_lote: 'apertura' | 'cierre';
   fecha_apertura: string; // ISO
   hora_apertura: string | null;
-  fecha_cierre: string; // ISO
+  fecha_cierre: string | null; // ISO o null
   hora_cierre: string | null;
   observaciones: string | null;
   saldo_inicial: number; // Saldo inicial de la caja

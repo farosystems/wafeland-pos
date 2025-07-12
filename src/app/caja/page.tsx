@@ -23,6 +23,14 @@ import { CuentaTesoreria } from "@/types/cuentaTesoreria";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { getLotesOperaciones } from "@/services/lotesOperaciones";
+import { getUsuarios } from "@/services/usuarios";
+import { Usuario } from "@/types/usuario";
+import { getClientes } from "@/services/clientes";
+import { getTiposComprobantes } from "@/services/tiposComprobantes";
+import { OrdenVenta } from "@/types/ordenVenta";
+import { OrdenVentaMediosPago } from "@/types/ordenVenta";
+import { Cliente } from "@/types/cliente";
+import { TipoComprobante } from "@/types/tipoComprobante";
 
 interface AperturaCaja {
   caja: string;
@@ -78,11 +86,14 @@ export default function CajaPage() {
   const [loadingCierre, setLoadingCierre] = useState(false);
   const [cuentasTesoreria, setCuentasTesoreria] = useState<CuentaTesoreria[]>([]);
   const [toast, setToast] = useState<{ show: boolean, message: string }>({ show: false, message: "" });
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<string>("");
 
   useEffect(() => {
     fetchCajas();
     fetchCajaAbierta();
     getCuentasTesoreria().then(setCuentasTesoreria);
+    getUsuarios().then(setUsuarios);
   }, []);
 
   const fetchCajaAbierta = async () => {
@@ -120,8 +131,8 @@ export default function CajaPage() {
   const handleAbrirCaja = async (e: React.FormEvent) => {
     e.preventDefault();
     setAperturaError(null);
-    if (!cajaSeleccionada || !saldoInicial) {
-      setAperturaError("Selecciona una caja y saldo inicial");
+    if (!cajaSeleccionada || !saldoInicial || !usuarioSeleccionado) {
+      setAperturaError("Selecciona una caja, usuario y saldo inicial");
       return;
     }
     if (cajaAbierta) {
@@ -142,6 +153,7 @@ export default function CajaPage() {
     });
     setCajaSeleccionada("");
     setSaldoInicial("");
+    setUsuarioSeleccionado("");
     setObservacionesApertura("");
     showToast("Caja abierta correctamente");
 
@@ -152,13 +164,13 @@ export default function CajaPage() {
       if (!cajaObj) return;
       // Crear lote de apertura
       const lote = await createLoteOperacion({
-        fk_id_usuario: 1, // usuario prueba
+        fk_id_usuario: parseInt(usuarioSeleccionado, 10),
         fk_id_caja: cajaObj.id,
         abierto: true,
         tipo_lote: "apertura",
         fecha_apertura: hoy,
         hora_apertura: format(now, "HH:mm"),
-        fecha_cierre: hoy, // se actualiza al cerrar
+        fecha_cierre: null, // <-- Debe ser null al abrir
         hora_cierre: null,
         observaciones: observacionesApertura || null,
         saldo_inicial: parseFloat(saldoInicial), // Agregar saldo inicial
@@ -195,13 +207,18 @@ export default function CajaPage() {
       const medios = await getOrdenesVentaMediosPago(venta.id);
       for (const m of medios) {
         if (pagosPorCuenta[m.fk_id_cuenta_tesoreria] === undefined) pagosPorCuenta[m.fk_id_cuenta_tesoreria] = 0;
-        pagosPorCuenta[m.fk_id_cuenta_tesoreria] += m.monto_pagado;
+        if (venta.fk_id_tipo_comprobante === 2) {
+          // Nota de crédito: restar el monto (devolución)
+          pagosPorCuenta[m.fk_id_cuenta_tesoreria] -= m.monto_pagado;
+        } else {
+          pagosPorCuenta[m.fk_id_cuenta_tesoreria] += m.monto_pagado;
+        }
       }
     }
     // Sumar ingresos y egresos por cuenta (movimientos + ventas)
     const resumenPorCuenta: Record<number, { cuenta: string, ingresos: number, egresos: number }> = {};
     for (const cuenta of cuentasTesoreria) {
-      resumenPorCuenta[cuenta.id] = { cuenta: cuenta.descripcion, ingresos: pagosPorCuenta[cuenta.id] || 0, egresos: 0 };
+      resumenPorCuenta[cuenta.id] = { cuenta: cuenta.descripcion, ingresos: Math.max(0, pagosPorCuenta[cuenta.id] || 0), egresos: 0 };
     }
     for (const mov of movimientos) {
       if (resumenPorCuenta[mov.fk_id_cuenta_tesoreria]) {
@@ -245,14 +262,10 @@ export default function CajaPage() {
     showToast("Cierre de caja confirmado");
   }
 
-  function generarPDFCierreCaja() {
+  async function generarPDFCierreCaja() {
     const doc = new jsPDF();
-    
-    // Título
     doc.setFontSize(20);
     doc.text("CIERRE DE CAJA", 105, 20, { align: "center" });
-    
-    // Información de la caja
     doc.setFontSize(12);
     doc.text(`Caja: ${aperturaActual?.caja || "N/A"}`, 20, 35);
     doc.text(`Saldo inicial: $${parseFloat(aperturaActual?.saldoInicial || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, 45);
@@ -260,7 +273,37 @@ export default function CajaPage() {
     doc.text(`Hora de apertura: ${aperturaActual?.horaApertura || "N/A"}`, 20, 65);
     doc.text(`Fecha de cierre: ${format(new Date(), "yyyy-MM-dd")}`, 20, 75);
     doc.text(`Hora de cierre: ${format(new Date(), "HH:mm")}`, 20, 85);
-    
+
+    // --- Bloque resumen de ventas y notas de crédito ---
+    const resumenY = 95;
+    let ventasLote: OrdenVenta[] = [];
+    let clientes: Cliente[] = [];
+    let usuarios: Usuario[] = [];
+    let tiposComprobantes: TipoComprobante[] = [];
+    let cuentasTesoreria: CuentaTesoreria[] = [];
+    if (aperturaActual && aperturaActual.id_lote) {
+      const [ventas, clientesArr, usuariosArr, tiposArr, cuentasArr] = await Promise.all([
+        getOrdenesVenta(),
+        getClientes(),
+        getUsuarios(),
+        getTiposComprobantes(),
+        getCuentasTesoreria(),
+      ]);
+      ventasLote = ventas.filter((v: OrdenVenta) => v.fk_id_lote === aperturaActual.id_lote);
+      clientes = clientesArr;
+      usuarios = usuariosArr;
+      tiposComprobantes = tiposArr;
+      cuentasTesoreria = cuentasArr;
+      if (ventasLote && ventasLote.length > 0) {
+        const totalVentas = ventasLote.filter((v: OrdenVenta) => v.fk_id_tipo_comprobante !== 2).reduce((sum: number, v: OrdenVenta) => sum + v.total, 0);
+        const totalNotasCredito = ventasLote.filter((v: OrdenVenta) => v.fk_id_tipo_comprobante === 2).reduce((sum: number, v: OrdenVenta) => sum + Math.abs(v.total), 0);
+        const ingresoNeto = totalVentas - totalNotasCredito;
+        doc.setFontSize(12);
+        doc.text(`Total ventas: $${totalVentas.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, resumenY);
+        doc.text(`Total notas de crédito: $${totalNotasCredito.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, resumenY + 8);
+        doc.text(`Ingreso neto: $${ingresoNeto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, resumenY + 16);
+      }
+    }
     // Tabla de resumen
     const tableData = resumen.map(r => [
       r.cuenta,
@@ -269,7 +312,7 @@ export default function CajaPage() {
     ]);
     
     autoTable(doc, {
-      startY: 100, // Ajustar posición inicial de la tabla
+      startY: 120, // Ajustar posición inicial de la tabla
       head: [["Cuenta Tesorería", "Total Ingresos", "Total Egresos"]],
       body: tableData,
       theme: "grid",
@@ -301,6 +344,52 @@ export default function CajaPage() {
     doc.text(`Total Egresos: $${totalEgresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY + 20);
     doc.text(`Saldo Final: $${saldoFinal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY + 30);
     
+    // --- Tabla de órdenes de venta del lote ---
+    if (ventasLote && ventasLote.length > 0) {
+      const resumenY2 = finalY + 40;
+      doc.setFontSize(14);
+      doc.text("Órdenes de venta del lote", 20, resumenY2);
+      doc.setFontSize(10);
+      const ordenesHead = [
+        "ID", "Fecha", "Total", "Subtotal", "Cliente", "Doc", "Usuario", "Comprobante", "Medios de pago"
+      ];
+      const ordenesBody: any[][] = [];
+      for (const orden of ventasLote) {
+        const clienteObj = clientes.find((c) => c.id === orden.fk_id_entidades);
+        const usuarioObj = usuarios.find((u) => u.id === orden.fk_id_usuario);
+        const tipoCompObj = tiposComprobantes.find((t) => t.id === orden.fk_id_tipo_comprobante);
+        const medios: OrdenVentaMediosPago[] = await getOrdenesVentaMediosPago(orden.id);
+        const mediosStr = medios.map((m) => {
+          const cuenta = cuentasTesoreria.find((ct) => ct.id === m.fk_id_cuenta_tesoreria);
+          return cuenta ? `${cuenta.descripcion}: $${m.monto_pagado.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `$${m.monto_pagado}`;
+        }).join(" | ");
+        ordenesBody.push([
+          orden.id,
+          orden.fecha?.slice(0, 16) || "",
+          `$${orden.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          `$${orden.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          clienteObj?.razon_social || "",
+          clienteObj?.num_doc || "",
+          usuarioObj?.nombre || "",
+          tipoCompObj?.descripcion || "",
+          mediosStr
+        ]);
+      }
+      autoTable(doc, {
+        startY: resumenY2,
+        head: [ordenesHead],
+        body: ordenesBody,
+        theme: "grid",
+        headStyles: {
+          fillColor: [66, 139, 202],
+          textColor: 255,
+          fontStyle: "bold"
+        },
+        styles: {
+          fontSize: 8
+        }
+      });
+    }
     // Pie de página
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
@@ -324,21 +413,17 @@ export default function CajaPage() {
     // Buscar ventas y medios de pago
     const ventas = await getOrdenesVenta();
     const ventasLote = ventas.filter(v => v.fk_id_lote === id_lote);
-    const pagosPorCuenta: Record<number, number> = {};
-    for (const cuenta of cuentasTesoreria) {
-      pagosPorCuenta[cuenta.id] = 0;
-    }
-    for (const venta of ventasLote) {
-      const medios = await getOrdenesVentaMediosPago(venta.id);
-      for (const m of medios) {
-        if (pagosPorCuenta[m.fk_id_cuenta_tesoreria] === undefined) pagosPorCuenta[m.fk_id_cuenta_tesoreria] = 0;
-        pagosPorCuenta[m.fk_id_cuenta_tesoreria] += m.monto_pagado;
-      }
-    }
+    // Obtener catálogos para joins
+    const [clientes, usuarios, tiposComprobantes, cuentasTesoreria] = await Promise.all([
+      getClientes(),
+      getUsuarios(),
+      getTiposComprobantes(),
+      getCuentasTesoreria(),
+    ]);
     // Sumar ingresos y egresos por cuenta (movimientos + ventas)
     const resumenPorCuenta: Record<number, { cuenta: string, ingresos: number, egresos: number }> = {};
     for (const cuenta of cuentasTesoreria) {
-      resumenPorCuenta[cuenta.id] = { cuenta: cuenta.descripcion, ingresos: pagosPorCuenta[cuenta.id] || 0, egresos: 0 };
+      resumenPorCuenta[cuenta.id] = { cuenta: cuenta.descripcion, ingresos: 0, egresos: 0 };
     }
     for (const mov of movimientos) {
       if (resumenPorCuenta[mov.fk_id_cuenta_tesoreria]) {
@@ -347,6 +432,19 @@ export default function CajaPage() {
         } else if (mov.tipo === 'egreso') {
           resumenPorCuenta[mov.fk_id_cuenta_tesoreria].egresos += Math.abs(mov.monto);
         }
+      }
+    }
+    for (const orden of ventasLote) {
+      const cliente = clientes.find(c => c.id === orden.fk_id_entidades);
+      const usuario = usuarios.find(u => u.id === orden.fk_id_usuario);
+      const tipoComp = tiposComprobantes.find(t => t.id === orden.fk_id_tipo_comprobante);
+      const medios = await getOrdenesVentaMediosPago(orden.id);
+      const mediosStr = medios.map(m => {
+        const cuenta = cuentasTesoreria.find(ct => ct.id === m.fk_id_cuenta_tesoreria);
+        return cuenta ? `${cuenta.descripcion}: $${m.monto_pagado.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `$${m.monto_pagado}`;
+      }).join(" | ");
+      if (resumenPorCuenta[orden.fk_id_tipo_comprobante]) { // Usar fk_id_tipo_comprobante como clave
+        resumenPorCuenta[orden.fk_id_tipo_comprobante].ingresos += orden.total;
       }
     }
     const resumenFinal = Object.values(resumenPorCuenta);
@@ -398,6 +496,52 @@ export default function CajaPage() {
     doc.text(`Total Ingresos: $${totalIngresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY + 10);
     doc.text(`Total Egresos: $${totalEgresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY + 20);
     doc.text(`Saldo Final: $${saldoFinal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY + 30);
+    // Resumen de órdenes de venta
+    let resumenY = finalY + 40;
+    doc.setFontSize(14);
+    doc.text("Órdenes de venta del lote", 20, resumenY);
+    doc.setFontSize(10);
+    resumenY += 8;
+    const ordenesHead = [
+      "ID", "Fecha", "Total", "Subtotal", "Cliente", "Doc", "Usuario", "Comprobante", "Medios de pago"
+    ];
+    const ordenesBody: any[][] = [];
+    for (const orden of ventasLote) {
+      const cliente = clientes.find(c => c.id === orden.fk_id_entidades);
+      const usuario = usuarios.find(u => u.id === orden.fk_id_usuario);
+      const tipoComp = tiposComprobantes.find(t => t.id === orden.fk_id_tipo_comprobante);
+      const medios = await getOrdenesVentaMediosPago(orden.id);
+      const mediosStr = medios.map(m => {
+        const cuenta = cuentasTesoreria.find(ct => ct.id === m.fk_id_cuenta_tesoreria);
+        return cuenta ? `${cuenta.descripcion}: $${m.monto_pagado.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `$${m.monto_pagado}`;
+      }).join(" | ");
+      ordenesBody.push([
+        orden.id,
+        orden.fecha?.slice(0, 16) || "",
+        `$${orden.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `$${orden.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        cliente?.razon_social || "",
+        cliente?.num_doc || "",
+        usuario?.nombre || "",
+        tipoComp?.descripcion || "",
+        mediosStr
+      ]);
+    }
+    autoTable(doc, {
+      startY: resumenY,
+      head: [ordenesHead],
+      body: ordenesBody,
+      theme: "grid",
+      headStyles: {
+        fillColor: [66, 139, 202],
+        textColor: 255,
+        fontStyle: "bold"
+      },
+      styles: {
+        fontSize: 8
+      }
+      // No columnStyles para dejar que autoTable ajuste el ancho
+    });
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.text(`Generado el ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 20, 280);
@@ -415,7 +559,7 @@ export default function CajaPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-8">
+    <div className="w-full px-8">
       <h1 className="text-2xl font-bold mb-4">Gestión de Caja</h1>
       {/* Formulario de apertura de caja (simulado) */}
       <div className="rounded-lg border bg-card p-6 mb-8">
@@ -454,6 +598,20 @@ export default function CajaPage() {
                 min={0}
                 step="0.01"
               />
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">Usuario</label>
+              <select
+                value={usuarioSeleccionado}
+                onChange={e => setUsuarioSeleccionado(e.target.value)}
+                className="border rounded px-2 py-1"
+                required
+              >
+                <option value="">Selecciona un usuario</option>
+                {usuarios.map(u => (
+                  <option key={u.id} value={u.id}>{u.nombre}</option>
+                ))}
+              </select>
             </div>
             <div className="flex items-end">
               <button

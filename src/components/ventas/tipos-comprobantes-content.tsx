@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { Plus, FileText, Edit } from "lucide-react";
+import { Plus, FileText, Edit, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -44,6 +44,7 @@ export function TiposComprobantesContent() {
     const formData = new FormData(form);
     const descripcion = formData.get("descripcion") as string;
     const descuenta_stock = formData.get("descuenta_stock") === "on";
+    const reingresa_stock = formData.get("reingresa_stock") === "on";
     const admite_impuestos = formData.get("admite_impuestos") === "on";
     const imprime_pdf = formData.get("imprime_pdf") === "on";
     const activo = formData.get("activo") === "on";
@@ -53,6 +54,7 @@ export function TiposComprobantesContent() {
         const updateData: Partial<TipoComprobante> = {};
         if (typeof descripcion === 'string') updateData.descripcion = descripcion;
         updateData.descuenta_stock = descuenta_stock;
+        updateData.reingresa_stock = reingresa_stock;
         updateData.admite_impuestos = admite_impuestos;
         updateData.imprime_pdf = imprime_pdf;
         updateData.activo = activo;
@@ -61,6 +63,7 @@ export function TiposComprobantesContent() {
         const createData = {
           descripcion: String(descripcion),
           descuenta_stock: descuenta_stock,
+          reingresa_stock: reingresa_stock,
           admite_impuestos: admite_impuestos,
           imprime_pdf: imprime_pdf,
           activo: activo,
@@ -117,8 +120,8 @@ export function TiposComprobantesContent() {
                 Descuenta stock
               </label>
               <label className="flex items-center gap-2">
-                <input type="checkbox" name="admite_impuestos" defaultChecked={!!editing?.admite_impuestos} />
-                Admite impuestos
+                <input type="checkbox" name="reingresa_stock" defaultChecked={!!editing?.reingresa_stock} />
+                Reingresa stock
               </label>
               <label className="flex items-center gap-2">
                 <input type="checkbox" name="imprime_pdf" defaultChecked={!!editing?.imprime_pdf} />
@@ -144,7 +147,7 @@ export function TiposComprobantesContent() {
               <th className="px-2 py-1 text-left">ID</th>
               <th className="px-2 py-1 text-left">Descripción</th>
               <th className="px-2 py-1 text-left">Descuenta stock</th>
-              <th className="px-2 py-1 text-left">Admite impuestos</th>
+              <th className="px-2 py-1 text-left">Reingresa stock</th>
               <th className="px-2 py-1 text-left">Imprime PDF</th>
               <th className="px-2 py-1 text-left">Activo</th>
               <th className="px-2 py-1 text-left">Creado el</th>
@@ -157,13 +160,17 @@ export function TiposComprobantesContent() {
                 <td className="px-2 py-1">{t.id}</td>
                 <td className="px-2 py-1">{t.descripcion}</td>
                 <td className="px-2 py-1">{t.descuenta_stock ? "Sí" : "No"}</td>
-                <td className="px-2 py-1">{t.admite_impuestos ? "Sí" : "No"}</td>
+                <td className="px-2 py-1">{t.reingresa_stock ? "Sí" : "No"}</td>
                 <td className="px-2 py-1">{t.imprime_pdf ? "Sí" : "No"}</td>
                 <td className="px-2 py-1">{t.activo ? "Sí" : "No"}</td>
                 <td className="px-2 py-1">{t.creado_el?.slice(0, 19).replace('T', ' ')}</td>
                 <td className="px-2 py-1">
-                  <Button size="sm" variant="outline" onClick={() => openEditDialog(t)}><Edit className="w-4 h-4" /></Button>
-                  <Button size="sm" variant="destructive" onClick={() => handleDelete(t.id)} className="ml-2">Eliminar</Button>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="outline" onClick={() => openEditDialog(t)}><Edit className="w-4 h-4" /></Button>
+                    <Button size="icon" variant="destructive" onClick={() => handleDelete(t.id)}>
+                      <Trash className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </td>
               </tr>
             ))}
