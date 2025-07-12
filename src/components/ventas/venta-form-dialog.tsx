@@ -98,8 +98,8 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   // Filtrar solo cuentas de tesorería activas
   const cuentasTesoreriaValidas = cuentasTesoreria.filter(c => c.activo && c.descripcion && c.descripcion.trim() !== "");
 
-  // Filtrar solo tipos de comprobante activos
-  const tiposComprobantesValidos = tiposComprobantes.filter(tc => tc.activo && tc.descripcion && tc.descripcion.trim() !== "");
+  // Filtrar solo tipos de comprobante activos y con reingresa_stock = false
+  const tiposComprobantesValidos = tiposComprobantes.filter(tc => tc.activo && tc.descripcion && tc.descripcion.trim() !== "" && tc.reingresa_stock === false);
 
   // Calcular total
   const total = detalle.reduce((acc, d) => acc + (d.cantidad && d.precio ? d.cantidad * d.precio : 0), 0);

@@ -38,20 +38,7 @@ interface AperturaCaja {
   id_lote?: number;
 }
 
-// const TURNOS = [
-//   { label: "Mañana", value: "mañana" },
-//   { label: "Tarde", value: "tarde" },
-//   { label: "Noche", value: "noche" },
-// ];
 
-// function nowDate() {
-//   const d = new Date();
-//   return d.toISOString().slice(0, 10);
-// }
-// function nowTime() {
-//   const d = new Date();
-//   return d.toTimeString().slice(0, 5);
-// }
 
 export default function CajaPage() {
   // Formulario de apertura de caja (simulado)
@@ -341,7 +328,7 @@ export default function CajaPage() {
       const ordenesHead = [
         "ID", "Fecha", "Total", "Subtotal", "Cliente", "Doc", "Usuario", "Comprobante", "Medios de pago"
       ];
-      const ordenesBody: any[][] = [];
+      const ordenesBody: string[][] = [];
       for (const orden of ventasLote) {
         const usuarioObj = usuarios.find((u) => u.id === orden.fk_id_usuario);
         const tipoCompObj = cuentasTesoreria.find((t) => t.id === orden.fk_id_tipo_comprobante);
@@ -351,7 +338,7 @@ export default function CajaPage() {
           return cuenta ? `${cuenta.descripcion}: $${m.monto_pagado.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `$${m.monto_pagado}`;
         }).join(" | ");
         ordenesBody.push([
-          orden.id,
+          orden.id.toString(),
           orden.fecha?.slice(0, 16) || "",
           `$${orden.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
           `$${orden.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -482,9 +469,9 @@ export default function CajaPage() {
     const ordenesHead = [
       "ID", "Fecha", "Total", "Subtotal", "Cliente", "Doc", "Usuario", "Comprobante", "Medios de pago"
     ];
-    const ordenesBody: any[][] = [];
+    const ordenesBody: string[][] = [];
     for (let i = 0; i < ventasLote.length; i++) {
-      const orden = ventasLote[i];
+      //const orden = ventasLote[i];
       // Eliminadas variables no usadas para evitar error de linter
     }
     autoTable(doc, {
