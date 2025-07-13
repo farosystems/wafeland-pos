@@ -57,7 +57,7 @@ export function AppSidebar() {
   return (
     <aside className="flex flex-col h-full w-60 bg-white border-r">
       <div className="px-4 py-4 text-xs font-bold tracking-widest text-gray-700">
-        FARO POS DEMO
+        LAPIPI POS
       </div>
       <nav className="flex-1">
         <ul className="flex flex-col gap-1">
