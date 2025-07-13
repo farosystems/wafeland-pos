@@ -27,6 +27,8 @@ import { getUsuarios } from "@/services/usuarios";
 import { Usuario } from "@/types/usuario";
 import { OrdenVenta } from "@/types/ordenVenta";
 import { OrdenVentaMediosPago } from "@/types/ordenVenta";
+import { getTiposComprobantes } from "@/services/tiposComprobantes";
+import { TipoComprobante } from "@/types/tipoComprobante";
 
 interface AperturaCaja {
   caja: string;
@@ -388,14 +390,19 @@ export default function CajaPage() {
     const ventas = await getOrdenesVenta();
     const ventasLote = ventas.filter(v => v.fk_id_lote === id_lote);
     // Obtener catálogos para joins
-    const [cuentasTesoreria] = await Promise.all([
+    const [cuentasTesoreria, usuariosArr, tiposComprobantes] = await Promise.all([
       getCuentasTesoreria(),
+      getUsuarios(),
+      getTiposComprobantes(),
     ]);
+    
     // Sumar ingresos y egresos por cuenta (movimientos + ventas)
     const resumenPorCuenta: Record<number, { cuenta: string, ingresos: number, egresos: number }> = {};
     for (const cuenta of cuentasTesoreria) {
       resumenPorCuenta[cuenta.id] = { cuenta: cuenta.descripcion, ingresos: 0, egresos: 0 };
     }
+    
+    // Procesar movimientos del lote
     for (const mov of movimientos) {
       if (resumenPorCuenta[mov.fk_id_cuenta_tesoreria]) {
         if (mov.tipo === 'ingreso') {
@@ -405,13 +412,24 @@ export default function CajaPage() {
         }
       }
     }
-    for (const orden of ventasLote) {
-      // Eliminadas variables no usadas para evitar error de linter
-      if (resumenPorCuenta[orden.fk_id_tipo_comprobante]) { // Usar fk_id_tipo_comprobante como clave
-        resumenPorCuenta[orden.fk_id_tipo_comprobante].ingresos += orden.total;
+    
+    // Procesar ventas del lote
+    for (const venta of ventasLote) {
+      const medios = await getOrdenesVentaMediosPago(venta.id);
+      for (const m of medios) {
+        if (resumenPorCuenta[m.fk_id_cuenta_tesoreria]) {
+          if (venta.fk_id_tipo_comprobante === 2) {
+            // Nota de crédito: restar el monto (devolución)
+            resumenPorCuenta[m.fk_id_cuenta_tesoreria].ingresos -= m.monto_pagado;
+          } else {
+            resumenPorCuenta[m.fk_id_cuenta_tesoreria].ingresos += m.monto_pagado;
+          }
+        }
       }
     }
+    
     const resumenFinal = Object.values(resumenPorCuenta);
+    
     // PDF
     const doc = new jsPDF();
     doc.setFontSize(20);
@@ -423,11 +441,13 @@ export default function CajaPage() {
     doc.text(`Hora de apertura: ${lote.hora_apertura || "N/A"}`, 20, 65);
     doc.text(`Fecha de cierre: ${lote.fecha_cierre?.slice(0, 10) || "N/A"}`, 20, 75);
     doc.text(`Hora de cierre: ${lote.hora_cierre || "N/A"}`, 20, 85);
+    
     const tableData = resumenFinal.map(r => [
       r.cuenta,
       `$${r.ingresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       `$${r.egresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     ]);
+    
     autoTable(doc, {
       startY: 100,
       head: [["Cuenta Tesorería", "Total Ingresos", "Total Egresos"]],
@@ -446,13 +466,12 @@ export default function CajaPage() {
         2: { halign: "right" }
       }
     });
+    
     const totalIngresos = resumenFinal.reduce((sum, r) => sum + r.ingresos, 0);
     const totalEgresos = resumenFinal.reduce((sum, r) => sum + r.egresos, 0);
-    // El saldo inicial ya está incluido en los ingresos, no sumarlo dos veces
-    // const saldoInicial = parseFloat(lote.saldo_inicial?.toString() || '0');
-    // const saldoFinal = saldoInicial + totalIngresos - totalEgresos;
     const saldoInicial = parseFloat(lote.saldo_inicial?.toString() || '0');
-    const saldoFinal = totalIngresos - totalEgresos;
+    const saldoFinal = saldoInicial + totalIngresos - totalEgresos;
+    
     const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
@@ -460,35 +479,57 @@ export default function CajaPage() {
     doc.text(`Total Ingresos: $${totalIngresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY + 10);
     doc.text(`Total Egresos: $${totalEgresos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY + 20);
     doc.text(`Saldo Final: $${saldoFinal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, finalY + 30);
+    
     // Resumen de órdenes de venta
-    let resumenY = finalY + 40;
-    doc.setFontSize(14);
-    doc.text("Órdenes de venta del lote", 20, resumenY);
-    doc.setFontSize(10);
-    resumenY += 8;
-    const ordenesHead = [
-      "ID", "Fecha", "Total", "Subtotal", "Cliente", "Doc", "Usuario", "Comprobante", "Medios de pago"
-    ];
-    const ordenesBody: string[][] = [];
-    for (let i = 0; i < ventasLote.length; i++) {
-      //const orden = ventasLote[i];
-      // Eliminadas variables no usadas para evitar error de linter
-    }
-    autoTable(doc, {
-      startY: resumenY,
-      head: [ordenesHead],
-      body: ordenesBody,
-      theme: "grid",
-      headStyles: {
-        fillColor: [66, 139, 202],
-        textColor: 255,
-        fontStyle: "bold"
-      },
-      styles: {
-        fontSize: 8
+    if (ventasLote && ventasLote.length > 0) {
+      const resumenY2 = finalY + 40;
+      doc.setFontSize(14);
+      doc.text("Órdenes de venta del lote", 20, resumenY2);
+      doc.setFontSize(10);
+      
+      const ordenesHead = [
+        "ID", "Fecha", "Total", "Subtotal", "Cliente", "Doc", "Usuario", "Comprobante", "Medios de pago"
+      ];
+      const ordenesBody: string[][] = [];
+      
+      for (const orden of ventasLote) {
+        const usuarioObj = usuariosArr.find((u: Usuario) => u.id === orden.fk_id_usuario);
+        const tipoCompObj = tiposComprobantes.find((t: TipoComprobante) => t.id === orden.fk_id_tipo_comprobante);
+        const medios: OrdenVentaMediosPago[] = await getOrdenesVentaMediosPago(orden.id);
+        const mediosStr = medios.map((m) => {
+          const cuenta = cuentasTesoreria.find((ct: CuentaTesoreria) => ct.id === m.fk_id_cuenta_tesoreria);
+          return cuenta ? `${cuenta.descripcion}: $${m.monto_pagado.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `$${m.monto_pagado}`;
+        }).join(" | ");
+        
+        ordenesBody.push([
+          orden.id.toString(),
+          orden.fecha?.slice(0, 16) || "",
+          `$${orden.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          `$${orden.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          "-",
+          "-",
+          usuarioObj?.nombre || "",
+          tipoCompObj?.descripcion || "",
+          mediosStr
+        ]);
       }
-      // No columnStyles para dejar que autoTable ajuste el ancho
-    });
+      
+      autoTable(doc, {
+        startY: resumenY2 + 8,
+        head: [ordenesHead],
+        body: ordenesBody,
+        theme: "grid",
+        headStyles: {
+          fillColor: [66, 139, 202],
+          textColor: 255,
+          fontStyle: "bold"
+        },
+        styles: {
+          fontSize: 8
+        }
+      });
+    }
+    
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.text(`Generado el ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 20, 280);
