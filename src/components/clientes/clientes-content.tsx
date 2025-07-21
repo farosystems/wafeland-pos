@@ -1,9 +1,10 @@
 "use client";
+
 import * as React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { getClientes, createCliente, updateCliente, deleteCliente } from "@/services/clientes";
 import { Cliente, CreateClienteData } from "@/types/cliente";
-import { User, Plus, Edit, Trash2 } from "lucide-react";
+import { Users, Plus, Edit, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,47 +12,12 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-
-const TIPO_DOCS = [
-  { label: "DNI", value: "dni" },
-  { label: "CUIT", value: "cuit" },
-  { label: "CUIL", value: "cuil" },
-];
-const TIPO_PERSONA = [
-  { label: "Cliente", value: "cliente" },
-  { label: "Proveedor", value: "proveedor" },
-];
-const CATEGORIAS_IVA = [
-  "Consumidor Final",
-  "Responsable Inscripto",
-  "Responsable Monotributo",
-  "Exento",
-  "No Responsable",
-  "Sujeto no Categorizado",
-];
-
-function validarDocumento(tipo: string, valor: string) {
-  if (tipo === "dni") return /^\d{7,8}$/.test(valor);
-  if (tipo === "cuit") return /^\d{11}$/.test(valor) && validarCuit(valor);
-  if (tipo === "cuil") return /^\d{11}$/.test(valor);
-  return false;
-}
-function validarCuit(cuit: string) {
-  // Algoritmo de validación de CUIT argentino
-  if (!/^\d{11}$/.test(cuit)) return false;
-  const mult = [5,4,3,2,7,6,5,4,3,2];
-  let suma = 0;
-  for (let i = 0; i < 10; i++) suma += parseInt(cuit[i]) * mult[i];
-  const resto = suma % 11;
-  const digito = resto === 0 ? 0 : resto === 1 ? 9 : 11 - resto;
-  return digito === parseInt(cuit[10]);
-}
+import { useTrialCheck } from "@/hooks/use-trial-check";
 
 export function ClientesContent() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Cliente | null>(null);
@@ -65,17 +31,61 @@ export function ClientesContent() {
     categoria_iva: "Consumidor Final",
   });
   const [formError, setFormError] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState("");
+  const [paginaActual, setPaginaActual] = useState(1);
+  const CLIENTES_POR_PAGINA = 10;
+  const { checkTrial } = useTrialCheck();
+  const [showTrialEnded, setShowTrialEnded] = useState(false);
 
-  useEffect(() => { fetchAll(); }, []);
-  async function fetchAll() {
-    setLoading(true); setError(null);
-    try { setClientes(await getClientes()); } catch (error) { 
-      console.error("Error al cargar clientes:", error);
-      setError((error as Error).message); 
+  // Memoizar clientes filtrados
+  const clientesFiltrados = useMemo(() => {
+    if (!filtro.trim()) return clientes;
+    
+    const filtroLower = filtro.toLowerCase();
+    return clientes.filter(cliente => {
+      return (
+        cliente.razon_social.toLowerCase().includes(filtroLower) ||
+        cliente.email.toLowerCase().includes(filtroLower) ||
+        cliente.num_doc.toLowerCase().includes(filtroLower) ||
+        cliente.telefono.toLowerCase().includes(filtroLower) ||
+        cliente.categoria_iva.toLowerCase().includes(filtroLower)
+      );
+    });
+  }, [clientes, filtro]);
+
+  // Memoizar clientes paginados
+  const clientesPagina = useMemo(() => {
+    const totalPaginas = Math.ceil(clientesFiltrados.length / CLIENTES_POR_PAGINA);
+    const paginaValida = Math.min(paginaActual, totalPaginas);
+    if (paginaValida !== paginaActual && totalPaginas > 0) {
+      setPaginaActual(paginaValida);
     }
-    setLoading(false);
-  }
-  function openNew() {
+    return clientesFiltrados.slice((paginaValida - 1) * CLIENTES_POR_PAGINA, paginaValida * CLIENTES_POR_PAGINA);
+  }, [clientesFiltrados, paginaActual]);
+
+  const totalPaginas = useMemo(() => {
+    return Math.ceil(clientesFiltrados.length / CLIENTES_POR_PAGINA);
+  }, [clientesFiltrados]);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getClientes();
+      setClientes(data);
+    } catch (error) {
+      console.error("Error al cargar clientes:", error);
+      setError((error as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  const openNew = useCallback(() => {
     setEditing(null);
     setForm({
       razon_social: "",
@@ -88,180 +98,304 @@ export function ClientesContent() {
     });
     setFormError(null);
     setIsDialogOpen(true);
-  }
-  function openEdit(cliente: Cliente) {
+  }, []);
+
+  const openEdit = useCallback((cliente: Cliente) => {
     setEditing(cliente);
     setForm({ ...cliente });
     setFormError(null);
     setIsDialogOpen(true);
-  }
-  async function handleSubmit(e: React.FormEvent) {
+  }, []);
+
+  const closeDialog = useCallback(() => {
+    setIsDialogOpen(false);
+    setEditing(null);
+    setFormError(null);
+  }, []);
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
-    if (!form.razon_social) return setFormError("La razón social es obligatoria");
-    if (!form.email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email)) return setFormError("Email inválido");
-    if (!form.telefono) return setFormError("El teléfono es obligatorio");
-    if (!form.num_doc || !validarDocumento(form.tipo_doc, form.num_doc)) {
-      if (form.tipo_doc === "dni") return setFormError("DNI inválido (7 u 8 dígitos)");
-      if (form.tipo_doc === "cuit") return setFormError("CUIT inválido");
-      if (form.tipo_doc === "cuil") return setFormError("CUIL inválido (11 dígitos)");
-      return setFormError("Documento inválido");
-    }
-    setLoading(true);
+    const expired = await checkTrial(() => setShowTrialEnded(true));
+    if (expired) return;
     try {
       if (editing) {
         await updateCliente(editing.id, form);
       } else {
         await createCliente(form);
       }
-      setIsDialogOpen(false);
-      await fetchAll();
+      closeDialog();
+      fetchAll(); // Refrescar datos
     } catch (error) {
       console.error("Error al guardar cliente:", error);
       setFormError((error as Error).message);
     }
-    setLoading(false);
-  }
-  async function handleDelete(id: number) {
-    if (!window.confirm("¿Eliminar cliente?")) return;
-    setLoading(true);
-    try { await deleteCliente(id); await fetchAll(); } catch (error) { 
+  }, [editing, form, closeDialog, fetchAll, checkTrial]);
+
+  const handleDelete = useCallback(async (id: number) => {
+    const expired = await checkTrial(() => setShowTrialEnded(true));
+    if (expired) return;
+    if (!confirm("¿Estás seguro de que quieres eliminar este cliente?")) return;
+    
+    try {
+      await deleteCliente(id);
+      fetchAll(); // Refrescar datos
+    } catch (error) {
       console.error("Error al eliminar cliente:", error);
-      setError((error as Error).message); 
+      setError((error as Error).message);
     }
-    setLoading(false);
-  }
-  return (
-    <div className="flex flex-col gap-6 p-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <User className="h-8 w-8 text-primary" />
+  }, [fetchAll, checkTrial]);
+
+  if (loading) {
+    return (
+      <div className="w-full px-8 mt-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Users className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-3xl font-bold">Clientes</h1>
-            <p className="text-muted-foreground">
-              Gestiona tus clientes y proveedores
-            </p>
+            <h1 className="text-3xl font-bold leading-tight">Gestión de Clientes</h1>
+            <p className="text-muted-foreground text-base">Administra tu base de datos de clientes y proveedores.</p>
           </div>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openNew}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo Cliente
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>
-                {editing ? "Editar Cliente" : "Nuevo Cliente"}
-              </DialogTitle>
-              <DialogDescription>
-                {editing
-                  ? "Modifica la información del cliente seleccionado."
-                  : "Completa la información para crear un nuevo cliente."}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block mb-1 font-medium">Razón Social</label>
-                <input type="text" className="w-full border rounded px-2 py-1" value={form.razon_social} onChange={e => setForm(f => ({ ...f, razon_social: e.target.value }))} required />
-              </div>
-              <div>
-                <label className="block mb-1 font-medium">Tipo</label>
-                <select className="w-full border rounded px-2 py-1" value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as any }))} required>
-                  {TIPO_PERSONA.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block mb-1 font-medium">Email</label>
-                <input type="email" className="w-full border rounded px-2 py-1" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
-              </div>
-              <div>
-                <label className="block mb-1 font-medium">Tipo Doc</label>
-                <select className="w-full border rounded px-2 py-1" value={form.tipo_doc} onChange={e => setForm(f => ({ ...f, tipo_doc: e.target.value as any, num_doc: "" }))} required>
-                  {TIPO_DOCS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block mb-1 font-medium">N° Doc</label>
-                <input type="text" className="w-full border rounded px-2 py-1" value={form.num_doc} onChange={e => setForm(f => ({ ...f, num_doc: e.target.value }))} required />
-              </div>
-              <div>
-                <label className="block mb-1 font-medium">Teléfono</label>
-                <input type="text" className="w-full border rounded px-2 py-1" value={form.telefono} onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))} required />
-              </div>
-              <div>
-                <label className="block mb-1 font-medium">Categoría IVA</label>
-                <select className="w-full border rounded px-2 py-1" value={form.categoria_iva} onChange={e => setForm(f => ({ ...f, categoria_iva: e.target.value as any }))} required>
-                  {CATEGORIAS_IVA.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="flex items-end">
-                <Button type="submit" disabled={loading}>
-                  {editing ? "Guardar" : "Crear"}
-                </Button>
-                <Button type="button" variant="outline" className="ml-2" onClick={() => setIsDialogOpen(false)} disabled={loading}>
-                  Cancelar
-                </Button>
-              </div>
-              {formError && <div className="col-span-2 text-red-600 text-sm">{formError}</div>}
-            </form>
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center justify-center h-32">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2 text-muted-foreground">Cargando clientes...</span>
+        </div>
       </div>
-      {error && <div className="text-red-600 mb-2">{error}</div>}
+    );
+  }
+
+  return (
+    <div className="w-full px-8 mt-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Users className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-3xl font-bold leading-tight">Gestión de Clientes</h1>
+            <p className="text-muted-foreground text-base">Administra tu base de datos de clientes y proveedores.</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={fetchAll}
+            variant="outline"
+            disabled={loading}
+            className="flex items-center gap-2"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refrescar"}
+          </Button>
+          <Button onClick={openNew}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo cliente
+          </Button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-800">Error: {error}</p>
+        </div>
+      )}
+
       <div className="rounded-lg border bg-card p-4">
-        <table className="min-w-full text-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <input
+            type="text"
+            placeholder="Buscar cliente..."
+            value={filtro}
+            onChange={e => setFiltro(e.target.value)}
+            className="border rounded px-3 py-2 flex-1 max-w-xs"
+          />
+        </div>
+
+        <table className="min-w-full text-sm border mb-4">
           <thead>
             <tr className="bg-gray-100">
-              <th className="px-2 py-1 text-left">ID</th>
-              <th className="px-2 py-1 text-left">Razón Social</th>
-              <th className="px-2 py-1 text-left">Tipo</th>
-              <th className="px-2 py-1 text-left">Email</th>
-              <th className="px-2 py-1 text-left">Tipo Doc</th>
-              <th className="px-2 py-1 text-left">N° Doc</th>
-              <th className="px-2 py-1 text-left">Teléfono</th>
-              <th className="px-2 py-1 text-left">Categoría IVA</th>
-              <th className="px-2 py-1 text-center">Acciones</th>
+              <th className="px-2 py-1">ID</th>
+              <th className="px-2 py-1">Razón social</th>
+              <th className="px-2 py-1">Email</th>
+              <th className="px-2 py-1">Teléfono</th>
+              <th className="px-2 py-1">Categoría IVA</th>
+              <th className="px-2 py-1 text-center">Máximo cuenta corriente</th>
+              <th className="px-2 py-1">Acciones</th>
             </tr>
           </thead>
           <tbody>
-            {clientes.map((c) => (
-              <tr key={c.id} className="border-b">
-                <td className="px-2 py-1 align-middle">{c.id}</td>
-                <td className="px-2 py-1 align-middle">{c.razon_social}</td>
-                <td className="px-2 py-1 align-middle">{c.tipo}</td>
-                <td className="px-2 py-1 align-middle">{c.email}</td>
-                <td className="px-2 py-1 align-middle">{c.tipo_doc}</td>
-                <td className="px-2 py-1 align-middle">{c.num_doc}</td>
-                <td className="px-2 py-1 align-middle">{c.telefono}</td>
-                <td className="px-2 py-1 align-middle">{c.categoria_iva}</td>
-                <td className="px-2 py-1 text-center align-middle">
-                  <button
-                    className="text-blue-600 hover:text-blue-800 p-1"
-                    onClick={() => openEdit(c)}
-                    disabled={loading}
-                    title="Editar"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </button>
-                  <button
-                    className="text-red-600 hover:text-red-800 p-1 ml-2"
-                    onClick={() => handleDelete(c.id)}
-                    disabled={loading}
-                    title="Eliminar"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+            {clientesPagina.map((cliente) => (
+              <tr key={cliente.id} className="border-b hover:bg-blue-50 transition-colors">
+                <td className="px-2 py-1">{cliente.id}</td>
+                <td className="px-2 py-1">{cliente.razon_social}</td>
+                <td className="px-2 py-1">{cliente.email}</td>
+                <td className="px-2 py-1">{cliente.telefono}</td>
+                <td className="px-2 py-1">{cliente.categoria_iva}</td>
+                <td className="px-2 py-1 text-center">
+                  {cliente.maximo_cuenta_corriente !== undefined && cliente.maximo_cuenta_corriente !== null
+                    ? `$${cliente.maximo_cuenta_corriente.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : '-'}
+                </td>
+                <td className="px-2 py-1">
+                  {/* Acciones existentes */}
+                  <Button size="sm" variant="outline" onClick={() => openEdit(cliente)}><Edit className="w-4 h-4" /></Button>
+                  <Button size="icon" variant="destructive" onClick={() => handleDelete(cliente.id)}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </td>
               </tr>
             ))}
-            {clientes.length === 0 && (
-              <tr><td colSpan={9} className="text-center py-4 text-muted-foreground">No hay clientes registrados.</td></tr>
-            )}
           </tbody>
         </table>
+
+        {/* Paginación */}
+        <div className="flex items-center justify-end space-x-2 py-4">
+          <div className="flex-1 text-sm text-muted-foreground">
+            {clientesFiltrados.length === 0 ? (
+              "0 de 0 clientes."
+            ) : (
+              `${(paginaActual - 1) * CLIENTES_POR_PAGINA + 1} - ${Math.min(paginaActual * CLIENTES_POR_PAGINA, clientesFiltrados.length)} de ${clientesFiltrados.length} cliente(s).`
+            )}
+          </div>
+          <div className="space-x-2">
+            <button
+              className="px-3 py-1 rounded border bg-white disabled:opacity-50 hover:bg-gray-50 transition-colors"
+              onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
+              disabled={paginaActual === 1}
+            >
+              Anterior
+            </button>
+            <button
+              className="px-3 py-1 rounded border bg-white disabled:opacity-50 hover:bg-gray-50 transition-colors"
+              onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
+              disabled={paginaActual === totalPaginas || totalPaginas === 0}
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
       </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editing ? "Editar Cliente" : "Nuevo Cliente"}</DialogTitle>
+            <DialogDescription>
+              {editing ? "Modifica los datos del cliente." : "Completa los datos para crear un nuevo cliente."}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block mb-1 font-medium">Razón Social</label>
+              <input
+                type="text"
+                value={form.razon_social}
+                onChange={e => setForm({ ...form, razon_social: e.target.value })}
+                className="w-full border rounded px-3 py-2"
+                required
+              />
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">Tipo</label>
+              <select
+                value={form.tipo}
+                onChange={e => setForm({ ...form, tipo: e.target.value as "cliente" | "proveedor" })}
+                className="w-full border rounded px-3 py-2"
+              >
+                <option value="cliente">Cliente</option>
+                <option value="proveedor">Proveedor</option>
+              </select>
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">Email</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={e => setForm({ ...form, email: e.target.value })}
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block mb-1 font-medium">Tipo de Documento</label>
+                <select
+                  value={form.tipo_doc}
+                  onChange={e => setForm({ ...form, tipo_doc: e.target.value as "dni" | "cuit" | "cuil" })}
+                  className="w-full border rounded px-3 py-2"
+                >
+                  <option value="dni">DNI</option>
+                  <option value="cuit">CUIT</option>
+                  <option value="cuil">CUIL</option>
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1 font-medium">Número de Documento</label>
+                <input
+                  type="text"
+                  value={form.num_doc}
+                  onChange={e => setForm({ ...form, num_doc: e.target.value })}
+                  className="w-full border rounded px-3 py-2"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">Teléfono</label>
+              <input
+                type="text"
+                value={form.telefono}
+                onChange={e => setForm({ ...form, telefono: e.target.value })}
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">Categoría IVA</label>
+              <select
+                value={form.categoria_iva}
+                onChange={e => setForm({ ...form, categoria_iva: e.target.value as "Consumidor Final" | "Responsable Inscripto" | "Responsable Monotributo" | "Exento" | "No Responsable" | "Sujeto no Categorizado" })}
+                className="w-full border rounded px-3 py-2"
+              >
+                <option value="Consumidor Final">Consumidor Final</option>
+                <option value="Responsable Inscripto">Responsable Inscripto</option>
+                <option value="Responsable Monotributo">Responsable Monotributo</option>
+                <option value="Exento">Exento</option>
+                <option value="No Responsable">No Responsable</option>
+                <option value="Sujeto no Categorizado">Sujeto no Categorizado</option>
+              </select>
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">Máximo cuenta corriente</label>
+              <input
+                type="number"
+                className="w-full border rounded px-2 py-1"
+                value={form.maximo_cuenta_corriente ?? ''}
+                onChange={e => setForm(f => ({ ...f, maximo_cuenta_corriente: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
+                min={0}
+                step={0.01}
+                placeholder="Ej: 50000.00"
+              />
+            </div>
+            {formError && <div className="text-red-600 text-sm">{formError}</div>}
+            <div className="flex justify-end space-x-2">
+              <Button type="button" variant="outline" onClick={closeDialog}>
+                Cancelar+
+              </Button>
+              <Button type="submit">
+                {editing ? "Actualizar" : "Crear"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showTrialEnded} onOpenChange={setShowTrialEnded}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Prueba gratis finalizada</DialogTitle>
+            <DialogDescription>
+              La prueba gratis ha finalizado. Debe abonar para continuar usando el sistema.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end mt-4">
+            <Button onClick={() => setShowTrialEnded(false)}>Cerrar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

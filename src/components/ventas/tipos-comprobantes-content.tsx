@@ -156,7 +156,7 @@ export function TiposComprobantesContent() {
           </thead>
           <tbody>
             {tipos.map((t) => (
-              <tr key={t.id} className="border-b">
+              <tr key={t.id} className="border-b hover:bg-blue-50 transition-colors">
                 <td className="px-2 py-1">{t.id}</td>
                 <td className="px-2 py-1">{t.descripcion}</td>
                 <td className="px-2 py-1">{t.descuenta_stock ? "Sí" : "No"}</td>

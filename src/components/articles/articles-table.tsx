@@ -32,6 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Article } from "@/types/article";
+import { formatCurrency, DEFAULT_CURRENCY, DEFAULT_LOCALE } from "@/lib/utils";
 
 interface ArticlesTableProps {
   data: Article[];
@@ -60,11 +61,7 @@ export function ArticlesTable({ data, onEdit }: ArticlesTableProps) {
       header: "Precio Unitario",
       cell: ({ row }) => {
         const price = parseFloat(row.getValue("precio_unitario"));
-        const formatted = new Intl.NumberFormat("es-AR", {
-          style: "currency",
-          currency: "ARS",
-        }).format(price);
-        return <div className="font-medium">{formatted}</div>;
+        return <div className="font-medium">{formatCurrency(price, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</div>;
       },
     },
     {
@@ -80,11 +77,6 @@ export function ArticlesTable({ data, onEdit }: ArticlesTableProps) {
           {row.getValue("activo") ? "Sí" : "No"}
         </span>
       ),
-    },
-    {
-      accessorKey: "porcentaje_iva",
-      header: "IVA %",
-      cell: ({ row }) => <div>{row.getValue("porcentaje_iva")}%</div>,
     },
     // Nueva columna para stock
     {
@@ -194,6 +186,7 @@ export function ArticlesTable({ data, onEdit }: ArticlesTableProps) {
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className="hover:bg-blue-50 transition-colors"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>

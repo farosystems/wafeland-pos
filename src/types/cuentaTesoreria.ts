@@ -2,9 +2,7 @@ export interface CuentaTesoreria {
   id: number;
   descripcion: string;
   tipo: string;
-  activo: boolean;
+  activo: boolean | null;
 }
 
-export interface CreateCuentaTesoreriaData extends Omit<CuentaTesoreria, 'id'> {
-  // Add specific properties here if needed
-} 
+export type CreateCuentaTesoreriaData = Omit<CuentaTesoreria, "id">; 

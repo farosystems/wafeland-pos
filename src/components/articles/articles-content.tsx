@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Package } from "lucide-react";
+import { Plus, Package, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,7 +9,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { ArticlesTable } from "@/components/articles/articles-table";
 import { ArticleForm } from "@/components/articles/article-form";
@@ -22,9 +21,11 @@ export function ArticlesContent() {
   const { isSignedIn } = useUser();
   const {
     articles,
+    loading,
     error,
     addArticle,
     editArticle,
+    fetchArticles,
   } = useArticles();
 
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
@@ -46,6 +47,22 @@ export function ArticlesContent() {
     setEditingArticle(undefined);
   };
 
+  const handleSave = async (data: CreateArticleData | UpdateArticleData) => {
+    setIsLoading(true);
+    try {
+      if (editingArticle) {
+        await editArticle(editingArticle.id, data as UpdateArticleData);
+      } else {
+        await addArticle(data as CreateArticleData);
+      }
+      closeDialog();
+    } catch (error) {
+      console.error("Error al guardar artículo:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (!isSignedIn) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px]">
@@ -55,77 +72,77 @@ export function ArticlesContent() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div className="flex items-center justify-between">
+    <div className="w-full px-8 mt-6">
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <Package className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-3xl font-bold">Artículos</h1>
-            <p className="text-muted-foreground">
-              Gestiona el inventario de productos
-            </p>
+            <h1 className="text-3xl font-bold leading-tight">Gestión de Artículos</h1>
+            <p className="text-muted-foreground text-base">Administra tu catálogo de productos y servicios.</p>
           </div>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openCreateDialog}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo Artículo
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>
-                {editingArticle ? "Editar Artículo" : "Nuevo Artículo"}
-              </DialogTitle>
-              <DialogDescription>
-                {editingArticle
-                  ? "Modifica la información del artículo seleccionado."
-                  : "Completa la información para crear un nuevo artículo."}
-              </DialogDescription>
-            </DialogHeader>
-            <ArticleForm
-              article={editingArticle}
-              onSubmit={async (data: CreateArticleData | UpdateArticleData) => {
-                setIsLoading(true);
-                if (editingArticle) {
-                  // Solo pasa los campos requeridos si existen
-                  const updateData: UpdateArticleData = {};
-                  if (typeof data.descripcion === 'string') updateData.descripcion = data.descripcion;
-                  if (typeof data.precio_unitario === 'number') updateData.precio_unitario = data.precio_unitario;
-                  if (typeof data.fk_id_agrupador === 'number') updateData.fk_id_agrupador = data.fk_id_agrupador;
-                  if (typeof data.activo === 'boolean') updateData.activo = data.activo;
-                  if (typeof data.porcentaje_iva === 'number') updateData.porcentaje_iva = data.porcentaje_iva;
-                  if (typeof data.stock === 'number') updateData.stock = data.stock;
-                  await editArticle(editingArticle.id, updateData);
-                } else {
-                  // Forzar que los campos requeridos sean del tipo correcto
-                  await addArticle({
-                    descripcion: String((data as CreateArticleData).descripcion),
-                    precio_unitario: Number((data as CreateArticleData).precio_unitario),
-                    fk_id_agrupador: Number((data as CreateArticleData).fk_id_agrupador),
-                    activo: Boolean((data as CreateArticleData).activo),
-                    porcentaje_iva: Number((data as CreateArticleData).porcentaje_iva),
-                    stock: Number((data as CreateArticleData).stock),
-                  });
-                }
-                setIsLoading(false);
-                closeDialog();
-              }}
-              onCancel={closeDialog}
-              isLoading={isLoading}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={fetchArticles}
+            variant="outline"
+            disabled={loading}
+            className="flex items-center gap-2"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refrescar"}
+          </Button>
+          <Button onClick={openCreateDialog}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo artículo
+          </Button>
+        </div>
       </div>
-      {error && (
-        <div className="text-red-600 text-sm">{error}</div>
+
+      {loading && (
+        <div className="flex items-center justify-center h-32 mb-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2 text-muted-foreground">Cargando artículos...</span>
+        </div>
       )}
-      <div className="rounded-lg border bg-card">
-        <ArticlesTable data={articles} onEdit={openEditDialog} />
+
+      {!loading && (
+        <>
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-800">Error: {error}</p>
+            </div>
+          )}
+
+          <div className="rounded-lg border bg-card p-4">
+            <ArticlesTable data={articles} onEdit={openEditDialog} />
+          </div>
+        </>
+      )}
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingArticle ? "Editar artículo" : "Nuevo artículo"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingArticle 
+                ? "Modifica los datos del artículo seleccionado."
+                : "Completa los datos para crear un nuevo artículo."
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <ArticleForm
+            article={editingArticle}
+            onSave={handleSave}
+            onCancel={closeDialog}
+            isLoading={isLoading}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <div className="mt-10">
+        <AgrupadoresContent />
       </div>
-      {/* Agrupadores debajo */}
-      <AgrupadoresContent />
     </div>
   );
 } 

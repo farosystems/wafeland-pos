@@ -60,3 +60,15 @@ export async function cerrarLoteApertura(id_lote: number, fecha_cierre: string, 
   if (error) throw error;
   return data;
 } 
+
+export async function getLoteAbierto() {
+  const { data, error } = await supabase
+    .from("lotes_operaciones")
+    .select("id_lote")
+    .eq("abierto", true)
+    .order("fecha_apertura", { ascending: false })
+    .limit(1)
+    .single();
+  if (error) throw error;
+  return data?.id_lote as number;
+} 

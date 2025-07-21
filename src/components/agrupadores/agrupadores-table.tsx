@@ -25,7 +25,7 @@ export function AgrupadoresTable({ data, onEdit }: AgrupadoresTableProps) {
           <TableBody>
             {data.length ? (
               data.map((agrupador) => (
-                <TableRow key={agrupador.id}>
+                <TableRow key={agrupador.id} className="hover:bg-blue-50 transition-colors">
                   <TableCell>{agrupador.id}</TableCell>
                   <TableCell>{agrupador.nombre}</TableCell>
                   <TableCell>

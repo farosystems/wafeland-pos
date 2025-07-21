@@ -6,6 +6,7 @@ export interface Cliente {
   tipo_doc: "dni" | "cuit" | "cuil";
   num_doc: string;
   telefono: string;
+  maximo_cuenta_corriente?: number;
   categoria_iva:
     | "Consumidor Final"
     | "Responsable Inscripto"

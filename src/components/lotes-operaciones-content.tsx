@@ -1,72 +1,153 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { getLotesOperaciones } from "@/services/lotesOperaciones";
 import { LoteOperacion } from "@/types/loteOperacion";
-import { FileText } from "lucide-react";
+import { FileText, Loader2 } from "lucide-react";
 import { getCajas } from "@/services/cajas";
 import { Caja } from "@/types/caja";
-import { getUsuarios } from "@/services/usuarios";
-import { Usuario } from "@/types/usuario";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
+import { formatCurrency, DEFAULT_CURRENCY, DEFAULT_LOCALE } from "@/lib/utils";
+
+const CACHE_KEY = 'lotes_operaciones_cache';
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+function saveCache(data: LoteOperacion[]) {
+  localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+}
+function loadCache(): LoteOperacion[] | null {
+  const raw = localStorage.getItem(CACHE_KEY);
+  if (!raw) return null;
+  try {
+    const { data, ts } = JSON.parse(raw);
+    if (Date.now() - ts < CACHE_TTL) return data;
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 export function LotesOperacionesContent({ onImprimirCierre }: { onImprimirCierre?: (id_lote: number) => void }) {
   const [lotes, setLotes] = useState<LoteOperacion[]>([]);
   const [cajas, setCajas] = useState<Caja[]>([]);
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [filtroLote, setFiltroLote] = useState("");
   const [filtroCaja, setFiltroCaja] = useState("");
   const pressClass = "active:scale-95 transition-transform duration-100 hover:scale-105 hover:shadow-lg";
   const [paginaActual, setPaginaActual] = useState(1);
   const LOTES_POR_PAGINA = 6;
 
-  useEffect(() => {
-    fetchLotes();
-    getCajas().then(setCajas);
-    getUsuarios().then(setUsuarios);
-    // Escuchar evento de impresión
-    const handler = (e: unknown) => {
-      if (onImprimirCierre && (e as CustomEvent).detail?.id_lote) onImprimirCierre((e as CustomEvent).detail.id_lote);
-    };
-    window.addEventListener('imprimir-cierre-caja', handler);
-    return () => window.removeEventListener('imprimir-cierre-caja', handler);
-  }, []);
+  // Memoizar funciones de búsqueda para evitar re-renderizados
+  const getCajaNombre = useCallback((id: number) => {
+    const caja = cajas.find(c => c.id === id);
+    return caja ? caja.descripcion : id;
+  }, [cajas]);
 
-  async function fetchLotes() {
+  // Memoizar datos filtrados para evitar recálculos innecesarios
+  const lotesFiltrados = useMemo(() => {
+    return lotes.filter(lote => {
+      const cajaNombre = getCajaNombre(lote.fk_id_caja).toString().toLowerCase();
+      return (
+        (filtroLote === "" || lote.id_lote.toString().includes(filtroLote)) &&
+        (filtroCaja === "" || cajaNombre.includes(filtroCaja.toLowerCase()))
+      );
+    });
+  }, [lotes, filtroLote, filtroCaja, getCajaNombre]);
+
+  // Memoizar datos paginados
+  const lotesPagina = useMemo(() => {
+    const totalPaginas = Math.ceil(lotesFiltrados.length / LOTES_POR_PAGINA);
+    // Si no hay resultados o la página actual es mayor que el total, resetear a 1
+    if (paginaActual > totalPaginas || totalPaginas === 0) {
+      if (paginaActual !== 1) setPaginaActual(1);
+      return lotesFiltrados.slice(0, LOTES_POR_PAGINA);
+    }
+    return lotesFiltrados.slice((paginaActual - 1) * LOTES_POR_PAGINA, paginaActual * LOTES_POR_PAGINA);
+  }, [lotesFiltrados, paginaActual]);
+
+  const totalPaginas = useMemo(() => {
+    return Math.ceil(lotesFiltrados.length / LOTES_POR_PAGINA);
+  }, [lotesFiltrados]);
+
+  // Cargar lotes con caché local
+  const fetchLotes = useCallback(async () => {
+    setLoading(true);
     setError(null);
+    // Intentar leer del caché
+    const cached = loadCache();
+    if (cached) {
+      setLotes(cached);
+      setLoading(false);
+      // También refrescar en background
+      getLotesOperaciones().then(data => {
+        setLotes(data);
+        saveCache(data);
+      });
+      return;
+    }
+    // Si no hay caché, fetch normal
     try {
       const data = await getLotesOperaciones();
       setLotes(data);
-    } catch (error) {
-      console.error("Error al cargar lotes de operaciones:", error);
-      setError("Error al cargar lotes de operaciones");
+      saveCache(data);
+    } catch {} finally {
+      setLoading(false);
     }
-  }
+  }, []);
 
-  function getCajaNombreTurno(id: number) {
-    const caja = cajas.find(c => c.id === id);
-    return caja ? `${caja.descripcion} (${caja.turno})` : id;
-  }
+  useEffect(() => {
+    fetchLotes();
+  }, [fetchLotes]);
 
-  function getUsuarioNombre(id: number) {
-    const usuario = usuarios.find(u => u.id === id);
-    return usuario ? usuario.nombre : id;
-  }
+  useEffect(() => {
+    getCajas().then(setCajas);
+  }, []);
 
-  // Filtrado
-  const lotesFiltrados = lotes.filter(lote => {
-    const cajaNombreTurno = getCajaNombreTurno(lote.fk_id_caja).toString().toLowerCase();
+  // Cuando se refrescan los lotes desde el padre (por ejemplo, después de cerrar caja), limpiar y recargar caché
+  useEffect(() => {
+    const handler = () => {
+      localStorage.removeItem(CACHE_KEY);
+      fetchLotes();
+    };
+    window.addEventListener('refreshLotesOperaciones', handler);
+    return () => window.removeEventListener('refreshLotesOperaciones', handler);
+  }, [fetchLotes]);
+
+  // Función para refrescar datos
+  const refreshData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getLotesOperaciones();
+      setLotes(data);
+    } catch {} finally {
+      setLoading(false);
+    }
+  }, []);
+
+  if (loading) {
     return (
-      (filtroLote === "" || lote.id_lote.toString().includes(filtroLote)) &&
-      (filtroCaja === "" || cajaNombreTurno.includes(filtroCaja.toLowerCase()))
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold mb-4">Lotes de operaciones</h2>
+        <div className="flex items-center justify-center h-32">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2 text-muted-foreground">Cargando lotes...</span>
+        </div>
+      </div>
     );
-  });
-  // Paginación
-  const totalPaginas = Math.ceil(lotesFiltrados.length / LOTES_POR_PAGINA);
-  const lotesPagina = lotesFiltrados.slice((paginaActual - 1) * LOTES_POR_PAGINA, paginaActual * LOTES_POR_PAGINA);
+  }
 
   return (
     <div className="mt-8">
-      <h2 className="text-lg font-semibold mb-4">Lotes de operaciones</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold">Lotes de operaciones</h2>
+        <button
+          onClick={refreshData}
+          className="px-3 py-1 text-sm border rounded hover:bg-gray-50 transition-colors"
+          disabled={loading}
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refrescar"}
+        </button>
+      </div>
+      
       <div className="flex gap-4 mb-2">
         <input
           type="text"
@@ -83,7 +164,9 @@ export function LotesOperacionesContent({ onImprimirCierre }: { onImprimirCierre
           className="border rounded px-2 py-1"
         />
       </div>
+      
       {error && <div className="text-red-600 mb-2">{error}</div>}
+      
       <div className="rounded-md border bg-card w-full">
         <Table>
           <TableHeader>
@@ -97,22 +180,24 @@ export function LotesOperacionesContent({ onImprimirCierre }: { onImprimirCierre
               <TableHead>Fecha Apertura</TableHead>
               <TableHead>Hora Apertura</TableHead>
               <TableHead>Fecha Cierre</TableHead>
+              <TableHead>Hora Cierre</TableHead>
               <TableHead>Observaciones</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {lotesPagina.map((lote) => (
-              <TableRow key={lote.id_lote}>
+              <TableRow key={lote.id_lote} className="hover:bg-gray-50 transition-colors">
                 <TableCell className="font-semibold">{lote.id_lote}</TableCell>
-                <TableCell>{getCajaNombreTurno(lote.fk_id_caja)}</TableCell>
-                <TableCell>{getUsuarioNombre(lote.fk_id_usuario)}</TableCell>
+                <TableCell>{getCajaNombre(lote.fk_id_caja)}</TableCell>
+                <TableCell>{lote.fk_id_usuario ? lote.fk_id_usuario : ''}</TableCell>
                 <TableCell>{lote.tipo_lote}</TableCell>
                 <TableCell>{lote.abierto ? "Sí" : "No"}</TableCell>
-                <TableCell>${lote.saldo_inicial?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</TableCell>
+                <TableCell>{formatCurrency(lote.saldo_inicial || 0, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</TableCell>
                 <TableCell>{lote.fecha_apertura?.slice(0, 10)}</TableCell>
-                <TableCell>{lote.hora_apertura || 'N/A'}</TableCell>
+                <TableCell>{lote.hora_apertura ? lote.hora_apertura.slice(0,5) : ''}</TableCell>
                 <TableCell>{lote.fecha_cierre?.slice(0, 10)}</TableCell>
+                <TableCell>{lote.hora_cierre ? lote.hora_cierre.slice(0,5) : ''}</TableCell>
                 <TableCell>{lote.observaciones}</TableCell>
                 <TableCell>
                   {!lote.abierto && (
@@ -125,11 +210,14 @@ export function LotesOperacionesContent({ onImprimirCierre }: { onImprimirCierre
             ))}
             {lotesPagina.length === 0 && (
               <TableRow>
-                <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">No hay lotes registrados.</TableCell>
+                <TableCell colSpan={12} className="h-24 text-center text-muted-foreground">
+                  {lotes.length === 0 ? "No hay lotes registrados." : "No se encontraron lotes con los filtros aplicados."}
+                </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
+        
         {/* Paginación */}
         <div className="flex items-center justify-end space-x-2 py-4">
           <div className="flex-1 text-sm text-muted-foreground">
@@ -141,14 +229,14 @@ export function LotesOperacionesContent({ onImprimirCierre }: { onImprimirCierre
           </div>
           <div className="space-x-2">
             <button
-              className="px-3 py-1 rounded border bg-white disabled:opacity-50"
+              className="px-3 py-1 rounded border bg-white disabled:opacity-50 hover:bg-gray-50 transition-colors"
               onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
               disabled={paginaActual === 1}
             >
               Anterior
             </button>
             <button
-              className="px-3 py-1 rounded border bg-white disabled:opacity-50"
+              className="px-3 py-1 rounded border bg-white disabled:opacity-50 hover:bg-gray-50 transition-colors"
               onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
               disabled={paginaActual === totalPaginas || totalPaginas === 0}
             >

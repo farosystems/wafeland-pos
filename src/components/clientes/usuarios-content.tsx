@@ -20,6 +20,8 @@ const ROLES = [
   { label: "Supervisor", value: "supervisor" },
 ];
 
+const allowedRoles = ["vendedor", "cobrador", "supervisor"] as const;
+
 export function UsuariosContent() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,6 +34,7 @@ export function UsuariosContent() {
     telefono: "",
     password_hash: "",
     rol: "vendedor",
+    prueba_gratis: false,
   });
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -52,6 +55,7 @@ export function UsuariosContent() {
       telefono: "",
       password_hash: "",
       rol: "vendedor",
+      prueba_gratis: false,
     });
     setFormError(null);
     setIsDialogOpen(true);
@@ -80,13 +84,13 @@ export function UsuariosContent() {
         if (typeof form.rol === 'string') updateData.rol = form.rol;
         await updateUsuario(editing.id, updateData);
       } else {
-        const allowedRoles = ["vendedor", "cobrador", "supervisor"] as const;
         const createData: CreateUsuarioData = {
           nombre: String(form.nombre),
           email: String(form.email),
           telefono: String(form.telefono),
           password_hash: String(form.password_hash),
-          rol: allowedRoles.includes(form.rol as any) ? form.rol as typeof allowedRoles[number] : "vendedor",
+          rol: allowedRoles.includes(form.rol as typeof allowedRoles[number]) ? form.rol as typeof allowedRoles[number] : "vendedor",
+          prueba_gratis: form.prueba_gratis ?? false,
         };
         await createUsuario(createData);
       }
@@ -156,7 +160,7 @@ export function UsuariosContent() {
               </div>
               <div>
                 <label className="block mb-1 font-medium">Rol</label>
-                <select className="w-full border rounded px-2 py-1" value={form.rol} onChange={e => setForm(f => ({ ...f, rol: e.target.value as any }))} required>
+                <select className="w-full border rounded px-2 py-1" value={form.rol} onChange={e => setForm(f => ({ ...f, rol: e.target.value as typeof allowedRoles[number] }))} required>
                   {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
               </div>
@@ -189,7 +193,7 @@ export function UsuariosContent() {
           </thead>
           <tbody>
             {usuarios.map((u) => (
-              <tr key={u.id} className="border-b">
+              <tr key={u.id} className="border-b hover:bg-blue-50 transition-colors">
                 <td className="px-2 py-1 align-middle">{u.id}</td>
                 <td className="px-2 py-1 align-middle">{u.nombre}</td>
                 <td className="px-2 py-1 align-middle">{u.email}</td>

@@ -7,6 +7,8 @@ export interface OrdenVenta {
   fecha: string; // ISO
   total: number;
   subtotal: number;
+  anulada?: boolean;
+  fk_id_orden_anulada?: number;
 }
 export interface CreateOrdenVentaData extends Omit<OrdenVenta, 'id'> {
   // Add specific properties here if needed

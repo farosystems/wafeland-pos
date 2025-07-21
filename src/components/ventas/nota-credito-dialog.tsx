@@ -20,6 +20,8 @@ import { createOrdenVentaDetalle } from "@/services/ordenesVentaDetalle";
 import { createOrdenVentaMediosPago } from "@/services/ordenesVentaMediosPago";
 import { getLoteCajaAbiertaPorUsuario } from "@/services/lotesOperaciones";
 import { getOrdenesVentaDetalle } from "@/services/ordenesVentaDetalle";
+import { updateOrdenVenta } from "@/services/ordenesVenta";
+import { registrarMovimientoCaja } from "@/services/detalleLotesOperaciones";
 import { Cliente } from "@/types/cliente";
 import { Usuario } from "@/types/usuario";
 import { TipoComprobante } from "@/types/tipoComprobante";
@@ -28,7 +30,9 @@ import { Article } from "@/types/article";
 import { OrdenVenta, OrdenVentaDetalle } from "@/types/ordenVenta";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { updateArticle } from "@/services/articles";
+import { formatCurrency, DEFAULT_CURRENCY, DEFAULT_LOCALE } from "@/lib/utils";
+import { useTrialCheck } from "@/hooks/use-trial-check";
+import { createMovimientoStock } from "@/services/movimientosStock";
 
 interface NotaCreditoDialogProps {
   open: boolean;
@@ -53,6 +57,8 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
   const [articulos, setArticulos] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [detalleOriginal, setDetalleOriginal] = useState<OrdenVentaDetalle[]>([]);
+  const { checkTrial } = useTrialCheck();
+  const [showTrialEnded, setShowTrialEnded] = useState(false);
 
   useEffect(() => {
     if (open && ventaAAnular) {
@@ -239,6 +245,11 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
   async function handleGuardarNotaCredito() {
     setLoading(true);
     setError(null);
+    const expired = await checkTrial(() => setShowTrialEnded(true));
+    if (expired) {
+      setLoading(false);
+      return;
+    }
     try {
       if (!clienteSeleccionado || !usuarioSeleccionado || !loteAbierto || loteAbierto === 0) {
         setShowLoteError(true);
@@ -263,6 +274,7 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
         fecha: hoy,
         total: -totalNotaCredito, // Total negativo
         subtotal: -totalNotaCredito, // Subtotal negativo
+        fk_id_orden_anulada: ventaAAnular?.id,
       });
 
       // Crear los detalles de artículos
@@ -275,11 +287,14 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
             precio_unitario: d.precio,
           });
 
-          // Reingresar stock (sumar las cantidades)
-          if (typeof d.articulo.stock === 'number') {
-            const nuevoStock = d.articulo.stock + d.cantidad;
-            await updateArticle(d.articulo.id, { stock: nuevoStock });
-          }
+          // Registrar movimiento de stock (NOTA DE CREDITO)
+          await createMovimientoStock({
+            fk_id_orden: notaCredito.id,
+            fk_id_articulos: d.articulo.id,
+            origen: "NOTA DE CREDITO",
+            tipo: "entrada",
+            cantidad: Math.abs(d.cantidad),
+          });
         }
       }
 
@@ -291,8 +306,17 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
             fk_id_cuenta_tesoreria: m.cuenta.id,
             monto_pagado: m.monto,
           });
+          // Registrar egreso en caja
+          await registrarMovimientoCaja({
+            fk_id_lote: loteAbierto!,
+            fk_id_cuenta_tesoreria: m.cuenta.id,
+            tipo: "egreso",
+            monto: m.monto,
+          });
         }
       }
+      if (!ventaAAnular) return;
+      await updateOrdenVenta(ventaAAnular.id, { anulada: true });
 
       if (onNotaCreditoGuardada) onNotaCreditoGuardada();
       onOpenChange(false);
@@ -365,7 +389,7 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
                   <div>
                     <label className="block mb-1 font-medium">Total a devolver</label>
                     <div className="border rounded px-2 py-1 bg-gray-50 font-bold text-red-600">
-                      ${total.toFixed(2)}
+                      {formatCurrency(total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}
                     </div>
                   </div>
                 </div>
@@ -455,7 +479,7 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
                 </table>
                 <div className="flex justify-between items-center">
                   <button className="text-blue-600 hover:underline" onClick={agregarLinea}>+ Agregar línea</button>
-                  <div className="font-bold text-red-600">Total a devolver: ${total.toFixed(2)}</div>
+                  <div className="font-bold text-red-600">Total a devolver: {formatCurrency(total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</div>
                 </div>
               </TabsContent>
 
@@ -508,7 +532,7 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
                 
                 {mediosPagoIncompletos && (
                   <div className="text-red-600 text-xs mt-1">
-                    La suma de los montos de devolución debe ser igual al total de la nota de crédito ({total.toFixed(2)}). Diferencia: {diferenciaMediosPago > 0 ? "+" : ""}{diferenciaMediosPago.toFixed(2)}
+                    La suma de los montos de devolución debe ser igual al total de la nota de crédito ({formatCurrency(total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}). Diferencia: {diferenciaMediosPago > 0 ? "+" : ""}{diferenciaMediosPago.toFixed(2)}
                   </div>
                 )}
                 {hayCuentasDuplicadas && (
@@ -543,7 +567,7 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
                   </div>
                   <div>
                     <label className="block mb-1 font-medium">Total a devolver</label>
-                    <div className="border rounded px-2 py-1 bg-gray-50 font-bold text-red-600">${total.toFixed(2)}</div>
+                    <div className="border rounded px-2 py-1 bg-gray-50 font-bold text-red-600">${formatCurrency(total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</div>
                   </div>
                 </div>
 
@@ -640,6 +664,19 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
           <div className="text-red-600 mb-4">Debes agregar al menos un detalle de cuenta de tesorería y monto válido para la devolución.</div>
           <div className="flex justify-end">
             <Button onClick={() => setShowMediosPagoError(false)}>Aceptar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showTrialEnded} onOpenChange={setShowTrialEnded}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Prueba gratis finalizada</DialogTitle>
+            <DialogDescription>
+              La prueba gratis ha finalizado. Debe abonar para continuar usando el sistema.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end mt-4">
+            <Button onClick={() => setShowTrialEnded(false)}>Cerrar</Button>
           </div>
         </DialogContent>
       </Dialog>

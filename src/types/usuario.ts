@@ -6,8 +6,9 @@ export interface Usuario {
   password_hash: string;
   rol: 'vendedor' | 'cobrador' | 'supervisor';
   creado_el: string; // timestamp ISO
+  prueba_gratis: boolean;
 }
 
 export interface CreateUsuarioData extends Omit<Usuario, 'id' | 'creado_el'> {
-  // Add specific properties here if needed
+  prueba_gratis: boolean;
 } 

@@ -1,13 +1,15 @@
 import { supabase } from "@/lib/supabaseClient";
-import { CuentaTesoreria, CreateCuentaTesoreriaData } from "@/types/cuentaTesoreria";
+import { CreateCuentaTesoreriaData } from "@/types/cuentaTesoreria";
+import { CuentaTesoreria } from "@/types/cuentaTesoreria";
 
 export async function getCuentasTesoreria() {
   const { data, error } = await supabase
     .from("cuentas_tesoreria")
-    .select("*")
-    .order("id", { ascending: true });
+    .select("id, descripcion, tipo, activo")
+    .eq("activo", true)
+    .order("descripcion", { ascending: true });
   if (error) throw error;
-  return data as CuentaTesoreria[];
+  return data as { id: number; descripcion: string; tipo: string; activo: boolean }[];
 }
 
 export async function createCuentaTesoreria(cuenta: CreateCuentaTesoreriaData) {

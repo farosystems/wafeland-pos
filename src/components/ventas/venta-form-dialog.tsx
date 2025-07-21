@@ -26,7 +26,10 @@ import { CuentaTesoreria } from "@/types/cuentaTesoreria";
 import { Article } from "@/types/article";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { updateArticle } from "@/services/articles";
+import { formatCurrency, DEFAULT_CURRENCY, DEFAULT_LOCALE } from "@/lib/utils";
+import { createMovimientoStock } from "@/services/movimientosStock";
+import { createCuentaCorriente } from "@/services/cuentasCorrientes";
+import { registrarMovimientoCaja } from "@/services/detalleLotesOperaciones";
 
 interface VentaFormDialogProps {
   open: boolean;
@@ -43,6 +46,31 @@ interface DetalleLinea {
   subtotal: number;
   input: string;
 }
+
+// Función para formatear número con separadores de miles
+const formatNumberWithCommas = (value: string): string => {
+  // Remover todo excepto números y punto decimal
+  const cleanValue = value.replace(/[^\d.]/g, '');
+  
+  // Si está vacío, retornar vacío
+  if (!cleanValue) return '';
+  
+  // Separar parte entera y decimal
+  const parts = cleanValue.split('.');
+  const integerPart = parts[0];
+  const decimalPart = parts[1] || '';
+  
+  // Formatear parte entera con comas
+  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  
+  // Combinar con decimal si existe
+  return decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger;
+};
+
+// Función para desformatear número (remover comas)
+const unformatNumber = (value: string): string => {
+  return value.replace(/,/g, '');
+};
 
 export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFormDialogProps) {
   // const { user } = useUser();
@@ -89,6 +117,10 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
     if (!open) {
       setDetalle([{ articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "" }]);
       setShowSugerencias(null);
+      // Resetear a valores por defecto
+      setClienteSeleccionado(1); // Consumidor final
+      setUsuarioSeleccionado(1); // Jony
+      setTipoComprobanteSeleccionado(1); // Factura
     }
   }, [open]);
 
@@ -96,7 +128,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   const articulosActivos = useMemo(() => articulos.filter(a => a.activo), [articulos]);
 
   // Filtrar solo cuentas de tesorería activas
-  const cuentasTesoreriaValidas = cuentasTesoreria.filter(c => c.activo && c.descripcion && c.descripcion.trim() !== "");
+  const cuentasTesoreriaValidas = cuentasTesoreria.filter(c => c.descripcion && c.descripcion.trim() !== "");
 
   // Filtrar solo tipos de comprobante activos y con reingresa_stock = false
   const tiposComprobantesValidos = tiposComprobantes.filter(tc => tc.activo && tc.descripcion && tc.descripcion.trim() !== "" && tc.reingresa_stock === false);
@@ -153,8 +185,8 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   }
 
   // Estado para el detalle de medios de pago
-  const [mediosPago, setMediosPago] = useState<{ cuenta: CuentaTesoreria | null; monto: number }[]>([
-    { cuenta: null, monto: 0 },
+  const [mediosPago, setMediosPago] = useState<{ cuenta: CuentaTesoreria | null; monto: number; montoFormateado: string }[]>([
+    { cuenta: null, monto: 0, montoFormateado: "" },
   ]);
 
   // Calcular suma de medios de pago
@@ -175,23 +207,28 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   // Cuando cambia el total y hay al menos un medio de pago, autorellenar el primer monto si no fue editado manualmente
   useEffect(() => {
     if (!primerMontoEditado && mediosPago.length > 0) {
-      setMediosPago((prev) => [{ ...prev[0], monto: total }, ...prev.slice(1)]);
+      setMediosPago((prev) => [{ ...prev[0], monto: total, montoFormateado: formatNumberWithCommas(total.toString()) }, ...prev.slice(1)]);
     }
   }, [total, mediosPago.length, primerMontoEditado]);
 
   // Limpiar el detalle de medios de pago cuando se cierra el popup
   useEffect(() => {
     if (!open) {
-      setMediosPago([{ cuenta: null, monto: 0 }]);
+      setMediosPago([{ cuenta: null, monto: 0, montoFormateado: "" }]);
       setPrimerMontoEditado(false);
     }
   }, [open]);
 
   // Handler para cambio de monto
-  function handleMontoChange(idx: number, value: number) {
+  function handleMontoChange(idx: number, value: string) {
+    const formattedValue = formatNumberWithCommas(value);
+    const unformattedValue = unformatNumber(value);
+    const numericValue = parseFloat(unformattedValue) || 0;
+    
     setMediosPago((prev) => {
       const nuevo = [...prev];
-      nuevo[idx].monto = value;
+      nuevo[idx].monto = numericValue;
+      nuevo[idx].montoFormateado = formattedValue;
       return nuevo;
     });
     if (idx === 0) setPrimerMontoEditado(true);
@@ -199,7 +236,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
 
   // Handler para agregar/quitar medios de pago
   function agregarMedioPago() {
-    setMediosPago((prev) => [...prev, { cuenta: null, monto: 0 }]);
+    setMediosPago((prev) => [...prev, { cuenta: null, monto: 0, montoFormateado: "" }]);
   }
   function quitarMedioPago(idx: number) {
     setMediosPago((prev) => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev);
@@ -207,9 +244,9 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   }
 
   // Estados para selects principales
-  const [clienteSeleccionado, setClienteSeleccionado] = useState<number | null>(null);
-  const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<number | null>(null);
-  const [tipoComprobanteSeleccionado, setTipoComprobanteSeleccionado] = useState<number | null>(null);
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<number | null>(1); // Consumidor final
+  const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<number | null>(1); // Jony
+  const [tipoComprobanteSeleccionado, setTipoComprobanteSeleccionado] = useState<number | null>(1); // Factura
   const [loteAbierto, setLoteAbierto] = useState<number | null>(null); // Debe obtenerse del contexto o consulta
 
   // En el form principal (cabecera), los selects deben actualizar estos estados
@@ -239,19 +276,41 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   // Estado para error
   const [error, setError] = useState<string | null>(null);
   const [showLoteError, setShowLoteError] = useState(false);
+  const [showMediosPagoError, setShowMediosPagoError] = useState(false);
+  const [showTrialEnded, setShowTrialEnded] = useState(false);
+  const [showClienteConsumidorFinalError, setShowClienteConsumidorFinalError] = useState(false);
+  const [showMaxCuentaCorrienteError, setShowMaxCuentaCorrienteError] = useState(false);
   const [toast, setToast] = useState<{ show: boolean, message: string }>({ show: false, message: "" });
   function showToast(message: string) {
     setToast({ show: true, message });
     setTimeout(() => setToast({ show: false, message: "" }), 2500);
   }
 
-  const [showMediosPagoError, setShowMediosPagoError] = useState(false);
+  // Utilidad para formatear fecha local a 'YYYY-MM-DD HH:mm:ss'
+  function formatLocalDateTime(date: Date) {
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  }
 
   // En handleGuardarVenta:
   async function handleGuardarVenta() {
     setLoading(true);
     setError(null);
     try {
+      // Validar prueba gratis
+      const usuarios = await getUsuarios();
+      const usuario = usuarios.find(u => u.id === usuarioSeleccionado);
+      if (usuario && usuario.prueba_gratis) {
+        const creado = new Date(usuario.creado_el);
+        const hoy = new Date();
+        const diffMs = hoy.getTime() - creado.getTime();
+        const diffDias = 15 - Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        if (diffDias <= 0) {
+          setShowTrialEnded(true);
+          setLoading(false);
+          return;
+        }
+      }
       // Validar selects y lote
       if (!clienteSeleccionado || !usuarioSeleccionado || !tipoComprobanteSeleccionado || !loteAbierto || loteAbierto === 0) {
         setShowLoteError(true);
@@ -264,10 +323,27 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
         setLoading(false);
         return;
       }
+
+      // Validar que si el medio de pago es CUENTA CORRIENTE, el cliente no sea el de id 1 (Consumidor Final)
+      const medioPagoCuentaCorriente = mediosPago.find(m => m.cuenta && m.cuenta.descripcion.toUpperCase() === "CUENTA CORRIENTE");
+      if (medioPagoCuentaCorriente) {
+        if (clienteSeleccionado === 1) {
+          setShowClienteConsumidorFinalError(true);
+          setLoading(false);
+          return;
+        }
+        // Validar máximo cuenta corriente
+        const cliente = clientes.find(c => c.id === clienteSeleccionado);
+        if (cliente && typeof cliente.maximo_cuenta_corriente === 'number' && cliente.maximo_cuenta_corriente > 0 && total > cliente.maximo_cuenta_corriente) {
+          setShowMaxCuentaCorrienteError(true);
+          setLoading(false);
+          return;
+        }
+      }
       // Calcular total y subtotal de la venta
       const totalVenta = detalle.reduce((acc, d) => acc + (d.cantidad && d.precio ? d.cantidad * d.precio : 0), 0);
       // 1. Crear la orden de venta principal
-      const hoy = format(new Date(), "yyyy-MM-dd");
+      const hoy = formatLocalDateTime(new Date());
       const ordenVenta = await createOrdenVenta({
         fk_id_entidades: clienteSeleccionado,
         fk_id_usuario: usuarioSeleccionado,
@@ -286,11 +362,14 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
             cantidad: d.cantidad,
             precio_unitario: d.precio,
           });
-          // Descontar stock
-          if (typeof d.articulo.stock === 'number') {
-            const nuevoStock = Math.max(0, d.articulo.stock - d.cantidad);
-            await updateArticle(d.articulo.id, { stock: nuevoStock });
-          }
+          // Registrar movimiento de stock (FACTURA)
+          await createMovimientoStock({
+            fk_id_orden: ordenVenta.id,
+            fk_id_articulos: d.articulo.id,
+            origen: "FACTURA",
+            tipo: "salida",
+            cantidad: -Math.abs(d.cantidad),
+          });
         }
       }
       // 3. Crear los medios de pago
@@ -301,7 +380,27 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
             fk_id_cuenta_tesoreria: m.cuenta.id,
             monto_pagado: m.monto,
           });
+          // Registrar ingreso en caja solo si NO es cuenta corriente (robusto)
+          if (!m.cuenta.descripcion.toUpperCase().replace(/\s/g, '').includes("CUENTACORRIENTE")) {
+            await registrarMovimientoCaja({
+              fk_id_lote: loteAbierto!,
+              fk_id_cuenta_tesoreria: m.cuenta.id,
+              tipo: "ingreso",
+              monto: m.monto,
+            });
+          }
         }
+      }
+      // Lógica CUENTA CORRIENTE
+      const cuentaCorrienteTesoreria = mediosPago.find(m => m.cuenta && m.cuenta.descripcion.toUpperCase() === "CUENTA CORRIENTE");
+      if (cuentaCorrienteTesoreria) {
+        await createCuentaCorriente({
+          fk_id_orden: ordenVenta.id,
+          fk_id_cliente: clienteSeleccionado,
+          total: totalVenta,
+          saldo: totalVenta,
+          estado: "pendiente",
+        });
       }
       // 4. Crear los impuestos
       // Elimina el estado y handlers de impuestos si no se usan en otro lado
@@ -472,7 +571,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                             disabled={!d.articulo}
                           />
                         </td>
-                        <td className="px-2 py-1">${(d.subtotal || 0).toFixed(2)}</td>
+                        <td className="px-2 py-1">${formatCurrency(d.subtotal, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
                         <td className="px-2 py-1">
                           <button
                             className="text-red-600 hover:underline"
@@ -488,7 +587,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                 </table>
                 <div className="flex justify-between items-center">
                   <button className="text-blue-600 hover:underline" onClick={agregarLinea}>+ Agregar línea</button>
-                  <div className="font-bold">Total: ${total.toFixed(2)}</div>
+                  <div className="font-bold">Total: ${formatCurrency(total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</div>
                 </div>
               </TabsContent>
               <TabsContent value="medios">
@@ -521,11 +620,10 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                         </td>
                         <td className="px-2 py-1">
                           <input
-                            type="number"
-                            min="0"
+                            type="text"
                             className="w-32 border rounded px-2 py-1 text-right"
-                            value={m.monto === 0 ? "" : m.monto}
-                            onChange={e => handleMontoChange(idx, Number(e.target.value))}
+                            value={m.montoFormateado}
+                            onChange={e => handleMontoChange(idx, e.target.value)}
                             placeholder="Monto"
                           />
                         </td>
@@ -539,7 +637,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                 <Button size="sm" variant="outline" onClick={agregarMedioPago}>Agregar medio de pago</Button>
                 {mediosPagoIncompletos && (
                   <div className="text-red-600 text-xs mt-1">
-                    La suma de los montos de los medios de pago debe ser igual al total de la venta ({total.toFixed(2)}). Diferencia: {diferenciaMediosPago > 0 ? "+" : ""}{diferenciaMediosPago.toFixed(2)}
+                    La suma de los montos de los medios de pago debe ser igual al total de la venta ({formatCurrency(total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}). Diferencia: {diferenciaMediosPago > 0 ? "+" : ""}{formatCurrency(diferenciaMediosPago, DEFAULT_CURRENCY, DEFAULT_LOCALE)}
                   </div>
                 )}
                 {hayCuentasDuplicadas && (
@@ -623,7 +721,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                     {detalle.filter(d => d.articulo && d.cantidad > 0).map((d, idx) => (
                       <div key={idx} className="flex justify-between text-sm py-1">
                         <span>{d.articulo?.descripcion}</span>
-                        <span>{d.cantidad} x ${d.precio.toFixed(2)} = ${d.subtotal.toFixed(2)}</span>
+                        <span>{d.cantidad} x ${formatCurrency(d.precio, DEFAULT_CURRENCY, DEFAULT_LOCALE)} = ${formatCurrency(d.subtotal, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
                       </div>
                     ))}
                     {detalle.filter(d => d.articulo && d.cantidad > 0).length === 0 && (
@@ -639,7 +737,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                     {mediosPago.filter(m => m.cuenta && m.monto > 0).map((m, idx) => (
                       <div key={idx} className="flex justify-between text-sm py-1">
                         <span>{m.cuenta?.descripcion}</span>
-                        <span>${m.monto.toFixed(2)}</span>
+                        <span>${formatCurrency(m.monto, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
                       </div>
                     ))}
                     {mediosPago.filter(m => m.cuenta && m.monto > 0).length === 0 && (
@@ -649,15 +747,15 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                       <div className="border-t pt-2 mt-2">
                         <div className="flex justify-between font-semibold">
                           <span>Total medios de pago:</span>
-                          <span>${sumaMediosPago.toFixed(2)}</span>
+                          <span>${formatCurrency(sumaMediosPago, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>Total venta:</span>
-                          <span>${total.toFixed(2)}</span>
+                          <span>${formatCurrency(total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
                         </div>
                         <div className={`flex justify-between text-sm ${diferenciaMediosPago === 0 ? 'text-green-600' : 'text-red-600'}`}>
                           <span>Diferencia:</span>
-                          <span>{diferenciaMediosPago > 0 ? '+' : ''}{diferenciaMediosPago.toFixed(2)}</span>
+                          <span>{diferenciaMediosPago > 0 ? '+' : ''}{formatCurrency(diferenciaMediosPago, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
                         </div>
                       </div>
                     )}
@@ -723,6 +821,48 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
           <div className="text-red-600 mb-4">Debes agregar al menos un detalle de cuenta de tesorería y monto válido.</div>
           <div className="flex justify-end">
             <Button onClick={() => setShowMediosPagoError(false)}>Aceptar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Modal de prueba gratis finalizada */}
+      <Dialog open={showTrialEnded} onOpenChange={setShowTrialEnded}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Prueba gratis finalizada</DialogTitle>
+            <DialogDescription>
+              La prueba gratis ha finalizado. Debe abonar para continuar usando el sistema.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end mt-4">
+            <Button onClick={() => setShowTrialEnded(false)}>Cerrar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Modal de error para CUENTA CORRIENTE y Consumidor Final */}
+      <Dialog open={showClienteConsumidorFinalError} onOpenChange={setShowClienteConsumidorFinalError}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Error de cliente</DialogTitle>
+            <DialogDescription>
+              No se puede utilizar el medio de pago &quot;Cuenta Corriente&quot; si el cliente es &quot;Consumidor Final&quot;. Por favor, selecciona un cliente válido.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end mt-4">
+            <Button onClick={() => setShowClienteConsumidorFinalError(false)}>Cerrar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Modal de error de máximo cuenta corriente */}
+      <Dialog open={showMaxCuentaCorrienteError} onOpenChange={setShowMaxCuentaCorrienteError}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Límite de cuenta corriente superado</DialogTitle>
+            <DialogDescription>
+              El total de la venta supera el máximo permitido para cuenta corriente de este cliente. Por favor, revisa el límite o elige otro medio de pago.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end mt-4">
+            <Button onClick={() => setShowMaxCuentaCorrienteError(false)}>Cerrar</Button>
           </div>
         </DialogContent>
       </Dialog>
