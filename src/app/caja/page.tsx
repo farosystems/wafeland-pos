@@ -1,5 +1,8 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import { useUser } from "@clerk/nextjs";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import React, { useEffect, useState, useCallback } from "react";
 import { getCajas } from "@/services/cajas";
 import { Caja } from "@/types/caja";
 import { format } from "date-fns";
@@ -33,6 +36,7 @@ import { formatCurrency, DEFAULT_CURRENCY, DEFAULT_LOCALE } from "@/lib/utils";
 import { BreadcrumbBar } from "@/components/BreadcrumbBar";
 import { getClientes } from "@/services/clientes";
 import { getPagosCuentaCorriente } from "@/services/pagosCuentaCorriente";
+import { LoteOperacion } from "@/types/loteOperacion";
 
 interface AperturaCaja {
   caja: string;
@@ -48,46 +52,52 @@ interface AperturaCaja {
 
 
 export default function CajaPage() {
-  // Formulario de apertura de caja (simulado)
+  const { isSignedIn, user } = useUser();
+  const router = useRouter();
+
+  // TODOS los hooks deben ir aquí
   const [cajaSeleccionada, setCajaSeleccionada] = useState("");
   const [saldoInicial, setSaldoInicial] = useState("");
   const [cajaAbierta, setCajaAbierta] = useState<string | null>(null);
   const [aperturaError, setAperturaError] = useState<string | null>(null);
   const [observacionesApertura, setObservacionesApertura] = useState("");
-
-  // CRUD de cajas de turno
   const [cajas, setCajas] = useState<Caja[]>([]);
-  // const [loading, setLoading] = useState(false);
-  // const [crudError, setCrudError] = useState<string | null>(null);
-  // const [editCaja, setEditCaja] = useState<Caja | null>(null);
-  // const [descripcion, setDescripcion] = useState("");
-  // const [turno, setTurno] = useState("");
-
-  // Simulación de historial de aperturas/cierres
   const [historial] = useState<AperturaCaja[]>([]);
   const [aperturaActual, setAperturaActual] = useState<AperturaCaja | null>(null);
-
-  // Ref para refrescar lotes
   const [refreshLotes, setRefreshLotes] = useState(0);
-
   const [showCierreModal, setShowCierreModal] = useState(false);
-  // const [movimientos, setMovimientos] = useState<DetalleLoteOperacion[]>([]);
   const [resumen, setResumen] = useState<{ cuenta: string, ingresos: number, egresos: number }[]>([]);
-  const [loadingCierre, setLoadingCierre] = useState(false);
+  const [loadingCierre] = useState(false);
   const [cuentasTesoreria, setCuentasTesoreria] = useState<CuentaTesoreria[]>([]);
   const [toast, setToast] = useState<{ show: boolean, message: string }>({ show: false, message: "" });
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<string>("");
   const [showTrialEnded, setShowTrialEnded] = useState(false);
+  const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
+  const [usuarioDB, setUsuarioDB] = useState<Usuario | null>(null);
 
-  const fetchCajaAbierta = async () => {
-    // Por ahora usuario id 1
-    const lote = await getLoteCajaAbiertaPorUsuario(1);
+  // Loader global
+  const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
+
+  // Modificar fetchCajaAbierta para que el supervisor pueda ver la caja abierta de cualquier usuario seleccionado
+  const fetchCajaAbierta = useCallback(async (usuarioId?: number) => {
+    // Si es supervisor y hay un usuario seleccionado, usar ese id; si no, usar el propio
+    let idToUse = usuarioId;
+    if (usuarioDB?.rol === "supervisor" && usuarioSeleccionado) {
+      idToUse = Number(usuarioSeleccionado);
+    }
+    if (!idToUse) {
+      setCajaAbierta(null);
+      setAperturaActual(null);
+      return;
+    }
+    const lote = await getLoteCajaAbiertaPorUsuario(idToUse);
     if (lote) {
       setCajaAbierta(lote.fk_id_caja);
       setAperturaActual({
         caja: cajas.find(c => c.id === lote.fk_id_caja)?.descripcion || lote.fk_id_caja,
-        saldoInicial: lote.saldo_inicial?.toString() || '', // Obtener saldo del lote
+        saldoInicial: lote.saldo_inicial?.toString() || '',
         fechaApertura: lote.fecha_apertura?.slice(0, 10),
         horaApertura: lote.hora_apertura,
         fechaCierre: null,
@@ -99,15 +109,54 @@ export default function CajaPage() {
       setCajaAbierta(null);
       setAperturaActual(null);
     }
-  };
+  }, [usuarioDB, usuarioSeleccionado, cajas]);
 
   // Cambiar useEffect para que el array de dependencias esté vacío:
   useEffect(() => {
     fetchCajas();
-    fetchCajaAbierta();
     getCuentasTesoreria().then(setCuentasTesoreria);
-    getUsuarios().then(setUsuarios);
-  }, [fetchCajaAbierta]);
+    getUsuarios().then(us => {
+      setUsuarios(us);
+      if (user?.emailAddresses?.[0]?.emailAddress) {
+        const actual = us.find(u => u.email === user.emailAddresses[0].emailAddress);
+        setUsuarioActual(actual || null);
+        setUsuarioDB(actual || null);
+        if (actual) setUsuarioSeleccionado(actual.id.toString());
+        // Solo llamar a fetchCajaAbierta cuando usuarioActual esté definido
+        if (actual) fetchCajaAbierta(actual.id);
+      }
+    });
+  }, [user]);
+
+  // Al cargar usuarios, si es supervisor y no hay usuario seleccionado, seleccionar el primero y mostrar su caja abierta
+  React.useEffect(() => {
+    if (usuarioDB?.rol === "supervisor" && usuarios.length > 0 && !usuarioSeleccionado) {
+      setUsuarioSeleccionado(usuarios[0].id.toString());
+      fetchCajaAbierta(Number(usuarios[0].id));
+    }
+  }, [usuarioDB, usuarios, usuarioSeleccionado, fetchCajaAbierta]);
+
+  // Refrescar caja abierta al cambiar usuarioSeleccionado si es supervisor
+  React.useEffect(() => {
+    if (usuarioDB?.rol === "supervisor" && usuarioSeleccionado) {
+      fetchCajaAbierta(Number(usuarioSeleccionado));
+    }
+  }, [usuarioSeleccionado, usuarioDB, fetchCajaAbierta]);
+
+  // Estado para el lote abierto global (para supervisor)
+  const [loteAbiertoGlobal, setLoteAbiertoGlobal] = useState<LoteOperacion | null>(null);
+
+  // Al cargar, si el usuario es supervisor, buscar cualquier caja abierta
+  React.useEffect(() => {
+    async function fetchLoteAbiertoGlobal() {
+      if (usuarioDB?.rol === "supervisor") {
+        const lotes = await getLotesOperaciones();
+        const abierto = lotes.find(l => l.abierto);
+        setLoteAbiertoGlobal(abierto || null);
+      }
+    }
+    fetchLoteAbiertoGlobal();
+  }, [usuarioDB, refreshLotes]);
 
   const fetchCajas = async () => {
     try {
@@ -120,10 +169,52 @@ export default function CajaPage() {
     }
   };
 
+  if (!isSignedIn) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-muted-foreground gap-4">
+        <span>Debes iniciar sesión para ver la caja.</span>
+        <Button onClick={() => router.push("/sign-in")}>Iniciar Sesión</Button>
+      </div>
+    );
+  }
+  // Formulario de apertura de caja (simulado)
+  // const [cajaSeleccionada, setCajaSeleccionada] = useState("");
+  // const [saldoInicial, setSaldoInicial] = useState("");
+  // const [cajaAbierta, setCajaAbierta] = useState<string | null>(null);
+  // const [aperturaError, setAperturaError] = useState<string | null>(null);
+  // const [observacionesApertura, setObservacionesApertura] = useState("");
+
+  // CRUD de cajas de turno
+  // const [cajas, setCajas] = useState<Caja[]>([]);
+  // const [loading, setLoading] = useState(false);
+  // const [crudError, setCrudError] = useState<string | null>(null);
+  // const [editCaja, setEditCaja] = useState<Caja | null>(null);
+  // const [descripcion, setDescripcion] = useState("");
+  // const [turno, setTurno] = useState("");
+
+  // Simulación de historial de aperturas/cierres
+  // const [historial] = useState<AperturaCaja[]>([]);
+  // const [aperturaActual, setAperturaActual] = useState<AperturaCaja | null>(null);
+
+  // Ref para refrescar lotes
+  // const [refreshLotes, setRefreshLotes] = useState(0);
+
+  // const [showCierreModal, setShowCierreModal] = useState(false);
+  // const [movimientos, setMovimientos] = useState<DetalleLoteOperacion[]>([]);
+  // const [resumen, setResumen] = useState<{ cuenta: string, ingresos: number, egresos: number }[]>([]);
+  // const [loadingCierre, setLoadingCierre] = useState(false);
+  // const [cuentasTesoreria, setCuentasTesoreria] = useState<CuentaTesoreria[]>([]);
+  // const [toast, setToast] = useState<{ show: boolean, message: string }>({ show: false, message: "" });
+  // const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  // const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<string>("");
+  // const [showTrialEnded, setShowTrialEnded] = useState(false);
+
   // --- Apertura de caja (simulado, en el futuro irá a otra tabla) ---
   const handleAbrirCaja = async (e: React.FormEvent) => {
     e.preventDefault();
     setAperturaError(null);
+    setLoading(true);
+    setLoadingMessage("Abriendo caja, por favor espera...");
     // Validar prueba gratis
     try {
       const usuarios = await getUsuarios();
@@ -135,41 +226,30 @@ export default function CajaPage() {
         const diffDias = 15 - Math.floor(diffMs / (1000 * 60 * 60 * 24));
         if (diffDias <= 0) {
           setShowTrialEnded(true);
+          setLoading(false);
+          setLoadingMessage("");
           return;
         }
       }
     } catch {}
     if (!cajaSeleccionada || !saldoInicial || !usuarioSeleccionado) {
       setAperturaError("Selecciona una caja, usuario y saldo inicial");
+      setLoading(false);
+      setLoadingMessage("");
       return;
     }
     if (cajaAbierta) {
       setAperturaError("Ya hay una caja abierta. Cierra la caja antes de abrir otra.");
+      setLoading(false);
+      setLoadingMessage("");
       return;
     }
     const now = new Date();
     const hoy = format(now, "yyyy-MM-dd");
-    setCajaAbierta(cajaSeleccionada);
-    setAperturaActual({
-      caja: cajaSeleccionada,
-      saldoInicial,
-      fechaApertura: hoy,
-      horaApertura: format(now, "HH:mm"),
-      fechaCierre: null,
-      horaCierre: null,
-      // observaciones: observacionesApertura, // No corresponde aquí
-    });
-    setCajaSeleccionada("");
-    setSaldoInicial("");
-    setUsuarioSeleccionado("");
-    setObservacionesApertura("");
-    showToast("Caja abierta correctamente");
-
-    // --- Lógica de lotes de operaciones ---
     try {
       // Buscar la caja por descripción
       const cajaObj = cajas.find(c => c.descripcion === cajaSeleccionada);
-      if (!cajaObj) return;
+      if (!cajaObj) throw new Error("Caja no encontrada");
       // Crear lote de apertura
       const lote = await createLoteOperacion({
         fk_id_usuario: parseInt(usuarioSeleccionado, 10),
@@ -190,14 +270,36 @@ export default function CajaPage() {
         tipo: 'ingreso',
         monto: parseFloat(saldoInicial),
       });
+      // Actualiza el frontend inmediatamente
+      setCajaAbierta(cajaSeleccionada);
+      setAperturaActual({
+        caja: cajaSeleccionada,
+        saldoInicial,
+        fechaApertura: hoy,
+        horaApertura: format(now, "HH:mm"),
+        fechaCierre: null,
+        horaCierre: null,
+        id_lote: lote.id_lote,
+        fk_id_usuario: parseInt(usuarioSeleccionado, 10),
+      });
+      setCajaSeleccionada("");
+      setSaldoInicial("");
+      setUsuarioSeleccionado("");
+      setObservacionesApertura("");
       setRefreshLotes(x => x + 1);
-    } catch {}
-    await fetchCajaAbierta();
+      showToast("Caja abierta correctamente");
+    } finally {
+      setLoading(false);
+      setLoadingMessage("");
+    }
+    // Refresca datos secundarios si es necesario
+    // await fetchCajaAbierta();
   };
 
   async function handleCerrarCaja() {
+    setLoading(true);
+    setLoadingMessage("Cerrando caja y calculando movimientos...");
     if (!aperturaActual || !aperturaActual.id_lote) return;
-    setLoadingCierre(true);
     // Traer todos los movimientos reales del lote
     const movimientos = await getDetalleLotesOperaciones(aperturaActual.id_lote);
     // Traer todas las cuentas de tesorería
@@ -219,34 +321,31 @@ export default function CajaPage() {
     const resumenFinal = Object.values(resumenPorCuenta);
     setResumen(resumenFinal);
     setShowCierreModal(true);
-    setLoadingCierre(false);
+    setLoading(false);
+    setLoadingMessage("");
   }
 
   async function confirmarCierreCaja() {
     setShowCierreModal(false);
     if (!aperturaActual || !aperturaActual.id_lote) return;
-    setLoadingCierre(true);
+    setLoading(true);
+    setLoadingMessage("Confirmando cierre de caja...");
     const now = new Date();
     const hoyCierre = format(now, "yyyy-MM-dd");
-    // Registrar saldo inicial como ingreso en efectivo al cierre
-    const saldoInicial = parseFloat(aperturaActual.saldoInicial || '0');
-    if (saldoInicial > 0 && cuentasTesoreria.length > 0) {
-      const cuentaEfectivo = cuentasTesoreria.find(c => c.descripcion.toLowerCase().includes('efectivo'));
-      if (cuentaEfectivo) {
-        await createDetalleLoteOperacion({
-          fk_id_lote: aperturaActual.id_lote,
-          fk_id_cuenta_tesoreria: cuentaEfectivo.id,
-          tipo: 'ingreso',
-          monto: saldoInicial,
-        });
-      }
+    try {
+      // 1. Actualiza el registro en la base de datos
+      await cerrarLoteApertura(aperturaActual.id_lote, hoyCierre, format(now, "HH:mm"));
+      // 2. Actualiza el estado del frontend inmediatamente
+      setCajaAbierta(null);
+      setAperturaActual(null);
+      setRefreshLotes(x => x + 1);
+      showToast("Cierre de caja confirmado");
+    } finally {
+      setLoading(false);
+      setLoadingMessage("");
     }
-    await cerrarLoteApertura(aperturaActual.id_lote, hoyCierre, format(now, "HH:mm"));
-    setCajaAbierta(null);
-    setAperturaActual(null);
-    setLoadingCierre(false);
-    setRefreshLotes(x => x + 1); // Refrescar la tabla de lotes SOLO después de confirmar
-    showToast("Cierre de caja confirmado");
+    // 3. (Opcional) Calcula movimientos o genera PDF en segundo plano si es necesario
+    // calcularMovimientosYGenerarPDF();
   }
 
   async function generarPDFCierreCaja() {
@@ -315,7 +414,7 @@ export default function CajaPage() {
         2: { halign: "right" }
       }
     });
-    const afterTablesY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 8 : yDatos + 20;
+    const afterTablesY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable ? (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8 : yDatos + 20;
     // Totales alineados a la derecha
     let afterTotalesY = afterTablesY + 28;
     // Tabla de pagos
@@ -351,7 +450,7 @@ export default function CajaPage() {
           fontSize: 9
         }
       });
-      const pagosFinalY = (doc as any).lastAutoTable.finalY + 6;
+      const pagosFinalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
       doc.text(`Total de pagos: ${formatCurrency(totalPagos, DEFAULT_CURRENCY, DEFAULT_LOCALE)}`, 150, pagosFinalY, { align: "right" });
@@ -364,7 +463,7 @@ export default function CajaPage() {
     doc.text("Nota: Los ingresos de 'CUENTA CORRIENTE' son informativos y no se suman al total de ingresos de caja. Ese total se reparte en los otros medios de pago a medida que el cliente paga su deuda.", 20, afterTotalesY, { maxWidth: 170 });
     doc.setTextColor(0);
     // --- Tabla de órdenes de venta del lote ---
-    const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY : yDatos + 20;
+    const finalY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable ? (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY : yDatos + 20;
     if (ventasLote && ventasLote.length > 0) {
       const resumenY2 = finalY + 55;
       doc.setFontSize(14);
@@ -418,15 +517,20 @@ export default function CajaPage() {
     doc.text(`Generado el ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 20, 280);
     // Totales al final, alineados a la izquierda y centrados respecto a la hoja
     const pageWidth = doc.internal.pageSize.getWidth();
+    const totalIngresosSinCuentaCorriente = resumen
+      .filter(r => r.cuenta.toUpperCase() !== "CUENTA CORRIENTE")
+      .reduce((sum, r) => sum + r.ingresos, 0);
+    const totalEgresosSinCuentaCorriente = resumen
+      .filter(r => r.cuenta.toUpperCase() !== "CUENTA CORRIENTE")
+      .reduce((sum, r) => sum + r.egresos, 0);
+    // const saldoFinal = totalIngresosSinCuentaCorriente - totalEgresosSinCuentaCorriente;
+    const yTotales = 265;
     const totalesText = [
-      `Saldo inicial: ${formatCurrency(parseFloat(aperturaActual?.saldoInicial || '0'), DEFAULT_CURRENCY, DEFAULT_LOCALE)}`,
+      `Saldo inicial: ${formatCurrency(Number(saldoInicial), DEFAULT_CURRENCY, DEFAULT_LOCALE)}`,
       `Total Ingresos: ${formatCurrency(totalIngresosSinCuentaCorriente, DEFAULT_CURRENCY, DEFAULT_LOCALE)}`,
       `Total Egresos: ${formatCurrency(totalEgresosSinCuentaCorriente, DEFAULT_CURRENCY, DEFAULT_LOCALE)}`,
-      `Saldo Final: ${formatCurrency(saldoFinal, DEFAULT_CURRENCY, DEFAULT_LOCALE)}`
+      `Saldo Final: ${formatCurrency(totalIngresosSinCuentaCorriente - totalEgresosSinCuentaCorriente, DEFAULT_CURRENCY, DEFAULT_LOCALE)}`
     ];
-    doc.setFontSize(13);
-    doc.setFont("helvetica", "bold");
-    const yTotales = 265;
     totalesText.forEach((line, idx) => {
       doc.text(line, pageWidth / 2, yTotales + idx * 7, { align: "center" });
     });
@@ -437,7 +541,6 @@ export default function CajaPage() {
 
   // Imprimir cierre de caja para cualquier lote
   async function imprimirCierreDeLote(id_lote: number) {
-    // Buscar el lote
     const lotes = await getLotesOperaciones();
     const lote = lotes.find(l => l.id_lote === id_lote);
     if (!lote) return;
@@ -473,19 +576,21 @@ export default function CajaPage() {
     }
     
     // Procesar ventas del lote
-    for (const venta of ventasLote) {
-      const medios = await getOrdenesVentaMediosPago(venta.id);
+    const mediosPorVenta = await Promise.all(
+      ventasLote.map(venta => getOrdenesVentaMediosPago(venta.id))
+    );
+    ventasLote.forEach((venta, i) => {
+      const medios = mediosPorVenta[i];
       for (const m of medios) {
         if (resumenPorCuenta[m.fk_id_cuenta_tesoreria]) {
           if (venta.fk_id_tipo_comprobante === 2) {
-            // Nota de crédito: restar el monto (devolución)
             resumenPorCuenta[m.fk_id_cuenta_tesoreria].ingresos -= m.monto_pagado;
           } else {
             resumenPorCuenta[m.fk_id_cuenta_tesoreria].ingresos += m.monto_pagado;
           }
         }
       }
-    }
+    });
     
     const resumenFinal = Object.values(resumenPorCuenta);
     
@@ -529,7 +634,7 @@ export default function CajaPage() {
     const totalIngresos = resumenFinal.reduce((sum, r) => sum + r.ingresos, 0);
     const totalEgresos = resumenFinal.reduce((sum, r) => sum + r.egresos, 0);
     const saldoInicial = parseFloat(lote.saldo_inicial?.toString() || '0');
-    const saldoFinal = saldoInicial + totalIngresos - totalEgresos;
+    const saldoFinal = totalIngresos - totalEgresos;
     
     const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
     doc.setFontSize(12);
@@ -611,12 +716,12 @@ export default function CajaPage() {
     .reduce((sum, r) => sum + r.ingresos, 0);
 
   // Definir totalEgresosSinCuentaCorriente antes de imprimir los totales
-  const totalEgresosSinCuentaCorriente = resumen
-    .filter(r => r.cuenta.toUpperCase() !== "CUENTA CORRIENTE")
-    .reduce((sum, r) => sum + r.egresos, 0);
+  // const totalEgresosSinCuentaCorriente = resumen
+  //   .filter(r => r.cuenta.toUpperCase() !== "CUENTA CORRIENTE")
+  //   .reduce((sum, r) => sum + r.egresos, 0);
 
   // Definir saldoFinal antes de imprimir los totales
-  const saldoFinal = totalIngresosSinCuentaCorriente - totalEgresosSinCuentaCorriente;
+  // const saldoFinal = totalIngresosSinCuentaCorriente - totalEgresosSinCuentaCorriente;
 
   return (
     <div className="w-full px-8 mt-6">
@@ -627,10 +732,25 @@ export default function CajaPage() {
           <h1 className="text-2xl font-bold">Gestión de Caja</h1>
         </div>
       </div>
-      {/* Formulario de apertura de caja (simulado) */}
       <div className="rounded-lg border bg-card p-6 mb-8">
         <h2 className="text-lg font-semibold mb-2">Apertura de caja</h2>
-        {cajaAbierta ? (
+        {usuarioDB?.rol === "supervisor" && loteAbiertoGlobal ? (
+          <div className="flex items-center gap-6 p-4 bg-green-50 border border-green-200 rounded-lg shadow-sm">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <Box className="w-6 h-6 text-green-600" />
+                <span className="text-green-700 font-semibold text-lg">
+                  Caja abierta: 
+                  <span className="font-bold">{(() => {
+                    const cajaObj = cajas.find((c: Caja) => c.id === Number(loteAbiertoGlobal.fk_id_caja));
+                    return cajaObj?.descripcion || loteAbiertoGlobal.fk_id_caja;
+                  })()}</span>
+                </span>
+              </div>
+              <span className="text-xs text-green-800">Abierta por: {usuarios.find(u => u.id === loteAbiertoGlobal.fk_id_usuario)?.nombre || "-"}</span>
+            </div>
+          </div>
+        ) : cajaAbierta ? (
           <div className="flex items-center gap-6 p-4 bg-green-50 border border-green-200 rounded-lg shadow-sm">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
@@ -640,7 +760,7 @@ export default function CajaPage() {
                   <span className="font-bold">
                     {(() => {
                       if (aperturaActual && aperturaActual.id_lote && cajaAbierta) {
-                        const cajaObj = cajas.find((c: unknown) => (c as any).id === Number(cajaAbierta));
+                        const cajaObj = cajas.find((c: Caja) => c.id === Number(cajaAbierta));
                         return cajaObj?.descripcion || aperturaActual.caja || cajaAbierta;
                       }
                       return aperturaActual?.caja || cajaAbierta;
@@ -649,17 +769,20 @@ export default function CajaPage() {
                 </span>
               </div>
               {aperturaActual?.fk_id_usuario && (
-                <span className="text-xs text-green-800">Usuario: {usuarios.find(u => u.id === aperturaActual.fk_id_usuario)?.nombre || "-"}</span>
+                <span className="text-xs text-green-800">Abierta por: {usuarios.find(u => u.id === aperturaActual.fk_id_usuario)?.nombre || "-"}</span>
               )}
             </div>
-            <button
-              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-lg shadow transition-all duration-150 active:scale-95"
-              onClick={handleCerrarCaja}
-              disabled={loadingCierre}
-            >
-              <CloseIcon className="w-4 h-4" />
-              Cerrar caja
-            </button>
+            {/* Solo mostrar botón de cierre si el usuario es supervisor o el que abrió la caja */}
+            {(usuarioDB?.rol === "supervisor" || aperturaActual?.fk_id_usuario === usuarioActual?.id) && (
+              <button
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-lg shadow transition-all duration-150 active:scale-95"
+                onClick={handleCerrarCaja}
+                disabled={loadingCierre}
+              >
+                <CloseIcon className="w-4 h-4" />
+                Cerrar caja
+              </button>
+            )}
           </div>
         ) : (
           <form onSubmit={handleAbrirCaja} className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -673,7 +796,7 @@ export default function CajaPage() {
               >
                 <option value="">Seleccionar caja</option>
                 {cajas.map((caja) => (
-                  <option key={caja.id} value={caja.descripcion}>{caja.descripcion}</option>
+                  <option key={caja.id} value={caja.id}>{caja.descripcion}</option>
                 ))}
               </select>
             </div>
@@ -694,17 +817,16 @@ export default function CajaPage() {
                 </div>
               )}
             </div>
+            {/* Usuario */}
             <div>
               <label className="block mb-1 font-medium">Usuario</label>
               <select
+                className="w-full border rounded px-2 py-1"
                 value={usuarioSeleccionado}
                 onChange={e => setUsuarioSeleccionado(e.target.value)}
-                className="border rounded px-2 py-1"
-                required
               >
-                <option value="">Selecciona un usuario</option>
-                {usuarios.map(u => (
-                  <option key={u.id} value={u.id}>{u.nombre}</option>
+                {usuarios.map((usuario) => (
+                  <option key={usuario.id} value={usuario.id.toString()}>{usuario.nombre}</option>
                 ))}
               </select>
             </div>
@@ -826,6 +948,15 @@ export default function CajaPage() {
       {toast.show && (
         <div className="fixed top-6 right-6 z-50 bg-green-600 text-white px-6 py-3 rounded shadow-lg animate-fade-in">
           {toast.message}
+        </div>
+      )}
+      {/* Loader modal global */}
+      {loading && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 flex flex-col items-center gap-4 shadow-lg">
+            <span className="text-[#00adde] font-bold text-lg">{loadingMessage}</span>
+            <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-[#00adde] border-solid"></div>
+          </div>
         </div>
       )}
     </div>

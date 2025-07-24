@@ -56,7 +56,7 @@ export function AgrupadoresContent() {
               Nuevo Agrupador
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[400px]">
+          <DialogContent className="sm:max-w-[400px]" preventOutsideClose>
             <DialogHeader>
               <DialogTitle>
                 {editingAgrupador ? "Editar Agrupador" : "Nuevo Agrupador"}

@@ -13,14 +13,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { IconCash } from "@tabler/icons-react";
 import { getCuentasCorrientes, cancelarCuentaCorriente } from "@/services/cuentasCorrientes";
 import { getClientes } from "@/services/clientes";
+import { getUsuarios } from "@/services/usuarios";
 import { Cliente } from "@/types/cliente";
 import { CuentaCorriente } from "@/types/cuentaCorriente";
+import { Usuario } from "@/types/usuario";
 import { X, DollarSign } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { BreadcrumbBar } from "@/components/BreadcrumbBar";
 import { PagoModal } from "@/components/cuentas-corrientes/pago-modal";
+import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 
 export default function CuentasCorrientesPage() {
+  const { isSignedIn, user } = useUser();
+  const router = useRouter();
   const [cuentas, setCuentas] = useState<CuentaCorriente[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [filtro, setFiltro] = useState("");
@@ -33,7 +39,7 @@ export default function CuentasCorrientesPage() {
   const [cancelErrorMsg, setCancelErrorMsg] = useState("");
   const [showCancelConfirm, setShowCancelConfirm] = useState<{ open: boolean, cuenta: CuentaCorriente | null }>({ open: false, cuenta: null });
   const [showPagoCanceladoError, setShowPagoCanceladoError] = useState(false);
-
+  const [usuarioActualId, setUsuarioActualId] = useState<number | null>(null);
   const columns = [
     { key: "id", label: "ID" },
     { key: "creada_el", label: "Fecha" },
@@ -49,12 +55,18 @@ export default function CuentasCorrientesPage() {
   const fetchAll = async () => {
     setError(null);
     try {
-      const [cuentas, clientes] = await Promise.all([
+      const [cuentas, clientes, usuarios] = await Promise.all([
         getCuentasCorrientes(),
         getClientes(),
+        getUsuarios(),
       ]);
       setCuentas(cuentas);
       setClientes(clientes);
+      // Buscar el usuario logueado por email
+      if (user?.emailAddresses?.[0]?.emailAddress) {
+        const actual = usuarios.find((u: Usuario) => u.email === user.emailAddresses[0].emailAddress);
+        setUsuarioActualId(actual?.id ?? null);
+      }
     } catch (e) {
       setError((e as Error).message || "Error al cargar cuentas corrientes");
     }
@@ -62,7 +74,7 @@ export default function CuentasCorrientesPage() {
 
   useEffect(() => {
     fetchAll();
-  }, []);
+  }, [fetchAll]);
 
   const cuentasFiltradas = useMemo(() => {
     if (!filtro.trim()) return cuentas;
@@ -84,6 +96,15 @@ export default function CuentasCorrientesPage() {
   const totalPaginas = useMemo(() => {
     return Math.ceil(cuentasFiltradas.length / CUENTAS_POR_PAGINA);
   }, [cuentasFiltradas]);
+
+  if (!isSignedIn) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-muted-foreground gap-4">
+        <span>Debes iniciar sesión para ver las cuentas corrientes.</span>
+        <Button onClick={() => router.push("/sign-in")}>Iniciar Sesión</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full mt-6">
@@ -260,6 +281,7 @@ export default function CuentasCorrientesPage() {
             fetchAll();
             setShowPagoModal(null);
           }}
+          usuarioActualId={usuarioActualId}
         />
 
         {/* Popup de error al cancelar cuenta pagada */}

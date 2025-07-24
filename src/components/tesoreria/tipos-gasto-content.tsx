@@ -112,7 +112,7 @@ export function TiposGastoContent() {
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent preventOutsideClose>
           <DialogHeader>
             <DialogTitle>{editing ? "Editar" : "Nuevo"} Tipo de Gasto</DialogTitle>
             <DialogDescription>

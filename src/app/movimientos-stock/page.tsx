@@ -1,4 +1,5 @@
 "use client";
+import { useUser } from "@clerk/nextjs";
 import React, { useEffect, useState, useMemo } from "react";
 import { getMovimientosStock } from "@/services/movimientosStock";
 import { MovimientoStock } from "@/types/movimientoStock";
@@ -22,9 +23,37 @@ import { getOrdenesVentaMediosPago } from "@/services/ordenesVentaMediosPago";
 import { getClientes } from "@/services/clientes";
 import { getUsuarios } from "@/services/usuarios";
 import { getCuentasTesoreria } from "@/services/cuentasTesoreria";
+import { Cliente } from "@/types/cliente";
+import { Usuario } from "@/types/usuario";
+import { CuentaTesoreria } from "@/types/cuentaTesoreria";
 import { BreadcrumbBar } from "@/components/BreadcrumbBar";
+import { useRouter } from "next/navigation";
+
+type OrdenDetalleType = {
+  cabecera: {
+    id: number;
+    fecha: string;
+    fk_id_entidades: number | null;
+    fk_id_usuario: number;
+    total: number;
+    subtotal: number;
+    fk_id_tipo_comprobante: number;
+    fk_id_lote: number;
+  };
+  detalles: Array<{
+    fk_id_articulo: number;
+    cantidad: number;
+    precio_unitario: number;
+  }>;
+  pagos: Array<{
+    fk_id_cuenta_tesoreria: number;
+    monto_pagado: number;
+  }>;
+};
 
 export default function MovimientosStockPage() {
+  const { isSignedIn } = useUser();
+  const router = useRouter();
   const [movimientos, setMovimientos] = useState<MovimientoStock[]>([]);
   const [articulos, setArticulos] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,11 +65,11 @@ export default function MovimientosStockPage() {
   // Estados para popups
   const [showMovimiento, setShowMovimiento] = useState<null | MovimientoStock>(null);
   const [showOrden, setShowOrden] = useState<null | number>(null);
-  const [ordenDetalle, setOrdenDetalle] = useState<any>(null);
+  const [ordenDetalle, setOrdenDetalle] = useState<OrdenDetalleType | null>(null);
 
-  const [clientes, setClientes] = useState<any[]>([]);
-  const [usuarios, setUsuarios] = useState<any[]>([]);
-  const [cuentasTesoreria, setCuentasTesoreria] = useState<any[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [cuentasTesoreria, setCuentasTesoreria] = useState<CuentaTesoreria[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -104,9 +133,22 @@ export default function MovimientosStockPage() {
     setShowOrden(id);
     // Cargar cabecera, detalles y pagos
     const cabecera = await getOrdenesVenta().then(ordenes => ordenes.find(o => o.id === id));
-    const detalles = await getOrdenesVentaDetalle(id);
-    const pagos = await getOrdenesVentaMediosPago(id);
-    setOrdenDetalle({ cabecera, detalles, pagos });
+    const detalles = await getOrdenesVentaDetalle(id) || [];
+    const pagos = await getOrdenesVentaMediosPago(id) || [];
+    setOrdenDetalle({
+      cabecera: cabecera || {
+        id: 0,
+        fecha: '',
+        fk_id_entidades: null,
+        fk_id_usuario: 0,
+        total: 0,
+        subtotal: 0,
+        fk_id_tipo_comprobante: 0,
+        fk_id_lote: 0,
+      },
+      detalles,
+      pagos,
+    });
   };
 
   function getClienteNombre(id: number) {
@@ -135,6 +177,15 @@ export default function MovimientosStockPage() {
     { key: "creado_el", label: "Fecha" },
     { key: "acciones", label: "Acciones" },
   ];
+
+  if (!isSignedIn) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-muted-foreground gap-4">
+        <span>Debes iniciar sesión para ver los movimientos de stock.</span>
+        <Button onClick={() => router.push("/sign-in")}>Iniciar Sesión</Button>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -332,7 +383,7 @@ export default function MovimientosStockPage() {
                     <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
                       <div><b>N° Orden:</b> {ordenDetalle.cabecera.id}</div>
                       <div><b>Fecha:</b> {new Date(ordenDetalle.cabecera.fecha).toLocaleDateString()}</div>
-                      <div><b>Cliente:</b> {getClienteNombre(ordenDetalle.cabecera.fk_id_entidades)}</div>
+                      <div><b>Cliente:</b> {getClienteNombre(ordenDetalle.cabecera.fk_id_entidades || 0)}</div>
                       <div><b>Usuario:</b> {getUsuarioNombre(ordenDetalle.cabecera.fk_id_usuario)}</div>
                       <div><b>Total:</b> <span className="font-bold text-green-700">{formatMoney(ordenDetalle.cabecera.total)}</span></div>
                       <div><b>Subtotal:</b> {formatMoney(ordenDetalle.cabecera.subtotal)}</div>

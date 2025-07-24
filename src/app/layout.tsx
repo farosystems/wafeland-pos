@@ -7,6 +7,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <ClerkProvider>
       <html lang="es">
+        <head>
+          <link rel="icon" type="image/png" href="/favicon.png" />
+        </head>
         <body className="flex h-screen">
           <SidebarProvider>
             <AppSidebar />

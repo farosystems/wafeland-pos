@@ -234,41 +234,43 @@ export function AppSidebar() {
             )}
           </li>
           {/* Menú Sueldos desplegable */}
-          <li>
-            <button
-              type="button"
-              className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isSueldosActive ? "text-blue-600" : "text-gray-800"}`}
-              onClick={() => setSueldosOpen((v) => !v)}
-            >
-              <IconReceipt className={`w-5 h-5 ${isSueldosActive ? "text-blue-600" : ""}`} />
-              <span className="font-medium">Sueldos</span>
-              <svg className={`ml-auto w-4 h-4 transition-transform ${sueldosOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-            {sueldosOpen && (
-              <ul className="ml-8 mt-1 flex flex-col gap-1">
-                <li className={`${pathname === "/liquidaciones" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                  <Link
-                    href="/liquidaciones"
-                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/liquidaciones" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                    prefetch={false}
-                  >
-                    <IconCalculator className="w-4 h-4" />
-                    <span>Liquidaciones</span>
-                  </Link>
-                </li>
-                <li className={`${pathname === "/empleados" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                  <Link
-                    href="/empleados"
-                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/empleados" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                    prefetch={false}
-                  >
-                    <IconUsers className="w-4 h-4" />
-                    <span>Empleados</span>
-                  </Link>
-                </li>
-              </ul>
-            )}
-          </li>
+          {usuarioDB?.rol === "supervisor" && (
+            <li>
+              <button
+                type="button"
+                className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isSueldosActive ? "text-blue-600" : "text-gray-800"}`}
+                onClick={() => setSueldosOpen((v) => !v)}
+              >
+                <IconReceipt className={`w-5 h-5 ${isSueldosActive ? "text-blue-600" : ""}`} />
+                <span className="font-medium">Sueldos</span>
+                <svg className={`ml-auto w-4 h-4 transition-transform ${sueldosOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              {sueldosOpen && (
+                <ul className="ml-8 mt-1 flex flex-col gap-1">
+                  <li className={`${pathname === "/liquidaciones" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                    <Link
+                      href="/liquidaciones"
+                      className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/liquidaciones" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                      prefetch={false}
+                    >
+                      <IconCalculator className="w-4 h-4" />
+                      <span>Liquidaciones</span>
+                    </Link>
+                  </li>
+                  <li className={`${pathname === "/empleados" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                    <Link
+                      href="/empleados"
+                      className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/empleados" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                      prefetch={false}
+                    >
+                      <IconUsers className="w-4 h-4" />
+                      <span>Empleados</span>
+                    </Link>
+                  </li>
+                </ul>
+              )}
+            </li>
+          )}
         </ul>
       </nav>
       <div className="mt-auto p-4 flex flex-col items-start gap-2">
@@ -284,7 +286,7 @@ export function AppSidebar() {
         <div className="flex items-center gap-2 w-full">
           <UserButton afterSignOutUrl="/sign-in" />
           {isLoaded && isSignedIn && (
-            <span className="text-sm font-medium">Hola, {user.firstName}</span>
+            <span className="text-sm font-medium">Hola, {usuarioDB?.nombre || user.firstName}</span>
           )}
         </div>
       </div>

@@ -30,6 +30,7 @@ import { formatCurrency, DEFAULT_CURRENCY, DEFAULT_LOCALE } from "@/lib/utils";
 import { createMovimientoStock } from "@/services/movimientosStock";
 import { createCuentaCorriente } from "@/services/cuentasCorrientes";
 import { registrarMovimientoCaja } from "@/services/detalleLotesOperaciones";
+import { useUser } from "@clerk/nextjs";
 
 interface VentaFormDialogProps {
   open: boolean;
@@ -73,7 +74,7 @@ const unformatNumber = (value: string): string => {
 };
 
 export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFormDialogProps) {
-  // const { user } = useUser();
+  const { user } = useUser();
   // Datos para selects
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -81,6 +82,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   const [cuentasTesoreria, setCuentasTesoreria] = useState<CuentaTesoreria[]>([]);
   const [articulos, setArticulos] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -97,10 +99,19 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
         setTiposComprobantes(tc);
         setCuentasTesoreria(ct);
         setArticulos(a);
+        // Buscar usuario actual por email
+        if (user?.emailAddresses?.[0]?.emailAddress) {
+          const actual = u.find(us => us.email === user.emailAddresses[0].emailAddress);
+          setUsuarioActual(actual || null);
+          // Si es cobrador, setearlo automáticamente
+          if (actual && actual.rol !== "supervisor") {
+            setUsuarioSeleccionado(actual.id);
+          }
+        }
         setLoading(false);
       });
     }
-  }, [open]);
+  }, [open, user]);
 
   // Estado de tabs y formulario (simplificado, estructura)
   const [tab, setTab] = useState("cabecera");
@@ -446,10 +457,17 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   //   setImpuestos(impuestos => impuestos.length > 1 ? impuestos.filter((_, i) => i !== idx) : impuestos);
   // }
 
+  // Usuarios para el select
+  const usuariosParaSelect = usuarioActual?.rol === "supervisor"
+    ? usuarios
+    : usuarioActual
+      ? usuarios.filter(u => u.email === usuarioActual.email)
+      : [];
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl" preventOutsideClose>
           <DialogHeader>
             <DialogTitle>Nueva Venta</DialogTitle>
             <DialogDescription>
@@ -480,9 +498,14 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                   </div>
                   <div>
                     <label className="block mb-1 font-medium">Usuario</label>
-                    <select className="w-full border rounded px-2 py-1" value={usuarioSeleccionado ?? ""} onChange={e => setUsuarioSeleccionado(Number(e.target.value) || null)}>
+                    <select
+                      className="w-full border rounded px-2 py-1"
+                      value={usuarioSeleccionado ?? ""}
+                      onChange={e => setUsuarioSeleccionado(Number(e.target.value) || null)}
+                      disabled={usuarioActual?.rol !== "supervisor"}
+                    >
                       <option value="">Seleccionar usuario</option>
-                      {usuarios.map(u => (
+                      {usuariosParaSelect.map(u => (
                         <option key={u.id} value={u.id}>{u.nombre}</option>
                       ))}
                     </select>
@@ -571,7 +594,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                             disabled={!d.articulo}
                           />
                         </td>
-                        <td className="px-2 py-1">${formatCurrency(d.subtotal, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
+                        <td className="px-2 py-1">{formatCurrency(d.subtotal, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
                         <td className="px-2 py-1">
                           <button
                             className="text-red-600 hover:underline"
@@ -587,7 +610,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                 </table>
                 <div className="flex justify-between items-center">
                   <button className="text-blue-600 hover:underline" onClick={agregarLinea}>+ Agregar línea</button>
-                  <div className="font-bold">Total: ${formatCurrency(total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</div>
+                  <div className="font-bold">Total: {formatCurrency(total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</div>
                 </div>
               </TabsContent>
               <TabsContent value="medios">
@@ -692,7 +715,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                   </div>
                   <div>
                     <label className="block mb-1 font-medium">Usuario</label>
-                    <div className="border rounded px-2 py-1 bg-gray-50">{usuarios.find(u => u.id === usuarioSeleccionado)?.nombre || "-"}</div>
+                    <div className="border rounded px-2 py-1 bg-gray-50">{usuariosParaSelect.find(u => u.id === usuarioSeleccionado)?.nombre || "-"}</div>
                   </div>
                   <div>
                     <label className="block mb-1 font-medium">Tipo de comprobante</label>

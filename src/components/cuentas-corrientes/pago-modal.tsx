@@ -13,13 +13,13 @@ import { efectuarPagoCuentaCorriente } from "@/services/pagosCuentaCorriente";
 import { formatCurrency } from "@/lib/utils";
 import { registrarMovimientoCaja } from "@/services/detalleLotesOperaciones";
 import { getLoteCajaAbiertaPorUsuario } from "@/services/lotesOperaciones";
-import { getOrdenVenta } from "@/services/ordenesVenta";
 
 interface PagoModalProps {
   cuenta: CuentaCorriente | null;
   isOpen: boolean;
   onClose: () => void;
   onPagoRealizado: () => void;
+  usuarioActualId: number | null;
 }
 
 // Función para formatear número con separadores de miles
@@ -47,7 +47,7 @@ const unformatNumber = (value: string): string => {
   return value.replace(/,/g, '');
 };
 
-export function PagoModal({ cuenta, isOpen, onClose, onPagoRealizado }: PagoModalProps) {
+export function PagoModal({ cuenta, isOpen, onClose, onPagoRealizado, usuarioActualId }: PagoModalProps) {
   const [cuentasTesoreria, setCuentasTesoreria] = useState<CuentaTesoreria[]>([]);
   const [cuentaTesoreriaSeleccionada, setCuentaTesoreriaSeleccionada] = useState<string>("");
   const [monto, setMonto] = useState<string>("");
@@ -117,17 +117,15 @@ export function PagoModal({ cuenta, isOpen, onClose, onPagoRealizado }: PagoModa
     setError(null);
 
     try {
-      // Obtener usuario desde la orden de venta relacionada
-      const orden = await getOrdenVenta(cuenta.fk_id_orden);
-      if (!orden || !orden.fk_id_usuario) {
-        setError("No se pudo obtener el usuario para registrar el movimiento de caja");
+      if (!usuarioActualId) {
+        setError("No se pudo obtener el usuario logueado para registrar el movimiento de caja");
         setLoading(false);
         return;
       }
-      // Obtener lote abierto del usuario
-      const lote = await getLoteCajaAbiertaPorUsuario(orden.fk_id_usuario);
+      // Obtener lote abierto del usuario logueado
+      const lote = await getLoteCajaAbiertaPorUsuario(usuarioActualId);
       if (!lote || !lote.id_lote) {
-        setError("No se encontró un lote abierto para el usuario");
+        setError("No se encontró un lote abierto para el usuario logueado");
         setLoading(false);
         return;
       }

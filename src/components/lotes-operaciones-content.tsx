@@ -4,6 +4,8 @@ import { LoteOperacion } from "@/types/loteOperacion";
 import { FileText, Loader2 } from "lucide-react";
 import { getCajas } from "@/services/cajas";
 import { Caja } from "@/types/caja";
+import { getUsuarios } from "@/services/usuarios";
+import { Usuario } from "@/types/usuario";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { formatCurrency, DEFAULT_CURRENCY, DEFAULT_LOCALE } from "@/lib/utils";
 
@@ -35,12 +37,19 @@ export function LotesOperacionesContent({ onImprimirCierre }: { onImprimirCierre
   const pressClass = "active:scale-95 transition-transform duration-100 hover:scale-105 hover:shadow-lg";
   const [paginaActual, setPaginaActual] = useState(1);
   const LOTES_POR_PAGINA = 6;
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
 
   // Memoizar funciones de búsqueda para evitar re-renderizados
   const getCajaNombre = useCallback((id: number) => {
     const caja = cajas.find(c => c.id === id);
     return caja ? caja.descripcion : id;
   }, [cajas]);
+
+  // Memoizar función para obtener nombre de usuario
+  const getUsuarioNombre = useCallback((id: number) => {
+    const usuario = usuarios.find((u: Usuario) => u.id === id);
+    return usuario ? usuario.nombre : id;
+  }, [usuarios]);
 
   // Memoizar datos filtrados para evitar recálculos innecesarios
   const lotesFiltrados = useMemo(() => {
@@ -96,11 +105,9 @@ export function LotesOperacionesContent({ onImprimirCierre }: { onImprimirCierre
 
   useEffect(() => {
     fetchLotes();
-  }, [fetchLotes]);
-
-  useEffect(() => {
     getCajas().then(setCajas);
-  }, []);
+    getUsuarios().then(setUsuarios);
+  }, [fetchLotes]);
 
   // Cuando se refrescan los lotes desde el padre (por ejemplo, después de cerrar caja), limpiar y recargar caché
   useEffect(() => {
@@ -190,7 +197,7 @@ export function LotesOperacionesContent({ onImprimirCierre }: { onImprimirCierre
               <TableRow key={lote.id_lote} className="hover:bg-gray-50 transition-colors">
                 <TableCell className="font-semibold">{lote.id_lote}</TableCell>
                 <TableCell>{getCajaNombre(lote.fk_id_caja)}</TableCell>
-                <TableCell>{lote.fk_id_usuario ? lote.fk_id_usuario : ''}</TableCell>
+                <TableCell>{getUsuarioNombre(lote.fk_id_usuario)}</TableCell>
                 <TableCell>{lote.tipo_lote}</TableCell>
                 <TableCell>{lote.abierto ? "Sí" : "No"}</TableCell>
                 <TableCell>{formatCurrency(lote.saldo_inicial || 0, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</TableCell>

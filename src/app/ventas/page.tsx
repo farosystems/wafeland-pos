@@ -1,4 +1,5 @@
 "use client";
+import { useUser } from "@clerk/nextjs";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { getOrdenesVenta } from "@/services/ordenesVenta";
 import { OrdenVenta } from "@/types/ordenVenta";
@@ -30,8 +31,13 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 import { ChevronDown } from "lucide-react";
 import { formatCurrency, DEFAULT_CURRENCY, DEFAULT_LOCALE } from "@/lib/utils";
 import { BreadcrumbBar } from "@/components/BreadcrumbBar";
+import { useRouter } from "next/navigation";
 
 export default function VentasPage() {
+  const { isSignedIn, user } = useUser();
+  const router = useRouter();
+
+  // TODOS LOS HOOKS DEBEN IR AQUÍ, ANTES DE CUALQUIER RETURN
   const [ventas, setVentas] = useState<OrdenVenta[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,6 +58,8 @@ export default function VentasPage() {
   const [openNotaCredito, setOpenNotaCredito] = useState(false);
   const [notasCreditoPorVenta, setNotasCreditoPorVenta] = useState<Map<number, number>>(new Map());
   const [filtro, setFiltro] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
   const [columnVisibility, setColumnVisibility] = useState({
     id: true,
     fecha: true,
@@ -61,6 +69,7 @@ export default function VentasPage() {
     total: true,
     acciones: true,
   });
+  const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
 
   // Memoizar funciones de búsqueda para evitar re-renderizados
   const getClienteNombre = useCallback((id: number | null) => {
@@ -83,24 +92,31 @@ export default function VentasPage() {
 
   // Memoizar ventas filtradas
   const ventasFiltradas = useMemo(() => {
-    if (!filtro.trim()) return ventas;
-    
-    const filtroLower = filtro.toLowerCase();
-    return ventas.filter(venta => {
-      const clienteNombre = getClienteNombre(venta.fk_id_entidades).toLowerCase();
-      const usuarioNombre = getUsuarioNombre(venta.fk_id_usuario).toLowerCase();
-      const tipoComprobante = getTipoComprobanteNombre(venta.fk_id_tipo_comprobante).toLowerCase();
-      
-      return (
-        venta.id.toString().includes(filtroLower) ||
-        clienteNombre.includes(filtroLower) ||
-        usuarioNombre.includes(filtroLower) ||
-        tipoComprobante.includes(filtroLower) ||
-        (venta.fecha?.includes(filtroLower) || false) ||
-        venta.total.toString().includes(filtroLower)
-      );
-    });
-  }, [ventas, filtro, getClienteNombre, getUsuarioNombre, getTipoComprobanteNombre]);
+    let filtradas = ventas;
+    if (fechaDesde) {
+      filtradas = filtradas.filter(v => v.fecha && v.fecha >= fechaDesde);
+    }
+    if (fechaHasta) {
+      filtradas = filtradas.filter(v => v.fecha && v.fecha <= fechaHasta + 'T23:59:59');
+    }
+    if (filtro.trim()) {
+      const filtroLower = filtro.toLowerCase();
+      filtradas = filtradas.filter(venta => {
+        const clienteNombre = getClienteNombre(venta.fk_id_entidades).toLowerCase();
+        const usuarioNombre = getUsuarioNombre(venta.fk_id_usuario).toLowerCase();
+        const tipoComprobante = getTipoComprobanteNombre(venta.fk_id_tipo_comprobante).toLowerCase();
+        return (
+          venta.id.toString().includes(filtroLower) ||
+          clienteNombre.includes(filtroLower) ||
+          usuarioNombre.includes(filtroLower) ||
+          tipoComprobante.includes(filtroLower) ||
+          (venta.fecha?.includes(filtroLower) || false) ||
+          venta.total.toString().includes(filtroLower)
+        );
+      });
+    }
+    return filtradas;
+  }, [ventas, filtro, fechaDesde, fechaHasta, getClienteNombre, getUsuarioNombre, getTipoComprobanteNombre]);
 
   // Memoizar ventas paginadas
   const ventasPagina = useMemo(() => {
@@ -160,6 +176,13 @@ export default function VentasPage() {
 
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (user?.emailAddresses?.[0]?.emailAddress) {
+      const actual = usuarios.find(u => u.email === user.emailAddresses[0].emailAddress);
+      setUsuarioActual(actual || null);
+    }
+  }, [user, usuarios]);
 
   // Función para refrescar datos
   const refreshData = useCallback(async () => {
@@ -431,6 +454,16 @@ export default function VentasPage() {
     setOpenNotaCredito(true);
   }
 
+  // AHORA EL CHEQUEO DE isSignedIn
+  if (!isSignedIn) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-muted-foreground gap-4">
+        <span>Debes iniciar sesión para ver las ventas.</span>
+        <Button onClick={() => router.push("/sign-in")}>Iniciar Sesión</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full mt-6">
       <BreadcrumbBar />
@@ -467,13 +500,31 @@ export default function VentasPage() {
       
       {!loading && (
         <div className="rounded-lg border bg-card p-4">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
             <Input
               placeholder="Buscar venta..."
               value={filtro}
               onChange={e => setFiltro(e.target.value)}
               className="max-w-xs"
             />
+            <label className="ml-4 text-sm">Desde:
+              <input
+                type="date"
+                value={fechaDesde}
+                onChange={e => setFechaDesde(e.target.value)}
+                className="ml-2 border rounded px-2 py-1 text-sm"
+                style={{ minWidth: 120 }}
+              />
+            </label>
+            <label className="ml-2 text-sm">Hasta:
+              <input
+                type="date"
+                value={fechaHasta}
+                onChange={e => setFechaHasta(e.target.value)}
+                className="ml-2 border rounded px-2 py-1 text-sm"
+                style={{ minWidth: 120 }}
+              />
+            </label>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="ml-2">
@@ -548,8 +599,8 @@ export default function VentasPage() {
                           <Printer className="w-4 h-4" />
                         </Button>
                       )}
-                      {/* Solo mostrar botón de anular si la venta NO está anulada */}
-                      {esFactura(v) && !v.anulada && (
+                      {/* Solo mostrar botón de anular si la venta NO está anulada y es del usuario logueado o el usuario es supervisor */}
+                      {esFactura(v) && !v.anulada && usuarioActual && (v.fk_id_usuario === usuarioActual.id || usuarioActual.rol === "supervisor") && (
                         <Button 
                           size="icon" 
                           variant="outline" 

@@ -337,7 +337,7 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl" preventOutsideClose>
           <DialogHeader>
             <DialogTitle>Nota de Crédito - Anular Venta N° {ventaAAnular.id}</DialogTitle>
             <DialogDescription>

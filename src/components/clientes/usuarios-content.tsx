@@ -3,7 +3,7 @@ import * as React from "react";
 import { useState, useEffect } from "react";
 import { getUsuarios, createUsuario, updateUsuario, deleteUsuario } from "@/services/usuarios";
 import { Usuario, CreateUsuarioData } from "@/types/usuario";
-import { User, Plus, Edit, Trash2 } from "lucide-react";
+import { User, Plus, Edit, Trash2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useUser } from "@clerk/nextjs";
 
 const ROLES = [
   { label: "Vendedor", value: "vendedor" },
@@ -23,10 +24,11 @@ const ROLES = [
 const allowedRoles = ["vendedor", "cobrador", "supervisor"] as const;
 
 export function UsuariosContent() {
+  const { user } = useUser();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
   const [editing, setEditing] = useState<Usuario | null>(null);
   const [form, setForm] = useState<CreateUsuarioData>({
     nombre: "",
@@ -37,16 +39,26 @@ export function UsuariosContent() {
     prueba_gratis: false,
   });
   const [formError, setFormError] = useState<string | null>(null);
+  const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
 
-  useEffect(() => { fetchAll(); }, []);
-  async function fetchAll() {
+  const fetchAllAndCurrent = React.useCallback(async () => {
     setLoading(true); setError(null);
-    try { setUsuarios(await getUsuarios()); } catch (error) { 
+    try {
+      const all = await getUsuarios();
+      setUsuarios(all);
+      if (user?.emailAddresses?.[0]?.emailAddress) {
+        const actual = all.find(u => u.email === user.emailAddresses[0].emailAddress);
+        setUsuarioActual(actual || null);
+      }
+    } catch (error) {
       console.error("Error al cargar usuarios:", error);
-      setError((error as Error).message); 
+      setError((error as Error).message);
     }
     setLoading(false);
-  }
+  }, [user]);
+  useEffect(() => {
+    fetchAllAndCurrent();
+  }, [fetchAllAndCurrent]);
   function openNew() {
     setEditing(null);
     setForm({
@@ -95,7 +107,7 @@ export function UsuariosContent() {
         await createUsuario(createData);
       }
       setIsDialogOpen(false);
-      await fetchAll();
+      await fetchAllAndCurrent();
     } catch (error) {
       console.error("Error al guardar usuario:", error);
       setFormError((error as Error).message);
@@ -105,12 +117,22 @@ export function UsuariosContent() {
   async function handleDelete(id: number) {
     if (!window.confirm("¿Eliminar usuario?")) return;
     setLoading(true);
-    try { await deleteUsuario(id); await fetchAll(); } catch (error) { 
+    try { await deleteUsuario(id); await fetchAllAndCurrent(); } catch (error) { 
       console.error("Error al eliminar usuario:", error);
       setError((error as Error).message); 
     }
     setLoading(false);
   }
+  // Filtrado según rol
+  const usuariosAMostrar = usuarioActual?.rol === "supervisor"
+    ? usuarios
+    : usuarioActual
+      ? usuarios.filter(u => u.email === usuarioActual.email)
+      : [];
+  // Solo permitir alta/edición si es supervisor
+  const puedeEditar = usuarioActual?.rol === "supervisor";
+  // Modal de solo lectura para no supervisores
+  const soloLectura = !puedeEditar && !!editing;
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
@@ -123,59 +145,101 @@ export function UsuariosContent() {
             </p>
           </div>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openNew}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo Usuario
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>
-                {editing ? "Editar Usuario" : "Nuevo Usuario"}
-              </DialogTitle>
-              <DialogDescription>
-                {editing
-                  ? "Modifica la información del usuario seleccionado."
-                  : "Completa la información para crear un nuevo usuario."}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block mb-1 font-medium">Nombre</label>
-                <input type="text" className="w-full border rounded px-2 py-1" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} required />
-              </div>
-              <div>
-                <label className="block mb-1 font-medium">Email</label>
-                <input type="email" className="w-full border rounded px-2 py-1" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
-              </div>
-              <div>
-                <label className="block mb-1 font-medium">Teléfono</label>
-                <input type="text" className="w-full border rounded px-2 py-1" value={form.telefono} onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))} required />
-              </div>
-              <div>
-                <label className="block mb-1 font-medium">Contraseña</label>
-                <input type="password" className="w-full border rounded px-2 py-1" value={form.password_hash} onChange={e => setForm(f => ({ ...f, password_hash: e.target.value }))} required minLength={6} />
-              </div>
-              <div>
-                <label className="block mb-1 font-medium">Rol</label>
-                <select className="w-full border rounded px-2 py-1" value={form.rol} onChange={e => setForm(f => ({ ...f, rol: e.target.value as typeof allowedRoles[number] }))} required>
-                  {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                </select>
-              </div>
-              <div className="flex items-end">
-                <Button type="submit" disabled={loading}>
-                  {editing ? "Guardar" : "Crear"}
-                </Button>
-                <Button type="button" variant="outline" className="ml-2" onClick={() => setIsDialogOpen(false)} disabled={loading}>
-                  Cancelar
-                </Button>
-              </div>
-              {formError && <div className="col-span-2 text-red-600 text-sm">{formError}</div>}
-            </form>
-          </DialogContent>
-        </Dialog>
+        {puedeEditar && (
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={openNew}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nuevo Usuario
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]" preventOutsideClose>
+              <DialogHeader>
+                <DialogTitle>
+                  {editing ? "Editar Usuario" : "Nuevo Usuario"}
+                </DialogTitle>
+                <DialogDescription>
+                  {editing
+                    ? "Modifica la información del usuario seleccionado."
+                    : "Completa la información para crear un nuevo usuario."}
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block mb-1 font-medium">Nombre</label>
+                  <input type="text" className="w-full border rounded px-2 py-1" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} required disabled={soloLectura} />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium">Email</label>
+                  <input type="email" className="w-full border rounded px-2 py-1" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required disabled={soloLectura} />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium">Teléfono</label>
+                  <input type="text" className="w-full border rounded px-2 py-1" value={form.telefono} onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))} required disabled={soloLectura} />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium">Contraseña</label>
+                  <input type="password" className="w-full border rounded px-2 py-1" value={form.password_hash} onChange={e => setForm(f => ({ ...f, password_hash: e.target.value }))} required minLength={6} disabled={soloLectura} />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium">Rol</label>
+                  <select className="w-full border rounded px-2 py-1" value={form.rol} onChange={e => setForm(f => ({ ...f, rol: e.target.value as typeof allowedRoles[number] }))} required disabled={soloLectura}>
+                    {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  {!soloLectura && (
+                    <Button type="submit" disabled={loading}>
+                      {editing ? "Guardar" : "Crear"}
+                    </Button>
+                  )}
+                  <Button type="button" variant="outline" className="ml-2" onClick={() => setIsDialogOpen(false)} disabled={loading}>
+                    Cancelar
+                  </Button>
+                </div>
+                {formError && <div className="col-span-2 text-red-600 text-sm">{formError}</div>}
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
+        {/* Modal solo lectura para no supervisores */}
+        {!puedeEditar && editing !== null && (
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogContent className="sm:max-w-[500px]" preventOutsideClose>
+              <DialogHeader>
+                <DialogTitle>Ver Usuario</DialogTitle>
+                <DialogDescription>Visualiza los datos del usuario seleccionado.</DialogDescription>
+              </DialogHeader>
+              <form className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block mb-1 font-medium">Nombre</label>
+                  <input type="text" className="w-full border rounded px-2 py-1" value={form.nombre} disabled />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium">Email</label>
+                  <input type="email" className="w-full border rounded px-2 py-1" value={form.email} disabled />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium">Teléfono</label>
+                  <input type="text" className="w-full border rounded px-2 py-1" value={form.telefono} disabled />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium">Contraseña</label>
+                  <input type="password" className="w-full border rounded px-2 py-1" value={form.password_hash} disabled />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium">Rol</label>
+                  <input type="text" className="w-full border rounded px-2 py-1" value={form.rol} disabled />
+                </div>
+                <div className="flex items-end">
+                  <Button type="button" variant="outline" className="ml-2" onClick={() => setIsDialogOpen(false)}>
+                    Cerrar
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
       {error && <div className="text-red-600 mb-2">{error}</div>}
       <div className="rounded-lg border bg-card p-4">
@@ -192,7 +256,7 @@ export function UsuariosContent() {
             </tr>
           </thead>
           <tbody>
-            {usuarios.map((u) => (
+            {usuariosAMostrar.map((u) => (
               <tr key={u.id} className="border-b hover:bg-blue-50 transition-colors">
                 <td className="px-2 py-1 align-middle">{u.id}</td>
                 <td className="px-2 py-1 align-middle">{u.nombre}</td>
@@ -201,22 +265,35 @@ export function UsuariosContent() {
                 <td className="px-2 py-1 align-middle">{u.rol}</td>
                 <td className="px-2 py-1 align-middle">{new Date(u.creado_el).toLocaleString()}</td>
                 <td className="px-2 py-1 text-center align-middle">
-                  <button
-                    className="text-blue-600 hover:text-blue-800 p-1"
-                    onClick={() => openEdit(u)}
-                    disabled={loading}
-                    title="Editar"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </button>
-                  <button
-                    className="text-red-600 hover:text-red-800 p-1 ml-2"
-                    onClick={() => handleDelete(u.id)}
-                    disabled={loading}
-                    title="Eliminar"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {puedeEditar ? (
+                    <>
+                      <button
+                        className="text-blue-600 hover:text-blue-800 p-1"
+                        onClick={() => openEdit(u)}
+                        disabled={loading}
+                        title="Editar"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        className="text-red-600 hover:text-red-800 p-1 ml-2"
+                        onClick={() => handleDelete(u.id)}
+                        disabled={loading}
+                        title="Eliminar"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      className="text-gray-600 hover:text-blue-800 p-1"
+                      onClick={() => openEdit(u)}
+                      disabled={loading}
+                      title="Ver"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

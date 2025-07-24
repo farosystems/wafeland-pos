@@ -16,6 +16,8 @@ import { ReceiptText } from "lucide-react";
 import { TiposGastoContent } from "@/components/tesoreria/tipos-gasto-content";
 import { getTiposGasto } from "@/services/tiposGasto";
 import { TipoGasto } from "@/types/tipoGasto";
+import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 
 function Breadcrumb() {
   return (
@@ -28,6 +30,8 @@ function Breadcrumb() {
 }
 
 export default function GastosEmpleadosPage() {
+  const { isSignedIn } = useUser();
+  const router = useRouter();
   const [tiposGasto, setTiposGasto] = useState<TipoGasto[]>([]);
   useEffect(() => {
     getTiposGasto().then(setTiposGasto);
@@ -35,6 +39,15 @@ export default function GastosEmpleadosPage() {
   const { gastos, addGasto } = useGastosEmpleados(tiposGasto);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  if (!isSignedIn) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-muted-foreground gap-4">
+        <span>Debes iniciar sesión para ver los gastos de empleados.</span>
+        <Button onClick={() => router.push("/sign-in")}>Iniciar Sesión</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8">
@@ -63,7 +76,7 @@ export default function GastosEmpleadosPage() {
                 Nuevo Gasto
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[500px]" preventOutsideClose>
               <DialogHeader>
                 <DialogTitle>Nuevo Gasto de Empleado</DialogTitle>
               </DialogHeader>

@@ -273,7 +273,7 @@ export function ClientesContent() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent preventOutsideClose>
           <DialogHeader>
             <DialogTitle>{editing ? "Editar Cliente" : "Nuevo Cliente"}</DialogTitle>
             <DialogDescription>

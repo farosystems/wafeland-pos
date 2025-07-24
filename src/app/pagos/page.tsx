@@ -1,4 +1,5 @@
 "use client";
+import { useUser } from "@clerk/nextjs";
 import React, { useEffect, useState, useMemo } from "react";
 import { BreadcrumbBar } from "@/components/BreadcrumbBar";
 import { Button } from "@/components/ui/button";
@@ -13,8 +14,11 @@ import { CuentaCorriente } from "@/types/cuentaCorriente";
 import { CuentaTesoreria } from "@/types/cuentaTesoreria";
 import { Cliente } from "@/types/cliente";
 import { DetalleCuentaModal } from "@/components/cuentas-corrientes/detalle-cuenta-modal";
+import { useRouter } from "next/navigation";
 
 export default function PagosPage() {
+  const { isSignedIn } = useUser();
+  const router = useRouter();
   const [pagos, setPagos] = useState<PagoCuentaCorriente[]>([]);
   const [cuentasCorrientes, setCuentasCorrientes] = useState<CuentaCorriente[]>([]);
   const [cuentasTesoreria, setCuentasTesoreria] = useState<CuentaTesoreria[]>([]);
@@ -71,6 +75,15 @@ export default function PagosPage() {
   const totalPaginas = useMemo(() => {
     return Math.ceil(pagosFiltrados.length / PAGOS_POR_PAGINA);
   }, [pagosFiltrados]);
+
+  if (!isSignedIn) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-muted-foreground gap-4">
+        <span>Debes iniciar sesión para ver los pagos.</span>
+        <Button onClick={() => router.push("/sign-in")}>Iniciar Sesión</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full mt-6">

@@ -8,9 +8,15 @@ import { formatCurrency } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { getEmpleados } from "@/services/empleados";
 import { getCuentasTesoreria } from "@/services/cuentasTesoreria";
+import { useState } from "react";
+import { getTiposGasto } from "@/services/tiposGasto";
+import { getUsuarios } from "@/services/usuarios";
+import { TipoGasto } from "@/types/tipoGasto";
+import { Usuario } from "@/types/usuario";
+import { GastoEmpleado } from "@/types/gastoEmpleado";
 
 interface GastosEmpleadosTableProps {
-  data: any[]; // Changed from GastoEmpleado to any[] as Table components are removed
+  data: GastoEmpleado[];
 }
 
 const PAGE_SIZE = 10;
@@ -30,31 +36,35 @@ export function GastosEmpleadosTable({ data }: GastosEmpleadosTableProps) {
     cuentaTesoreria: true,
     acciones: true,
   });
-  const [selectedGasto, setSelectedGasto] = React.useState<any | null>(null); // Changed from GastoEmpleado to any
+  const [selectedGasto, setSelectedGasto] = React.useState<GastoEmpleado | null>(null);
   const [empleados, setEmpleados] = React.useState<{ id: number; nombre: string; apellido: string }[]>([]);
   const [cuentas, setCuentas] = React.useState<{ id: number; descripcion: string }[]>([]);
+  const [tiposGasto, setTiposGasto] = useState<TipoGasto[]>([]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
 
   React.useEffect(() => {
     async function fetchData() {
       setEmpleados(await getEmpleados());
       setCuentas(await getCuentasTesoreria());
+      setTiposGasto(await getTiposGasto());
+      setUsuarios(await getUsuarios());
     }
     fetchData();
   }, []);
 
-  const getEmpleadoNombre = (id: number) => {
+  const getEmpleadoNombre = (id: number | null) => {
     const emp = empleados.find(e => e.id === id);
-    return emp ? `${emp.nombre} ${emp.apellido}` : id;
+    return emp ? `${emp.nombre} ${emp.apellido}` : id ?? "-";
   };
-  const getCuentaDescripcion = (id: number) => {
+  const getCuentaDescripcion = (id: number | null) => {
     const cta = cuentas.find(c => c.id === id);
-    return cta ? cta.descripcion : id;
+    return cta ? cta.descripcion : id ?? "-";
   };
 
   // Filtro de búsqueda (por descripción, tipo o empleado)
   const filtered = data.filter(gasto =>
     (gasto.descripcion?.toLowerCase().includes(search.toLowerCase()) || "") ||
-    (gasto.tipo_gasto?.toLowerCase().includes(search.toLowerCase()) || "") ||
+    (tiposGasto.find(t => t.id === gasto.fk_tipo_gasto)?.descripcion?.toLowerCase().includes(search.toLowerCase()) || "") ||
     (gasto.fk_empleado?.toString().includes(search) || "")
   );
 
@@ -132,12 +142,12 @@ export function GastosEmpleadosTable({ data }: GastosEmpleadosTableProps) {
                 <tr key={gasto.id} className="border-b hover:bg-blue-50 transition-colors">
                   {columnVisibility.id && <td className="px-2 py-1 text-left">{gasto.id}</td>}
                   {columnVisibility.fecha && <td className="px-2 py-1">{gasto.creado_el ? new Date(gasto.creado_el).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : ""}</td>}
-                  {columnVisibility.tipo && <td className="px-2 py-1">{gasto.tipo_gasto}</td>}
+                  {columnVisibility.tipo && <td className="px-2 py-1">{tiposGasto.find(t => t.id === gasto.fk_tipo_gasto)?.descripcion || "-"}</td>}
                   {columnVisibility.monto && <td className="px-2 py-1">{gasto.monto != null ? formatCurrency(gasto.monto, "ARS", "es-AR") : ""}</td>}
                   {columnVisibility.descripcion && <td className="px-2 py-1">{gasto.descripcion}</td>}
                   {columnVisibility.empleado && <td className="px-2 py-1">{getEmpleadoNombre(gasto.fk_empleado)}</td>}
                   {columnVisibility.lote && <td className="px-2 py-1">{gasto.fk_lote_operaciones}</td>}
-                  {columnVisibility.usuario && <td className="px-2 py-1">{gasto.fk_usuario}</td>}
+                  {columnVisibility.usuario && <td className="px-2 py-1">{usuarios.find(u => u.id === gasto.fk_usuario)?.nombre || gasto.fk_usuario}</td>}
                   {columnVisibility.cuentaTesoreria && <td className="px-2 py-1">{getCuentaDescripcion(gasto.fk_cuenta_tesoreria)}</td>}
                   {columnVisibility.acciones && <td className="px-2 py-1">
                     <Button size="icon" variant="outline" onClick={() => setSelectedGasto(gasto)} title="Ver gasto">
@@ -177,7 +187,7 @@ export function GastosEmpleadosTable({ data }: GastosEmpleadosTableProps) {
         </div>
       </div>
       <Dialog open={!!selectedGasto} onOpenChange={v => !v && setSelectedGasto(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" preventOutsideClose>
           <DialogHeader>
             <DialogTitle className="text-blue-700 flex items-center gap-2">
               <FileText className="w-6 h-6 text-blue-500" />
@@ -203,7 +213,7 @@ export function GastosEmpleadosTable({ data }: GastosEmpleadosTableProps) {
                 </div>
                 <div className="flex justify-between mb-1">
                   <span className="text-gray-600">Tipo</span>
-                  <span className="font-semibold text-blue-700 capitalize">{selectedGasto.tipo_gasto}</span>
+                  <span className="font-semibold text-blue-700 capitalize">{tiposGasto.find(t => t.id === selectedGasto.fk_tipo_gasto)?.descripcion || "-"}</span>
                 </div>
                 <div className="flex justify-between mb-1">
                   <span className="text-gray-600">Monto</span>
@@ -219,7 +229,7 @@ export function GastosEmpleadosTable({ data }: GastosEmpleadosTableProps) {
                 </div>
                 <div className="flex justify-between mb-1">
                   <span className="text-gray-600">Usuario</span>
-                  <span className="text-gray-900">{selectedGasto.fk_usuario}</span>
+                  <span className="text-gray-900">{usuarios.find(u => u.id === selectedGasto.fk_usuario)?.nombre || selectedGasto.fk_usuario}</span>
                 </div>
               </div>
               {/* Fechas */}

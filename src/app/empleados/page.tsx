@@ -11,9 +11,14 @@ import {
 } from "@/services/empleados";
 import { CreateEmpleadoData } from "@/types/empleado";
 import { BreadcrumbBar } from "@/components/BreadcrumbBar";
+import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import { Empleado } from "@/types/empleado";
 
 export default function EmpleadosPage() {
-  const [empleados, setEmpleados] = useState<any[]>([]); // Changed type to any[] as Empleado interface was removed
+  const { isSignedIn } = useUser();
+  const router = useRouter();
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState<Partial<CreateEmpleadoData>>({
@@ -26,9 +31,9 @@ export default function EmpleadosPage() {
     telefono: undefined,
   });
   const [formError, setFormError] = useState<string | null>(null);
-  const [showViewDialog, setShowViewDialog] = useState<{ open: boolean, empleado: any | null }>({ open: false, empleado: null });
-  const [showEditDialog, setShowEditDialog] = useState<{ open: boolean, empleado: any | null }>({ open: false, empleado: null });
-  const [editForm, setEditForm] = useState<Partial<any>>({ // Changed type to any
+  const [showViewDialog, setShowViewDialog] = useState<{ open: boolean, empleado: Empleado | null }>({ open: false, empleado: null });
+  const [showEditDialog, setShowEditDialog] = useState<{ open: boolean, empleado: Empleado | null }>({ open: false, empleado: null });
+  const [editForm, setEditForm] = useState<Partial<Empleado>>({
     nombre: "",
     apellido: "",
     sueldo: undefined,
@@ -39,7 +44,6 @@ export default function EmpleadosPage() {
   });
   const [editFormError, setEditFormError] = useState<string | null>(null);
 
-
   useEffect(() => {
     setLoading(true);
     getEmpleados()
@@ -47,6 +51,15 @@ export default function EmpleadosPage() {
       .catch(() => setEmpleados([]))
       .finally(() => setLoading(false));
   }, []);
+
+  if (!isSignedIn) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-muted-foreground gap-4">
+        <span>Debes iniciar sesión para ver los empleados.</span>
+        <Button onClick={() => router.push("/sign-in")}>Iniciar Sesión</Button>
+      </div>
+    );
+  }
 
   const handleOpenDialog = () => {
     setForm({
@@ -166,7 +179,7 @@ export default function EmpleadosPage() {
         </div>
       )}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
+        <DialogContent preventOutsideClose>
           <DialogHeader>
             <DialogTitle>Nuevo empleado</DialogTitle>
           </DialogHeader>

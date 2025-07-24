@@ -25,9 +25,6 @@ export default async function HomePage() {
           <Link href="/sign-in">
             <Button>Iniciar Sesión</Button>
           </Link>
-          <Link href="/sign-up">
-            <Button variant="outline">Registrarse</Button>
-          </Link>
         </div>
       </div>
     </>

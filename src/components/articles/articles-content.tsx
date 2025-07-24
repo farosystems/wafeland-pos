@@ -119,7 +119,7 @@ export function ArticlesContent() {
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl" preventOutsideClose>
           <DialogHeader>
             <DialogTitle>
               {editingArticle ? "Editar artículo" : "Nuevo artículo"}

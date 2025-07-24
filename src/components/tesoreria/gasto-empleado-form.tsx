@@ -315,7 +315,7 @@ export function GastoEmpleadoForm({ onSubmit, onCancel, isLoading = false }: Gas
       </form>
       
       <Dialog open={errorModal.open} onOpenChange={(open) => setErrorModal({ ...errorModal, open })}>
-        <DialogContent>
+        <DialogContent preventOutsideClose>
           <DialogHeader>
             <DialogTitle>Error de Validación</DialogTitle>
             <DialogDescription>{errorModal.message}</DialogDescription>
