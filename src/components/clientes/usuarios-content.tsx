@@ -47,7 +47,8 @@ export function UsuariosContent() {
       const all = await getUsuarios();
       setUsuarios(all);
       if (user?.emailAddresses?.[0]?.emailAddress) {
-        const actual = all.find(u => u.email === user.emailAddresses[0].emailAddress);
+        const emailClerk = normalizeEmail(user.emailAddresses[0].emailAddress);
+        const actual = all.find(u => normalizeEmail(u.email) === emailClerk);
         setUsuarioActual(actual || null);
       }
     } catch (error) {
@@ -59,6 +60,11 @@ export function UsuariosContent() {
   useEffect(() => {
     fetchAllAndCurrent();
   }, [fetchAllAndCurrent]);
+
+  // Helper para normalizar emails
+  function normalizeEmail(email?: string | null) {
+    return (email || '').trim().toLowerCase();
+  }
   function openNew() {
     setEditing(null);
     setForm({
@@ -127,7 +133,7 @@ export function UsuariosContent() {
   const usuariosAMostrar = usuarioActual?.rol === "supervisor"
     ? usuarios
     : usuarioActual
-      ? usuarios.filter(u => u.email === usuarioActual.email)
+      ? usuarios.filter(u => normalizeEmail(u.email) === normalizeEmail(usuarioActual.email))
       : [];
   // Solo permitir alta/edición si es supervisor
   const puedeEditar = usuarioActual?.rol === "supervisor";

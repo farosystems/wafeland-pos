@@ -68,7 +68,7 @@ export async function getLoteAbierto() {
     .eq("abierto", true)
     .order("fecha_apertura", { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
   if (error) throw error;
-  return data?.id_lote as number;
+  return data?.id_lote as number | null;
 } 

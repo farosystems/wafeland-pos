@@ -4,13 +4,21 @@ import { Article, CreateArticleData, UpdateArticleData } from "@/types/article";
 export async function getArticles() {
   const { data, error } = await supabase
     .from("articulos")
-    .select("*, agrupadores:fk_id_agrupador(nombre)")
+    .select(`*,
+      agrupadores:fk_id_agrupador(nombre),
+      marcas:fk_id_marca(descripcion),
+      talles:fk_id_talle(descripcion),
+      color:fk_id_color(descripcion)
+    `)
     .order("id", { ascending: false });
   if (error) throw error;
-  // Mapear agrupador_nombre
+  // Mapear nombres/descripciones de foráneas
   const mapped = (data as unknown[]).map(a => ({
     ...(a as Record<string, unknown>),
-    agrupador_nombre: (a as { agrupadores?: { nombre: string } }).agrupadores?.nombre || '',
+    agrupador_nombre: (a as any).agrupadores?.nombre || '',
+    marca_nombre: (a as any).marcas?.descripcion || '',
+    talle_descripcion: (a as any).talles?.descripcion || '',
+    color_descripcion: (a as any).color?.descripcion || '',
   }));
   return mapped as Article[];
 }

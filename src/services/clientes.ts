@@ -10,10 +10,10 @@ export async function getClientes() {
 }
 
 export async function createCliente(cliente: CreateClienteData) {
-  const { razon_social, tipo, email, tipo_doc, num_doc, telefono, categoria_iva } = cliente;
+  const { razon_social, tipo, email, tipo_doc, num_doc, telefono, categoria_iva, maximo_cuenta_corriente } = cliente;
   const { data, error } = await supabase
     .from("entidades")
-    .insert([{ razon_social, tipo, email, tipo_doc, num_doc, telefono, categoria_iva }])
+    .insert([{ razon_social, tipo, email, tipo_doc, num_doc, telefono, categoria_iva, maximo_cuenta_corriente }])
     .select()
     .single();
   if (error) throw error;
@@ -21,10 +21,10 @@ export async function createCliente(cliente: CreateClienteData) {
 }
 
 export async function updateCliente(id: number, cliente: Partial<CreateClienteData>) {
-  const { razon_social, tipo, email, tipo_doc, num_doc, telefono, categoria_iva } = cliente;
+  const { razon_social, tipo, email, tipo_doc, num_doc, telefono, categoria_iva, maximo_cuenta_corriente } = cliente;
   const { data, error } = await supabase
     .from("entidades")
-    .update({ razon_social, tipo, email, tipo_doc, num_doc, telefono, categoria_iva })
+    .update({ razon_social, tipo, email, tipo_doc, num_doc, telefono, categoria_iva, maximo_cuenta_corriente })
     .eq("id", id)
     .select()
     .single();

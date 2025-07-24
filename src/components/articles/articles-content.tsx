@@ -16,6 +16,7 @@ import { useArticles } from "@/hooks/use-articles";
 import { useUser } from "@clerk/nextjs";
 import { AgrupadoresContent } from "@/components/agrupadores/agrupadores-content";
 import { Article, CreateArticleData, UpdateArticleData } from "@/types/article";
+import { MarcasContent } from "@/components/articles/marcas-content";
 
 export function ArticlesContent() {
   const { isSignedIn } = useUser();
@@ -142,6 +143,9 @@ export function ArticlesContent() {
 
       <div className="mt-10">
         <AgrupadoresContent />
+      </div>
+      <div className="mt-10">
+        <MarcasContent />
       </div>
     </div>
   );
