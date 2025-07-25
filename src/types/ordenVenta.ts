@@ -21,6 +21,8 @@ export interface OrdenVentaDetalle {
   cantidad: number;
   precio_unitario: number;
   subtotal: number;
+  fk_id_talle?: number | null;
+  fk_id_color?: number | null;
 }
 export interface CreateOrdenVentaDetalleData extends Omit<OrdenVentaDetalle, 'idd' | 'subtotal'> {
   // Add specific properties here if needed

@@ -64,10 +64,6 @@ export default function GastosEmpleadosPage() {
       <div className="flex items-center justify-between mb-4">
         <div />
         <div className="flex gap-2">
-          {/* Botón para ocultar columnas (placeholder, implementa lógica si tu tabla lo soporta) */}
-          <Button variant="outline" className="flex items-center gap-2">
-            Columnas <ChevronDown className="w-4 h-4" />
-          </Button>
           {/* Botón para dar de alta un nuevo gasto */}
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>

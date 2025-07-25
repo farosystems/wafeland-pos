@@ -4,14 +4,10 @@ export interface Article {
   precio_unitario: number;
   fk_id_agrupador: number;
   fk_id_marca: number | null;
-  fk_id_talle: number | null;
-  fk_id_color: number | null;
   activo: boolean;
   stock: number;
   agrupador_nombre?: string;
   marca_nombre?: string;
-  talle_descripcion?: string;
-  color_descripcion?: string;
 }
 
 export interface CreateArticleData {
@@ -19,8 +15,6 @@ export interface CreateArticleData {
   precio_unitario: number;
   fk_id_agrupador: number;
   fk_id_marca: number | null;
-  fk_id_talle: number | null;
-  fk_id_color: number | null;
   activo: boolean;
   stock: number;
 }
@@ -30,8 +24,6 @@ export interface UpdateArticleData {
   precio_unitario?: number;
   fk_id_agrupador?: number;
   fk_id_marca?: number | null;
-  fk_id_talle?: number | null;
-  fk_id_color?: number | null;
   activo?: boolean;
   stock?: number;
 } 

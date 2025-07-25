@@ -31,6 +31,11 @@ import { createMovimientoStock } from "@/services/movimientosStock";
 import { createCuentaCorriente } from "@/services/cuentasCorrientes";
 import { registrarMovimientoCaja } from "@/services/detalleLotesOperaciones";
 import { useUser } from "@clerk/nextjs";
+import { useTalles } from "@/hooks/use-talles";
+import { useColores } from "@/hooks/use-colores";
+import { useVariantes } from "@/hooks/use-variantes";
+import { editVariante } from "@/services/variantes";
+import { updateArticle } from "@/services/articles";
 
 interface VentaFormDialogProps {
   open: boolean;
@@ -46,6 +51,9 @@ interface DetalleLinea {
   precio: number;
   subtotal: number;
   input: string;
+  talle: number | null; // Nuevo campo para el talle
+  color: number | null; // Nuevo campo para el color
+  variante: number | null; // Nuevo campo para la variante
 }
 
 // Función para formatear número con separadores de miles
@@ -83,6 +91,9 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   const [articulos, setArticulos] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
+  const { talles } = useTalles();
+  const { colores } = useColores();
+  const { variantes } = useVariantes();
 
   useEffect(() => {
     if (open) {
@@ -118,7 +129,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
 
   // Estado para el detalle de la venta
   const [detalle, setDetalle] = useState<DetalleLinea[]>([
-    { articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "" },
+    { articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null },
   ]);
   const [showSugerencias, setShowSugerencias] = useState<number | null>(null); // idx de línea con sugerencias abiertas
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -126,7 +137,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   // Limpiar el detalle cuando se cierra el popup
   useEffect(() => {
     if (!open) {
-      setDetalle([{ articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "" }]);
+      setDetalle([{ articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null }]);
       setShowSugerencias(null);
       // Resetear a valores por defecto
       setClienteSeleccionado(1); // Consumidor final
@@ -184,7 +195,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
 
   // Agregar línea
   function agregarLinea() {
-    setDetalle(detalle => [...detalle, { articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "" }]);
+    setDetalle(detalle => [...detalle, { articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null }]);
     setTimeout(() => {
       const idx = detalle.length;
       if (inputRefs.current[idx]) inputRefs.current[idx]?.focus();
@@ -296,6 +307,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
     setToast({ show: true, message });
     setTimeout(() => setToast({ show: false, message: "" }), 2500);
   }
+  const [showStockError, setShowStockError] = useState(false);
 
   // Utilidad para formatear fecha local a 'YYYY-MM-DD HH:mm:ss'
   function formatLocalDateTime(date: Date) {
@@ -372,6 +384,8 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
             fk_id_articulo: d.articulo.id,
             cantidad: d.cantidad,
             precio_unitario: d.precio,
+            fk_id_talle: d.talle ?? null,
+            fk_id_color: d.color ?? null,
           });
           // Registrar movimiento de stock (FACTURA)
           await createMovimientoStock({
@@ -380,7 +394,16 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
             origen: "FACTURA",
             tipo: "salida",
             cantidad: -Math.abs(d.cantidad),
+            fk_id_talle: d.talle ?? null,
+            fk_id_color: d.color ?? null,
           });
+          // Descontar stock_unitario de la variante si corresponde
+          if (d.talle && d.color) {
+            const variante = variantes.find(v => v.fk_id_articulo === d.articulo.id && v.fk_id_talle === d.talle && v.fk_id_color === d.color);
+            if (variante) {
+              await editVariante(variante.id, { stock_unitario: (variante.stock_unitario ?? 0) - d.cantidad });
+            }
+          }
         }
       }
       // 3. Crear los medios de pago
@@ -464,6 +487,22 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
       ? usuarios.filter(u => u.email === usuarioActual.email)
       : [];
 
+  // Función para obtener combinaciones de stock disponibles para un artículo
+  function getStockCombinaciones(articulo: Article | null) {
+    if (!articulo) return [];
+    // Suponiendo que el artículo tiene un array de variantes o que hay que consultar a la API
+    // Aquí se asume que el stock está en el propio artículo para la combinación seleccionada
+    // Si tienes una tabla de variantes, deberías consultar ahí
+    // Por ahora, devolvemos todos los talles y colores con stock > 0 para ese artículo
+    // (esto es un mock, deberías adaptar según tu modelo real)
+    return [{ talle: articulo.fk_id_talle, color: articulo.fk_id_color, stock: articulo.stock }];
+  }
+
+  // Función para obtener variantes disponibles para un artículo
+  function getVariantesDisponibles(articuloId: number | null) {
+    return variantes.filter(v => v.fk_id_articulo === articuloId && v.stock_unitario > 0);
+  }
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -533,6 +572,8 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                   <thead>
                     <tr className="bg-gray-100">
                       <th className="px-2 py-1">Artículo</th>
+                      <th className="px-2 py-1">Talle</th>
+                      <th className="px-2 py-1">Color</th>
                       <th className="px-2 py-1">Cantidad</th>
                       <th className="px-2 py-1">Precio</th>
                       <th className="px-2 py-1">Subtotal</th>
@@ -570,6 +611,40 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                               </div>
                             )}
                           </div>
+                        </td>
+                        <td className="px-2 py-1">
+                          <select
+                            className="w-full border rounded px-2 py-1"
+                            value={d.talle ?? ""}
+                            onChange={e => {
+                              const talle = e.target.value ? Number(e.target.value) : null;
+                              setDetalle(detalle => detalle.map((linea, i) => i === idx ? { ...linea, talle, color: null, variante: null } : linea));
+                            }}
+                            disabled={!d.articulo}
+                          >
+                            <option value="">Talle</option>
+                            {getVariantesDisponibles(d.articulo?.id ?? null).filter(v => !d.color || v.fk_id_color === d.color).map(v => v.fk_id_talle).filter((v, i, arr) => arr.indexOf(v) === i).map(talleId => {
+                              const talle = talles.find(t => t.id === talleId);
+                              return talle ? <option key={talle.id} value={talle.id}>{talle.descripcion}</option> : null;
+                            })}
+                          </select>
+                        </td>
+                        <td className="px-2 py-1">
+                          <select
+                            className="w-full border rounded px-2 py-1"
+                            value={d.color ?? ""}
+                            onChange={e => {
+                              const color = e.target.value ? Number(e.target.value) : null;
+                              setDetalle(detalle => detalle.map((linea, i) => i === idx ? { ...linea, color, variante: null } : linea));
+                            }}
+                            disabled={!d.articulo}
+                          >
+                            <option value="">Color</option>
+                            {getVariantesDisponibles(d.articulo?.id ?? null).filter(v => !d.talle || v.fk_id_talle === d.talle).map(v => v.fk_id_color).filter((v, i, arr) => arr.indexOf(v) === i).map(colorId => {
+                              const color = colores.find(c => c.id === colorId);
+                              return color ? <option key={color.id} value={color.id}>{color.descripcion}</option> : null;
+                            })}
+                          </select>
                         </td>
                         <td className="px-2 py-1">
                           <input
@@ -886,6 +961,20 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
           </DialogHeader>
           <div className="flex justify-end mt-4">
             <Button onClick={() => setShowMaxCuentaCorrienteError(false)}>Cerrar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Modal de error de stock */}
+      <Dialog open={showStockError} onOpenChange={setShowStockError}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Stock insuficiente</DialogTitle>
+            <DialogDescription>
+              No hay stock disponible para la combinación seleccionada de artículo, talle y color. Por favor, revisa el stock antes de continuar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end mt-4">
+            <Button onClick={() => setShowStockError(false)}>Cerrar</Button>
           </div>
         </DialogContent>
       </Dialog>

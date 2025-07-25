@@ -11,6 +11,7 @@ import {
   IconReceipt,
   IconCalculator,
   IconPalette,
+  IconLayers,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
@@ -194,6 +195,16 @@ export function AppSidebar() {
                   >
                     <IconPalette className="w-4 h-4" />
                     <span>Talles y colores</span>
+                  </Link>
+                </li>
+                <li className={`${pathname === "/variantes-productos" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                  <Link
+                    href="/variantes-productos"
+                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/variantes-productos" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                    prefetch={false}
+                  >
+                    <IconStack className="w-4 h-4" />
+                    <span>Variantes de productos</span>
                   </Link>
                 </li>
                 <li className={`${pathname === "/movimientos-stock" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>

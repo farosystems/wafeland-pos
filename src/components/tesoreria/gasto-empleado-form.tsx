@@ -30,6 +30,7 @@ import { CuentaTesoreria } from "@/types/cuentaTesoreria";
 import { CreateGastoEmpleadoData } from "@/types/gastoEmpleado";
 import { Usuario } from "@/types/usuario";
 import { createDetalleLoteOperacion } from "@/services/detalleLotesOperaciones";
+import { useUser } from "@clerk/nextjs";
 
 function formatNumberWithCommas(value: string): string {
   if (!value) return "";
@@ -46,6 +47,7 @@ interface GastoEmpleadoFormProps {
 }
 
 export function GastoEmpleadoForm({ onSubmit, onCancel, isLoading = false }: GastoEmpleadoFormProps) {
+  const { user } = useUser();
   const [form, setForm] = useState<any>({
     monto: 0,
     fk_lote_operaciones: null,
@@ -64,6 +66,7 @@ export function GastoEmpleadoForm({ onSubmit, onCancel, isLoading = false }: Gas
   const [loadingData, setLoadingData] = useState(true);
   const [errorModal, setErrorModal] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
   const [topeRestante, setTopeRestante] = useState<number | null>(null);
+  const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
 
   const selectedTipoGasto = tiposGasto.find(t => t.id === form.fk_tipo_gasto);
   const isEmpleadoRequired = selectedTipoGasto?.obliga_empleado ?? false;
@@ -92,8 +95,18 @@ export function GastoEmpleadoForm({ onSubmit, onCancel, isLoading = false }: Gas
 
   useEffect(() => {
     getCuentasTesoreria().then(setCuentasTesoreria);
-    getUsuarios().then(setUsuarios);
-  }, []);
+    getUsuarios().then(us => {
+      setUsuarios(us);
+      if (user?.emailAddresses?.[0]?.emailAddress) {
+        const actual = us.find(u => u.email === user.emailAddresses[0].emailAddress);
+        setUsuarioActual(actual || null);
+        // Si no es supervisor, setear automáticamente el usuario en el form
+        if (actual && actual.rol !== "supervisor") {
+          setForm((prev: typeof form) => ({ ...prev, fk_usuario: actual.id }));
+        }
+      }
+    });
+  }, [user]);
 
   // Calcula el tope de adelanto restante
   useEffect(() => {
@@ -272,21 +285,30 @@ export function GastoEmpleadoForm({ onSubmit, onCancel, isLoading = false }: Gas
         </div>
         <div>
           <label className="block mb-1 font-medium">Usuario *</label>
-           <Select
-               value={form.fk_usuario ? String(form.fk_usuario) : ""}
-               onValueChange={(value) => {
-                   setForm((prev: typeof form) => ({ ...prev, fk_usuario: Number(value) }));
-               }}
-           >
-               <SelectTrigger className="w-full">
-                   <SelectValue placeholder="Seleccionar usuario" />
-               </SelectTrigger>
-               <SelectContent>
-                   {usuarios.map((u: Usuario) => (
-                       <SelectItem key={u.id} value={String(u.id)}>{u.nombre}</SelectItem>
-                   ))}
-               </SelectContent>
-           </Select>
+          {usuarioActual?.rol === "supervisor" ? (
+            <Select
+              value={form.fk_usuario ? String(form.fk_usuario) : ""}
+              onValueChange={(value) => {
+                setForm((prev: typeof form) => ({ ...prev, fk_usuario: Number(value) }));
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Seleccionar usuario" />
+              </SelectTrigger>
+              <SelectContent>
+                {usuarios.map((u: Usuario) => (
+                  <SelectItem key={u.id} value={String(u.id)}>{u.nombre}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              value={usuarioActual?.nombre || ""}
+              readOnly
+              disabled
+              className="bg-gray-100"
+            />
+          )}
         </div>
 
         <div>

@@ -4,22 +4,24 @@ import { Article, CreateArticleData, UpdateArticleData } from "@/types/article";
 export async function getArticles() {
   const { data, error } = await supabase
     .from("articulos")
-    .select(`*,
-      agrupadores:fk_id_agrupador(nombre),
-      marcas:fk_id_marca(descripcion),
-      talles:fk_id_talle(descripcion),
-      color:fk_id_color(descripcion)
-    `)
+    .select(`*, fk_id_marca, fk_id_agrupador`)
     .order("id", { ascending: false });
   if (error) throw error;
+
+  // Traer todas las marcas y agrupadores para mapear manualmente
+  const { data: marcas } = await supabase.from("marcas").select("id, descripcion");
+  const { data: agrupadores } = await supabase.from("agrupadores").select("id, nombre");
+
   // Mapear nombres/descripciones de foráneas
-  const mapped = (data as unknown[]).map(a => ({
-    ...(a as Record<string, unknown>),
-    agrupador_nombre: (a as any).agrupadores?.nombre || '',
-    marca_nombre: (a as any).marcas?.descripcion || '',
-    talle_descripcion: (a as any).talles?.descripcion || '',
-    color_descripcion: (a as any).color?.descripcion || '',
-  }));
+  const mapped = (data as unknown[]).map(a => {
+    const marca = marcas?.find((m: any) => m.id === (a as any).fk_id_marca);
+    const agrupador = agrupadores?.find((g: any) => g.id === (a as any).fk_id_agrupador);
+    return {
+      ...(a as Record<string, unknown>),
+      marca_nombre: marca?.descripcion || '-',
+      agrupador_nombre: agrupador?.nombre || '-',
+    };
+  });
   return mapped as Article[];
 }
 

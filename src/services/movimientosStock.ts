@@ -2,13 +2,17 @@ import { supabase } from "@/lib/supabaseClient";
 import { MovimientoStock } from "@/types/movimientoStock";
 import { getArticles, updateArticle } from "@/services/articles";
 
-export async function getMovimientosStock(): Promise<MovimientoStock[]> {
+export async function getMovimientosStock() {
   const { data, error } = await supabase
     .from("movimientos_stock")
-    .select("*")
-    .order("creado_el", { ascending: false });
+    .select(`*, talle:fk_id_talle(descripcion), color:fk_id_color(descripcion)`) // join a talles y color
+    .order("id", { ascending: false });
   if (error) throw error;
-  return data as MovimientoStock[];
+  return (data as any[]).map(m => ({
+    ...m,
+    talle_descripcion: m.talle?.descripcion || '-',
+    color_descripcion: m.color?.descripcion || '-',
+  }));
 }
 
 export interface MovimientoStockInsert {
@@ -20,17 +24,17 @@ export interface MovimientoStockInsert {
   creado_el?: string; // opcional, por defecto Date.now
 }
 
-export async function createMovimientoStock(mov: MovimientoStockInsert): Promise<void> {
-  // Obtener el artículo actual para conocer el stock
-  const articles = await getArticles();
-  const articulo = articles.find(a => a.id === mov.fk_id_articulos);
-  if (!articulo) throw new Error("Artículo no encontrado");
-  let nuevoStock = articulo.stock + mov.cantidad;
-  if (nuevoStock < 0) nuevoStock = 0;
-  // Actualizar el stock del artículo
-  await updateArticle(articulo.id, { stock: nuevoStock });
-  // Insertar el movimiento con el stock_actual
-  const { error } = await supabase
+export async function createMovimientoStock(mov: {
+  fk_id_orden: number | null;
+  fk_id_articulos: number;
+  origen: string;
+  tipo: string;
+  cantidad: number;
+  fk_id_talle?: number | null;
+  fk_id_color?: number | null;
+  stock_actual?: number | null;
+}) {
+  const { data, error } = await supabase
     .from("movimientos_stock")
     .insert([
       {
@@ -39,9 +43,13 @@ export async function createMovimientoStock(mov: MovimientoStockInsert): Promise
         origen: mov.origen,
         tipo: mov.tipo,
         cantidad: mov.cantidad,
-        creado_el: mov.creado_el || new Date().toISOString(),
-        stock_actual: nuevoStock,
+        fk_id_talle: mov.fk_id_talle ?? null,
+        fk_id_color: mov.fk_id_color ?? null,
+        stock_actual: mov.stock_actual ?? null,
       },
-    ]);
+    ])
+    .select()
+    .single();
   if (error) throw error;
+  return data;
 } 

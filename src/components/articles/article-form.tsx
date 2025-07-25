@@ -20,6 +20,7 @@ import { useAgrupadores } from "@/hooks/use-agrupadores";
 import { useMarcas } from "@/hooks/use-marcas";
 import { useTalles } from "@/hooks/use-talles";
 import { useColores } from "@/hooks/use-colores";
+import { useVariantes } from "@/hooks/use-variantes";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useTrialCheck } from "@/hooks/use-trial-check";
 import { createMovimientoStock } from "@/services/movimientosStock";
@@ -29,10 +30,7 @@ const articleSchema = z.object({
   precio_unitario: z.union([z.string(), z.number()]).transform(Number).refine(val => !isNaN(val) && val >= 0, { message: "El precio debe ser mayor o igual a 0" }),
   fk_id_agrupador: z.union([z.string(), z.number()]).transform(Number).refine(val => !isNaN(val) && val >= 1, { message: "El agrupador es requerido" }),
   fk_id_marca: z.union([z.string(), z.number()]).transform(val => val === "" ? null : Number(val)).nullable(),
-  fk_id_talle: z.union([z.string(), z.number()]).transform(val => val === "" ? null : Number(val)).nullable(),
-  fk_id_color: z.union([z.string(), z.number()]).transform(val => val === "" ? null : Number(val)).nullable(),
   activo: z.boolean(),
-  stock: z.union([z.string(), z.number()]).transform(Number).refine(val => !isNaN(val) && val >= 0, { message: "El stock debe ser mayor o igual a 0" }),
 });
 
 // type ArticleFormValues = z.infer<typeof articleSchema>;
@@ -49,6 +47,7 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
   const { marcas } = useMarcas();
   const { talles } = useTalles();
   const { colores } = useColores();
+  const { variantes } = useVariantes();
   const form = useForm({
     resolver: zodResolver(articleSchema),
     defaultValues: {
@@ -56,31 +55,11 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
       precio_unitario: article?.precio_unitario || 0,
       fk_id_agrupador: article?.fk_id_agrupador || 1,
       fk_id_marca: article?.fk_id_marca ?? null,
-      fk_id_talle: article?.fk_id_talle ?? null,
-      fk_id_color: article?.fk_id_color ?? null,
       activo: article?.activo ?? true,
-      stock: article?.stock ?? 0,
     },
   });
 
-  // Estado local para el campo temporal Stock nuevo (solo en edición)
-  const [stockNuevo, setStockNuevo] = React.useState(0);
-  // Estado local para el campo temporal Stock a descontar (solo en edición)
-  const [stockDescontar, setStockDescontar] = React.useState(0);
-  React.useEffect(() => {
-    if (article) {
-      setStockNuevo(0); // Resetear al abrir edición
-      setStockDescontar(0);
-    }
-  }, [article]);
-
-  // Cuando cambia stockNuevo, sumarlo al stock en el form (solo en edición)
-  React.useEffect(() => {
-    if (article) {
-      const stockBase = article.stock ?? 0;
-      form.setValue("stock", stockBase + Number(stockNuevo || 0) - Number(stockDescontar || 0));
-    }
-  }, [stockNuevo, stockDescontar, article]);
+  // Eliminar cualquier setValue('stock', ...) y dependencias de stockNuevo/stockDescontar en useEffect
 
   const { checkTrial } = useTrialCheck();
   const [showTrialEnded, setShowTrialEnded] = React.useState(false);
@@ -88,33 +67,15 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
   const handleSubmit = async (values: Record<string, unknown>) => {
     const expired = await checkTrial(() => setShowTrialEnded(true));
     if (expired) return;
-    // Si es edición y stockNuevo distinto de 0, registrar movimiento de stock (entrada)
-    if (article && stockNuevo !== 0) {
-      await createMovimientoStock({
-        fk_id_orden: null,
-        fk_id_articulos: article.id,
-        origen: "AJUSTE",
-        tipo: stockNuevo > 0 ? "entrada" : "salida",
-        cantidad: Number(stockNuevo),
-      });
-    }
-    // Si es edición y stockDescontar distinto de 0, registrar movimiento de stock (salida)
-    if (article && stockDescontar !== 0) {
-      await createMovimientoStock({
-        fk_id_orden: null,
-        fk_id_articulos: article.id,
-        origen: "AJUSTE",
-        tipo: "salida",
-        cantidad: -Math.abs(Number(stockDescontar)),
-      });
-    }
     onSave({
       ...values,
       precio_unitario: Number(values.precio_unitario),
       fk_id_agrupador: Number(values.fk_id_agrupador),
-      stock: Number(values.stock),
     });
   };
+
+  // Calcular stock total como sumatoria de variantes
+  const stockTotal = article ? variantes.filter(v => v.fk_id_articulo === article.id).reduce((acc, v) => acc + v.stock_unitario, 0) : 0;
 
   return (
     <Form {...form}>
@@ -194,52 +155,6 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
               </FormItem>
             )}
           />
-          <FormField
-            control={form.control}
-            name="fk_id_talle"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Talle</FormLabel>
-                <FormControl>
-                  <select
-                    className="w-full border rounded px-3 py-2"
-                    value={field.value ?? ""}
-                    onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                  >
-                    <option value="">Sin talle</option>
-                    {talles.map((talle) => (
-                      <option key={talle.id} value={talle.id}>{talle.descripcion}</option>
-                    ))}
-                  </select>
-                </FormControl>
-                <FormDescription>Selecciona el talle del artículo</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="fk_id_color"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Color</FormLabel>
-                <FormControl>
-                  <select
-                    className="w-full border rounded px-3 py-2"
-                    value={field.value ?? ""}
-                    onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                  >
-                    <option value="">Sin color</option>
-                    {colores.map((color) => (
-                      <option key={color.id} value={color.id}>{color.descripcion}</option>
-                    ))}
-                  </select>
-                </FormControl>
-                <FormDescription>Selecciona el color del artículo</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
         </div>
         <div className="flex flex-col gap-4">
           <FormField
@@ -256,20 +171,11 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
               </FormItem>
             )}
           />
-          <FormField
-            control={form.control}
-            name="stock"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Stock</FormLabel>
-                <FormControl>
-                  <Input type="number" min={0} step={1} placeholder="0" {...field} readOnly={!!article} />
-                </FormControl>
-                <FormDescription>{article ? "Stock actual del artículo (se actualizará si usas 'Stock nuevo')" : "Stock inicial del artículo"}</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <div>
+            <label className="block text-sm font-medium mb-1">Stock total</label>
+            <Input type="number" value={stockTotal} readOnly disabled className="bg-gray-100" />
+            <div className="text-xs text-muted-foreground mt-1">Sumatoria de stock de todas las variantes</div>
+          </div>
           {article && (
             <>
               <div>
@@ -279,8 +185,8 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
                   min={0}
                   step={1}
                   placeholder="0"
-                  value={stockNuevo}
-                  onChange={e => setStockNuevo(Number(e.target.value))}
+                  value={0} // Eliminar stockNuevo
+                  onChange={e => {}} // Eliminar setStockNuevo
                 />
                 <div className="text-xs text-muted-foreground mt-1">Al guardar, se sumará al stock actual.</div>
               </div>
@@ -291,8 +197,8 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
                   min={0}
                   step={1}
                   placeholder="0"
-                  value={stockDescontar}
-                  onChange={e => setStockDescontar(Number(e.target.value))}
+                  value={0} // Eliminar stockDescontar
+                  onChange={e => {}} // Eliminar setStockDescontar
                 />
                 <div className="text-xs text-muted-foreground mt-1">Al guardar, se restará del stock actual.</div>
               </div>

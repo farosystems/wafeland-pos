@@ -247,8 +247,8 @@ export default function CajaPage() {
     const now = new Date();
     const hoy = format(now, "yyyy-MM-dd");
     try {
-      // Buscar la caja por descripción
-      const cajaObj = cajas.find(c => c.descripcion === cajaSeleccionada);
+      // Buscar la caja por ID
+      const cajaObj = cajas.find(c => c.id === parseInt(cajaSeleccionada, 10));
       if (!cajaObj) throw new Error("Caja no encontrada");
       // Crear lote de apertura
       const lote = await createLoteOperacion({
@@ -820,15 +820,24 @@ export default function CajaPage() {
             {/* Usuario */}
             <div>
               <label className="block mb-1 font-medium">Usuario</label>
-              <select
-                className="w-full border rounded px-2 py-1"
-                value={usuarioSeleccionado}
-                onChange={e => setUsuarioSeleccionado(e.target.value)}
-              >
-                {usuarios.map((usuario) => (
-                  <option key={usuario.id} value={usuario.id.toString()}>{usuario.nombre}</option>
-                ))}
-              </select>
+              {usuarioDB?.rol === "supervisor" ? (
+                <select
+                  className="w-full border rounded px-2 py-1"
+                  value={usuarioSeleccionado}
+                  onChange={e => setUsuarioSeleccionado(e.target.value)}
+                >
+                  {usuarios.map((usuario) => (
+                    <option key={usuario.id} value={usuario.id.toString()}>{usuario.nombre}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className="w-full border rounded px-2 py-1 bg-gray-100"
+                  value={usuarioActual?.nombre || ""}
+                  disabled
+                  readOnly
+                />
+              )}
             </div>
             <div className="flex items-end">
               <button
