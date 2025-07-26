@@ -146,17 +146,15 @@ export default function CajaPage() {
   // Estado para el lote abierto global (para supervisor)
   const [loteAbiertoGlobal, setLoteAbiertoGlobal] = useState<LoteOperacion | null>(null);
 
-  // Al cargar, si el usuario es supervisor, buscar cualquier caja abierta
+  // Al cargar, buscar cualquier caja abierta (para todos los usuarios)
   React.useEffect(() => {
     async function fetchLoteAbiertoGlobal() {
-      if (usuarioDB?.rol === "supervisor") {
-        const lotes = await getLotesOperaciones();
-        const abierto = lotes.find(l => l.abierto);
-        setLoteAbiertoGlobal(abierto || null);
-      }
+      const lotes = await getLotesOperaciones();
+      const abierto = lotes.find(l => l.abierto);
+      setLoteAbiertoGlobal(abierto || null);
     }
     fetchLoteAbiertoGlobal();
-  }, [usuarioDB, refreshLotes]);
+  }, [refreshLotes]);
 
   const fetchCajas = async () => {
     try {
@@ -299,9 +297,10 @@ export default function CajaPage() {
   async function handleCerrarCaja() {
     setLoading(true);
     setLoadingMessage("Cerrando caja y calculando movimientos...");
-    if (!aperturaActual || !aperturaActual.id_lote) return;
+    const loteACerrar = loteAbiertoGlobal || (aperturaActual && aperturaActual.id_lote ? { id_lote: aperturaActual.id_lote } : null);
+    if (!loteACerrar || !loteACerrar.id_lote) return;
     // Traer todos los movimientos reales del lote
-    const movimientos = await getDetalleLotesOperaciones(aperturaActual.id_lote);
+    const movimientos = await getDetalleLotesOperaciones(loteACerrar.id_lote);
     // Traer todas las cuentas de tesorería
     const cuentasTesoreria = await getCuentasTesoreria();
     // Sumar ingresos y egresos por cuenta SOLO de movimientos
@@ -327,14 +326,15 @@ export default function CajaPage() {
 
   async function confirmarCierreCaja() {
     setShowCierreModal(false);
-    if (!aperturaActual || !aperturaActual.id_lote) return;
+    const loteACerrar = loteAbiertoGlobal || (aperturaActual && aperturaActual.id_lote ? { id_lote: aperturaActual.id_lote } : null);
+    if (!loteACerrar || !loteACerrar.id_lote) return;
     setLoading(true);
     setLoadingMessage("Confirmando cierre de caja...");
     const now = new Date();
     const hoyCierre = format(now, "yyyy-MM-dd");
     try {
       // 1. Actualiza el registro en la base de datos
-      await cerrarLoteApertura(aperturaActual.id_lote, hoyCierre, format(now, "HH:mm"));
+      await cerrarLoteApertura(loteACerrar.id_lote, hoyCierre, format(now, "HH:mm"));
       // 2. Actualiza el estado del frontend inmediatamente
       setCajaAbierta(null);
       setAperturaActual(null);
@@ -734,7 +734,7 @@ export default function CajaPage() {
       </div>
       <div className="rounded-lg border bg-card p-6 mb-8">
         <h2 className="text-lg font-semibold mb-2">Apertura de caja</h2>
-        {usuarioDB?.rol === "supervisor" && loteAbiertoGlobal ? (
+        {loteAbiertoGlobal ? (
           <div className="flex items-center gap-6 p-4 bg-green-50 border border-green-200 rounded-lg shadow-sm">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
@@ -748,7 +748,21 @@ export default function CajaPage() {
                 </span>
               </div>
               <span className="text-xs text-green-800">Abierta por: {usuarios.find(u => u.id === loteAbiertoGlobal.fk_id_usuario)?.nombre || "-"}</span>
+              {loteAbiertoGlobal.fk_id_usuario !== usuarioActual?.id && (
+                <span className="text-xs text-orange-600 font-medium">No puedes abrir otra caja mientras esta esté abierta</span>
+              )}
             </div>
+            {/* Solo mostrar botón de cierre si el usuario es supervisor o el que abrió la caja */}
+            {(usuarioDB?.rol === "supervisor" || loteAbiertoGlobal.fk_id_usuario === usuarioActual?.id) && (
+              <button
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-lg shadow transition-all duration-150 active:scale-95"
+                onClick={handleCerrarCaja}
+                disabled={loadingCierre}
+              >
+                <CloseIcon className="w-4 h-4" />
+                Cerrar caja
+              </button>
+            )}
           </div>
         ) : cajaAbierta ? (
           <div className="flex items-center gap-6 p-4 bg-green-50 border border-green-200 rounded-lg shadow-sm">
