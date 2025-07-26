@@ -18,12 +18,9 @@ import { Input } from "@/components/ui/input";
 import { Article, CreateArticleData, UpdateArticleData } from "@/types/article";
 import { useAgrupadores } from "@/hooks/use-agrupadores";
 import { useMarcas } from "@/hooks/use-marcas";
-import { useTalles } from "@/hooks/use-talles";
-import { useColores } from "@/hooks/use-colores";
 import { useVariantes } from "@/hooks/use-variantes";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useTrialCheck } from "@/hooks/use-trial-check";
-import { createMovimientoStock } from "@/services/movimientosStock";
 
 const articleSchema = z.object({
   descripcion: z.string().min(1, "La descripción es requerida"),
@@ -45,8 +42,6 @@ interface ArticleFormProps {
 export function ArticleForm({ article, onSave, onCancel, isLoading = false }: ArticleFormProps) {
   const { agrupadores } = useAgrupadores();
   const { marcas } = useMarcas();
-  const { talles } = useTalles();
-  const { colores } = useColores();
   const { variantes } = useVariantes();
   const form = useForm({
     resolver: zodResolver(articleSchema),
@@ -186,7 +181,7 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
                   step={1}
                   placeholder="0"
                   value={0} // Eliminar stockNuevo
-                  onChange={e => {}} // Eliminar setStockNuevo
+                  onChange={() => {}} // Eliminar setStockNuevo
                 />
                 <div className="text-xs text-muted-foreground mt-1">Al guardar, se sumará al stock actual.</div>
               </div>
@@ -198,7 +193,7 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
                   step={1}
                   placeholder="0"
                   value={0} // Eliminar stockDescontar
-                  onChange={e => {}} // Eliminar setStockDescontar
+                  onChange={() => {}} // Eliminar setStockDescontar
                 />
                 <div className="text-xs text-muted-foreground mt-1">Al guardar, se restará del stock actual.</div>
               </div>

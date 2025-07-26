@@ -11,7 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { ReceiptText } from "lucide-react";
 import { TiposGastoContent } from "@/components/tesoreria/tipos-gasto-content";
 import { getTiposGasto } from "@/services/tiposGasto";

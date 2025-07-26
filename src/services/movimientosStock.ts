@@ -1,6 +1,4 @@
 import { supabase } from "@/lib/supabaseClient";
-import { MovimientoStock } from "@/types/movimientoStock";
-import { getArticles, updateArticle } from "@/services/articles";
 
 export async function getMovimientosStock() {
   const { data, error } = await supabase
@@ -8,8 +6,22 @@ export async function getMovimientosStock() {
     .select(`*, talle:fk_id_talle(descripcion), color:fk_id_color(descripcion)`) // join a talles y color
     .order("id", { ascending: false });
   if (error) throw error;
-  return (data as any[]).map(m => ({
+  return (data as Array<{
+    id: number;
+    fk_id_orden: number | null;
+    fk_id_articulos: number;
+    origen: string;
+    tipo: string;
+    cantidad: number;
+    fk_id_talle: number | null;
+    fk_id_color: number | null;
+    stock_actual: number | null;
+    creado_el: string;
+    talle?: { descripcion: string } | null;
+    color?: { descripcion: string } | null;
+  }>).map(m => ({
     ...m,
+    stock_actual: m.stock_actual ?? undefined,
     talle_descripcion: m.talle?.descripcion || '-',
     color_descripcion: m.color?.descripcion || '-',
   }));

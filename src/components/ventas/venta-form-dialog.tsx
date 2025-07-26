@@ -35,7 +35,6 @@ import { useTalles } from "@/hooks/use-talles";
 import { useColores } from "@/hooks/use-colores";
 import { useVariantes } from "@/hooks/use-variantes";
 import { editVariante } from "@/services/variantes";
-import { updateArticle } from "@/services/articles";
 
 interface VentaFormDialogProps {
   open: boolean;
@@ -398,8 +397,8 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
             fk_id_color: d.color ?? null,
           });
           // Descontar stock_unitario de la variante si corresponde
-          if (d.talle && d.color) {
-            const variante = variantes.find(v => v.fk_id_articulo === d.articulo.id && v.fk_id_talle === d.talle && v.fk_id_color === d.color);
+          if (d.talle && d.color && d.articulo) {
+            const variante = variantes.find(v => v.fk_id_articulo === d.articulo!.id && v.fk_id_talle === d.talle && v.fk_id_color === d.color);
             if (variante) {
               await editVariante(variante.id, { stock_unitario: (variante.stock_unitario ?? 0) - d.cantidad });
             }
@@ -452,9 +451,9 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
       onOpenChange(false);
       showToast("Venta registrada con éxito");
       // Opcional: mostrar toast de éxito
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Error al guardar la venta:", e);
-      setError(e?.message || e?.error_description || "Error al guardar la venta");
+      setError(e instanceof Error ? e.message : "Error al guardar la venta");
     }
     setLoading(false);
   }
@@ -487,16 +486,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
       ? usuarios.filter(u => u.email === usuarioActual.email)
       : [];
 
-  // Función para obtener combinaciones de stock disponibles para un artículo
-  function getStockCombinaciones(articulo: Article | null) {
-    if (!articulo) return [];
-    // Suponiendo que el artículo tiene un array de variantes o que hay que consultar a la API
-    // Aquí se asume que el stock está en el propio artículo para la combinación seleccionada
-    // Si tienes una tabla de variantes, deberías consultar ahí
-    // Por ahora, devolvemos todos los talles y colores con stock > 0 para ese artículo
-    // (esto es un mock, deberías adaptar según tu modelo real)
-    return [{ talle: articulo.fk_id_talle, color: articulo.fk_id_color, stock: articulo.stock }];
-  }
+
 
   // Función para obtener variantes disponibles para un artículo
   function getVariantesDisponibles(articuloId: number | null) {

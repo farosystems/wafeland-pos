@@ -11,11 +11,11 @@ import { Edit, Trash, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Variante } from "@/types/variante";
 import { createMovimientoStock } from "@/services/movimientosStock";
-import { updateArticle, getArticles } from "@/services/articles";
+import { updateArticle } from "@/services/articles";
 import { getVariantes } from "@/services/variantes";
 
 export default function VariantesProductosPage() {
-  const { variantes, addVariante, editVariante, deleteVariante, error, loading, fetchVariantes } = useVariantes();
+  const { variantes, addVariante, editVariante, deleteVariante, error, fetchVariantes } = useVariantes();
   const { articles } = useArticles();
   const { talles } = useTalles();
   const { colores } = useColores();

@@ -29,7 +29,7 @@ import { Empleado } from "@/types/empleado";
 import { CuentaTesoreria } from "@/types/cuentaTesoreria";
 import { CreateGastoEmpleadoData } from "@/types/gastoEmpleado";
 import { Usuario } from "@/types/usuario";
-import { createDetalleLoteOperacion } from "@/services/detalleLotesOperaciones";
+
 import { useUser } from "@clerk/nextjs";
 
 function formatNumberWithCommas(value: string): string {
@@ -192,16 +192,6 @@ export function GastoEmpleadoForm({ onSubmit, onCancel, isLoading = false }: Gas
       return;
     }
     await onSubmit(form as CreateGastoEmpleadoData);
-    // Si el tipo de gasto afecta caja, registrar egreso en detalle_lotes_operaciones
-    const tipoGasto = tiposGasto.find((t: TipoGasto) => t.id === form.fk_tipo_gasto);
-    if (tipoGasto && tipoGasto.afecta_caja) {
-      await createDetalleLoteOperacion({
-        fk_id_lote: lote!,
-        fk_id_cuenta_tesoreria: form.fk_cuenta_tesoreria,
-        tipo: 'egreso',
-        monto: form.monto,
-      });
-    }
   };
 
   useEffect(() => {

@@ -97,7 +97,8 @@ export default function MovimientosStockPage() {
     getCuentasTesoreria().then(setCuentasTesoreria);
   }, []);
 
-  const getArticuloNombre = (id: number) => {
+  const getArticuloNombre = (id: number | null) => {
+    if (id === null) return 'Sin artículo';
     const art = articulos.find(a => a.id === id);
     return art ? art.descripcion : id;
   };
@@ -110,7 +111,7 @@ export default function MovimientosStockPage() {
       String(getArticuloNombre(mov.fk_id_articulos)).toLowerCase().includes(filtroLower) ||
       (mov.origen?.toLowerCase().includes(filtroLower) || false) ||
       (Array.isArray(mov.tipo) ? mov.tipo.join(",").toLowerCase().includes(filtroLower) : String(mov.tipo).toLowerCase().includes(filtroLower)) ||
-      mov.cantidad.toString().includes(filtroLower) ||
+      (mov.cantidad?.toString() || '0').includes(filtroLower) ||
       (mov.creado_el?.toLowerCase().includes(filtroLower) || false)
     );
   }, [movimientos, filtro, articulos]);
@@ -268,7 +269,7 @@ export default function MovimientosStockPage() {
                       {mov.fk_id_orden ? (
                         <span
                           className="underline text-blue-600 cursor-pointer"
-                          onClick={() => handleOpenOrden(mov.fk_id_orden)}
+                          onClick={() => mov.fk_id_orden && handleOpenOrden(mov.fk_id_orden)}
                         >
                           {mov.fk_id_orden}
                         </span>
@@ -365,7 +366,7 @@ export default function MovimientosStockPage() {
                       {Array.isArray(showMovimiento.tipo) ? showMovimiento.tipo[0] : showMovimiento.tipo}
                     </div>
                     <div><b>Cantidad:</b></div>
-                    <div className={showMovimiento.cantidad > 0 ? 'text-green-700' : 'text-red-700'}>{showMovimiento.cantidad}</div>
+                    <div className={(showMovimiento.cantidad ?? 0) > 0 ? 'text-green-700' : 'text-red-700'}>{showMovimiento.cantidad ?? 0}</div>
                     <div><b>Origen:</b></div>
                     <div>{showMovimiento.origen}</div>
                   </div>

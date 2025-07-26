@@ -10,10 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Color } from "@/types/color";
 
 export function ColoresTableBlock() {
-  const { colores, addColor, editColor, deleteColor, error, loading } = useColores();
+  const { colores, addColor, editColor, deleteColor, error } = useColores();
   const [filter, setFilter] = React.useState("");
   const [columnVisibility, setColumnVisibility] = React.useState({ id: true, creado_el: true, descripcion: true });
-  const [editing, setEditing] = React.useState<Color | null>(null);
   const [showDialog, setShowDialog] = React.useState(false);
   const [descripcion, setDescripcion] = React.useState("");
   const [editId, setEditId] = React.useState<number | null>(null);

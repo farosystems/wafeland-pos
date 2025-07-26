@@ -11,7 +11,6 @@ import {
   IconReceipt,
   IconCalculator,
   IconPalette,
-  IconLayers,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
@@ -50,7 +49,7 @@ export function AppSidebar() {
   // Utilidades para saber si algún submenú está activo
   const isStockActive = ["/articles", "/movimientos-stock"].includes(pathname);
   const isContactosActive = ["/clientes", "/usuarios"].includes(pathname);
-  const isVentasActive = ["/ventas", "/cuentas-corrientes"].includes(pathname);
+  const isVentasActive = ["/ventas"].includes(pathname);
   const isTesoreriaActive = ["/caja", "/gastos-empleados"].includes(pathname);
   const isSueldosActive = ["/liquidaciones", "/empleados"].includes(pathname);
 
@@ -279,7 +278,7 @@ export function AppSidebar() {
                     <span>Ventas</span>
                   </Link>
                 </li>
-                <li className={`${pathname === "/cuentas-corrientes" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                {/* <li className={`${pathname === "/cuentas-corrientes" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
                   <Link
                     href="/cuentas-corrientes"
                     className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/cuentas-corrientes" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
@@ -298,7 +297,7 @@ export function AppSidebar() {
                     <IconCash className="w-4 h-4" />
                     <span>Pagos</span>
                   </Link>
-                </li>
+                </li> */}
               </ul>
             )}
           </li>

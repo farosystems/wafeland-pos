@@ -1,5 +1,5 @@
 "use client";
-import { IconRuler, IconPalette } from "@tabler/icons-react";
+import { IconRuler } from "@tabler/icons-react";
 import { TallesTableBlock } from "@/components/talles/talles-table-block";
 import { ColoresTableBlock } from "@/components/colores/colores-table-block";
 

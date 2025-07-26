@@ -10,10 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Talle } from "@/types/talle";
 
 export function TallesTableBlock() {
-  const { talles, addTalle, editTalle, deleteTalle, error, loading } = useTalles();
+  const { talles, addTalle, editTalle, deleteTalle, error } = useTalles();
   const [filter, setFilter] = React.useState("");
   const [columnVisibility, setColumnVisibility] = React.useState({ id: true, creado_el: true, descripcion: true });
-  const [editing, setEditing] = React.useState<Talle | null>(null);
   const [showDialog, setShowDialog] = React.useState(false);
   const [descripcion, setDescripcion] = React.useState("");
   const [editId, setEditId] = React.useState<number | null>(null);
