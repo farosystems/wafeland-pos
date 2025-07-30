@@ -72,135 +72,109 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
   // Calcular stock total como sumatoria de variantes
   const stockTotal = article ? variantes.filter(v => v.fk_id_articulo === article.id).reduce((acc, v) => acc + v.stock_unitario, 0) : 0;
 
-  return (
+    return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="flex flex-col gap-4">
-          <FormField
-            control={form.control}
-            name="descripcion"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Descripción</FormLabel>
-                <FormControl>
-                  <Input placeholder="Ingrese la descripción del artículo" {...field} />
-                </FormControl>
-                <FormDescription>Descripción detallada del artículo</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="precio_unitario"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Precio Unitario</FormLabel>
-                <FormControl>
-                  <Input type="number" step="0.01" placeholder="0.00" {...field} />
-                </FormControl>
-                <FormDescription>Precio unitario del artículo</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="fk_id_agrupador"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Agrupador</FormLabel>
-                <FormControl>
-                  <select
-                    className="w-full border rounded px-3 py-2"
-                    value={field.value}
-                    onChange={e => field.onChange(Number(e.target.value))}
-                  >
-                    <option value="">Seleccione un agrupador</option>
-                    {agrupadores.map((agrupador) => (
-                      <option key={agrupador.id} value={agrupador.id}>{agrupador.nombre}</option>
-                    ))}
-                  </select>
-                </FormControl>
-                <FormDescription>Selecciona el agrupador del artículo</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="fk_id_marca"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Marca</FormLabel>
-                <FormControl>
-                  <select
-                    className="w-full border rounded px-3 py-2"
-                    value={field.value ?? ""}
-                    onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                  >
-                    <option value="">Sin marca</option>
-                    {marcas.map((marca) => (
-                      <option key={marca.id} value={marca.id}>{marca.descripcion}</option>
-                    ))}
-                  </select>
-                </FormControl>
-                <FormDescription>Selecciona la marca del artículo</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-        <div className="flex flex-col gap-4">
-          <FormField
-            control={form.control}
-            name="activo"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Activo</FormLabel>
-                <FormControl>
-                  <input type="checkbox" checked={field.value} onChange={e => field.onChange(e.target.checked)} />
-                </FormControl>
-                <FormDescription>¿El artículo está activo?</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <div>
-            <label className="block text-sm font-medium mb-1">Stock total</label>
-            <Input type="number" value={stockTotal} readOnly disabled className="bg-gray-100" />
-            <div className="text-xs text-muted-foreground mt-1">Sumatoria de stock de todas las variantes</div>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="descripcion"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descripción</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ingrese la descripción del artículo" {...field} />
+                  </FormControl>
+                  <FormDescription>Descripción detallada del artículo</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="precio_unitario"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Precio Unitario</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                  </FormControl>
+                  <FormDescription>Precio unitario del artículo</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="fk_id_agrupador"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Agrupador</FormLabel>
+                  <FormControl>
+                    <select
+                      className="w-full border rounded px-3 py-2"
+                      value={field.value}
+                      onChange={e => field.onChange(Number(e.target.value))}
+                    >
+                      <option value="">Seleccione un agrupador</option>
+                      {agrupadores.map((agrupador) => (
+                        <option key={agrupador.id} value={agrupador.id}>{agrupador.nombre}</option>
+                      ))}
+                    </select>
+                  </FormControl>
+                  <FormDescription>Selecciona el agrupador del artículo</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="fk_id_marca"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Marca</FormLabel>
+                  <FormControl>
+                    <select
+                      className="w-full border rounded px-3 py-2"
+                      value={field.value ?? ""}
+                      onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                    >
+                      <option value="">Sin marca</option>
+                      {marcas.map((marca) => (
+                        <option key={marca.id} value={marca.id}>{marca.descripcion}</option>
+                      ))}
+                    </select>
+                  </FormControl>
+                  <FormDescription>Selecciona la marca del artículo</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
-          {article && (
-            <>
-              <div>
-                <label className="block mb-1 font-medium">Stock nuevo</label>
-                <Input
-                  type="number"
-                  min={0}
-                  step={1}
-                  placeholder="0"
-                  value={0} // Eliminar stockNuevo
-                  onChange={() => {}} // Eliminar setStockNuevo
-                />
-                <div className="text-xs text-muted-foreground mt-1">Al guardar, se sumará al stock actual.</div>
-              </div>
-              <div>
-                <label className="block mb-1 font-medium">Stock a descontar</label>
-                <Input
-                  type="number"
-                  min={0}
-                  step={1}
-                  placeholder="0"
-                  value={0} // Eliminar stockDescontar
-                  onChange={() => {}} // Eliminar setStockDescontar
-                />
-                <div className="text-xs text-muted-foreground mt-1">Al guardar, se restará del stock actual.</div>
-              </div>
-            </>
-          )}
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="activo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Activo</FormLabel>
+                  <FormControl>
+                    <input type="checkbox" checked={field.value} onChange={e => field.onChange(e.target.checked)} />
+                  </FormControl>
+                  <FormDescription>¿El artículo está activo?</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div>
+              <label className="block text-sm font-medium mb-1">Stock total</label>
+              <Input type="number" value={stockTotal} readOnly disabled className="bg-gray-100" />
+              <div className="text-xs text-muted-foreground mt-1">Sumatoria de stock de todas las variantes</div>
+            </div>
+          </div>
         </div>
-        <div className="col-span-1 md:col-span-2 flex justify-end gap-2 mt-4">
+        <div className="flex justify-end gap-2 pt-4 border-t">
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancelar
           </Button>

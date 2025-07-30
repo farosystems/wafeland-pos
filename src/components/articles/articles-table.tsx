@@ -13,7 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ChevronDown, Edit } from "lucide-react";
+import { ChevronDown, Edit, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -37,9 +37,10 @@ import { formatCurrency, DEFAULT_CURRENCY, DEFAULT_LOCALE } from "@/lib/utils";
 interface ArticlesTableProps {
   data: Article[];
   onEdit?: (article: Article) => void;
+  onNewArticle?: () => void;
 }
 
-export function ArticlesTable({ data, onEdit }: ArticlesTableProps) {
+export function ArticlesTable({ data, onEdit, onNewArticle }: ArticlesTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -138,12 +139,22 @@ export function ArticlesTable({ data, onEdit }: ArticlesTableProps) {
           }
           className="max-w-sm"
         />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto">
-              Columnas <ChevronDown className="ml-2 h-4 w-4" />
+        
+        {/* Botones de acción */}
+        <div className="flex items-center gap-2 ml-8">
+          {onNewArticle && (
+            <Button onClick={onNewArticle}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo artículo
             </Button>
-          </DropdownMenuTrigger>
+          )}
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                Columnas <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {table
               .getAllColumns()
@@ -164,6 +175,7 @@ export function ArticlesTable({ data, onEdit }: ArticlesTableProps) {
               })}
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       </div>
       <div className="rounded-md border">
         <Table>

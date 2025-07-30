@@ -2,7 +2,7 @@
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { ArticlesContent } from "@/components/articles/articles-content";
+import { ArticlesContentSecure } from "@/components/articles/articles-content-secure";
 import { BreadcrumbBar } from "@/components/BreadcrumbBar";
 
 export default function ArticlesPage() {
@@ -16,5 +16,5 @@ export default function ArticlesPage() {
       </div>
     );
   }
-  return <div className="mt-6"><BreadcrumbBar /><ArticlesContent /></div>;
+  return <div className="mt-6"><BreadcrumbBar /><ArticlesContentSecure /></div>;
 } 
