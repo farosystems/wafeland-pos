@@ -11,6 +11,8 @@ import {
   IconReceipt,
   IconCalculator,
   IconPalette,
+  IconReportAnalytics,
+  IconUpload,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
@@ -25,12 +27,26 @@ import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, Dialog
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { getConfiguracionEmpresa, updateConfiguracionEmpresa, uploadLogoEmpresa, ConfiguracionEmpresa } from "@/services/configuracion";
+import { useColor } from "@/contexts/ColorContext";
+
+// Paleta de colores para el selector
+const DATABASE_COLORS = [
+  { name: "Verde", value: "#22c55e", class: "bg-green-500" },
+  { name: "Azul", value: "#3b82f6", class: "bg-blue-500" },
+  { name: "Rojo", value: "#ef4444", class: "bg-red-500" },
+  { name: "Púrpura", value: "#8b5cf6", class: "bg-purple-500" },
+  { name: "Naranja", value: "#f97316", class: "bg-orange-500" },
+  { name: "Teal", value: "#14b8a6", class: "bg-teal-500" },
+  { name: "Rosa", value: "#ec4899", class: "bg-pink-500" },
+  { name: "Indigo", value: "#6366f1", class: "bg-indigo-500" },
+];
 
 // sidebarItems ya no se usa, menúes son hardcodeados abajo
 
 
 export function AppSidebar() {
   const { user, isSignedIn, isLoaded } = useUser();
+  const { selectedColor, setSelectedColor, config: colorConfig } = useColor();
   const [usuarioDB, setUsuarioDB] = React.useState<Usuario | null>(null);
   const [diasRestantes, setDiasRestantes] = React.useState<number | null>(null);
   const [stockOpen, setStockOpen] = React.useState(false);
@@ -38,6 +54,8 @@ export function AppSidebar() {
   const [ventasOpen, setVentasOpen] = React.useState(false);
   const [tesoreriaOpen, setTesoreriaOpen] = React.useState(false);
   const [sueldosOpen, setSueldosOpen] = React.useState(false);
+  const [informesOpen, setInformesOpen] = React.useState(false);
+  const [importacionesOpen, setImportacionesOpen] = React.useState(false);
   const [config, setConfig] = React.useState<ConfiguracionEmpresa | null>(null);
   const [modalOpen, setModalOpen] = React.useState(false);
   const [nombreEmpresa, setNombreEmpresa] = React.useState("");
@@ -52,6 +70,8 @@ export function AppSidebar() {
   const isVentasActive = ["/ventas"].includes(pathname);
   const isTesoreriaActive = ["/caja", "/gastos-empleados"].includes(pathname);
   const isSueldosActive = ["/liquidaciones", "/empleados"].includes(pathname);
+  const isInformesActive = ["/stock-faltante"].includes(pathname);
+  const isImportacionesActive = ["/importacion-stock"].includes(pathname);
 
   React.useEffect(() => {
     function normalizeEmail(email?: string | null) {
@@ -107,8 +127,8 @@ export function AppSidebar() {
       if (logoFile) {
         logoUrl = await uploadLogoEmpresa(logoFile);
       }
-      await updateConfiguracionEmpresa(nombreEmpresa, logoUrl);
-      setConfig({ ...config!, nombre: nombreEmpresa, imagen: logoUrl });
+      await updateConfiguracionEmpresa(nombreEmpresa, logoUrl, selectedColor);
+      setConfig({ ...config!, nombre: nombreEmpresa, imagen: logoUrl, color_primario: selectedColor });
       setModalOpen(false);
     } catch (e: any) {
       alert("Error al guardar la configuración: " + (e?.message || JSON.stringify(e)));
@@ -119,17 +139,20 @@ export function AppSidebar() {
 
   return (
           <aside className="flex flex-col h-full w-72 bg-white border-r">
-      <div className="px-4 pt-4 pb-2">
+      <div 
+        className="px-4 py-3"
+        style={{ backgroundColor: selectedColor }}
+      >
         <Dialog open={modalOpen} onOpenChange={setModalOpen}>
           <DialogTrigger asChild>
-            <Card className="flex flex-row items-center gap-3 p-3 cursor-pointer hover:shadow-md transition" onClick={handleOpenModal}>
+            <div className="flex flex-row items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={handleOpenModal}>
               {config?.imagen ? (
-                <img src={config.imagen} alt="Logo" className="w-10 h-10 rounded-full object-cover border" />
+                <img src={config.imagen} alt="Logo" className="w-8 h-8 rounded-full object-cover border" />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 font-bold text-lg border">?</div>
+                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 font-bold text-sm border">?</div>
               )}
-              <span className="font-bold text-base truncate max-w-[120px]">{config?.nombre || "Nombre Empresa"}</span>
-            </Card>
+              <span className="font-bold text-sm truncate max-w-[120px]">{config?.nombre || "Nombre Empresa"}</span>
+            </div>
           </DialogTrigger>
           <DialogContent preventOutsideClose>
             <DialogHeader>
@@ -143,6 +166,22 @@ export function AppSidebar() {
               {logoPreview && (
                 <img src={logoPreview} alt="Previsualización Logo" className="w-20 h-20 rounded-full object-cover border mt-2" />
               )}
+              <label className="text-sm font-medium mt-2">Color del header</label>
+              <div className="grid grid-cols-4 gap-2 mt-2">
+                {DATABASE_COLORS.map((color) => (
+                  <button
+                    key={color.value}
+                    onClick={() => setSelectedColor(color.value)}
+                    className={`w-10 h-10 rounded-full border-2 transition-all ${
+                      selectedColor === color.value 
+                        ? 'border-gray-800 scale-110' 
+                        : 'border-gray-300 hover:scale-105'
+                    }`}
+                    style={{ backgroundColor: color.value }}
+                    title={color.name}
+                  />
+                ))}
+              </div>
             </div>
             <DialogFooter>
               <Button onClick={handleSave} disabled={loading}>{loading ? "Guardando..." : "Guardar"}</Button>
@@ -375,6 +414,58 @@ export function AppSidebar() {
               )}
             </li>
           )}
+          {/* Menú Informes desplegable */}
+          <li>
+            <button
+              type="button"
+              className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isInformesActive ? "text-blue-600" : "text-gray-800"}`}
+              onClick={() => setInformesOpen((v) => !v)}
+            >
+              <IconReportAnalytics className={`w-5 h-5 ${isInformesActive ? "text-blue-600" : ""}`} />
+              <span className="font-medium">Informes</span>
+              <svg className={`ml-auto w-4 h-4 transition-transform ${informesOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+            {informesOpen && (
+              <ul className="ml-8 mt-1 flex flex-col gap-1">
+                <li className={`${pathname === "/stock-faltante" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                  <Link
+                    href="/stock-faltante"
+                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/stock-faltante" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                    prefetch={false}
+                  >
+                    <IconStack className="w-4 h-4" />
+                    <span>Stock Faltante</span>
+                  </Link>
+                </li>
+              </ul>
+            )}
+          </li>
+          {/* Menú Importaciones de datos */}
+          <li>
+            <button
+              type="button"
+              className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isImportacionesActive ? "text-blue-600" : "text-gray-800"}`}
+              onClick={() => setImportacionesOpen((v) => !v)}
+            >
+              <IconUpload className={`w-5 h-5 ${isImportacionesActive ? "text-blue-600" : ""}`} />
+              <span className="font-medium">Importaciones de datos</span>
+              <svg className={`ml-auto w-4 h-4 transition-transform ${importacionesOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+            {importacionesOpen && (
+              <ul className="ml-8 mt-1 flex flex-col gap-1">
+                <li className={`${pathname === "/importacion-stock" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                  <Link
+                    href="/importacion-stock"
+                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/importacion-stock" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                    prefetch={false}
+                  >
+                    <IconUpload className="w-4 h-4" />
+                    <span>Importar Stock</span>
+                  </Link>
+                </li>
+              </ul>
+            )}
+          </li>
         </ul>
       </nav>
       <div className="mt-auto p-4 flex flex-col items-start gap-2">

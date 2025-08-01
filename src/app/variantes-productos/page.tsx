@@ -14,6 +14,138 @@ import { createMovimientoStock } from "@/services/movimientosStock";
 import { updateArticle } from "@/services/articles";
 import { getVariantes } from "@/services/variantes";
 
+// Función helper para obtener el color hexadecimal basado en el nombre del color
+const getColorHex = (colorName: string): string => {
+  if (!colorName) return '#ccc';
+  
+  const colorNameLower = colorName.toLowerCase().trim();
+  
+  // Si ya es un código hexadecimal válido, devolverlo tal como está
+  if (/^#[0-9A-F]{6}$/i.test(colorName)) {
+    return colorName;
+  }
+  
+  // Si es un código hexadecimal de 3 caracteres, expandirlo
+  if (/^#[0-9A-F]{3}$/i.test(colorName)) {
+    return colorName.split('').map(char => char === '#' ? '#' : char + char).join('');
+  }
+  
+  // Mapeo de colores comunes en español
+  const colorMap: { [key: string]: string } = {
+    // Colores básicos
+    'rojo': '#ef4444',
+    'azul': '#3b82f6',
+    'verde': '#10b981',
+    'amarillo': '#f59e0b',
+    'negro': '#000000',
+    'blanco': '#ffffff',
+    'gris': '#6b7280',
+    'rosa': '#ec4899',
+    'morado': '#8b5cf6',
+    'naranja': '#f97316',
+    'marron': '#a16207',
+    'celeste': '#0ea5e9',
+    'violeta': '#7c3aed',
+    'turquesa': '#14b8a6',
+    'beige': '#f5f5dc',
+    'coral': '#ff7f50',
+    'lila': '#c084fc',
+    'dorado': '#fbbf24',
+    'plateado': '#c0c0c0',
+    'bordo': '#dc2626',
+    'navy': '#1e3a8a',
+    'oliva': '#84cc16',
+    'salmon': '#fb7185',
+    'lavanda': '#a78bfa',
+    'menta': '#34d399',
+    'crema': '#fef3c7',
+    'chocolate': '#92400e',
+    'cobre': '#b45309',
+    'esmeralda': '#059669',
+    
+    // Variaciones
+    'rojo claro': '#fca5a5',
+    'rojo oscuro': '#dc2626',
+    'azul claro': '#93c5fd',
+    'azul oscuro': '#1e40af',
+    'verde claro': '#86efac',
+    'verde oscuro': '#047857',
+    'amarillo claro': '#fde047',
+    'amarillo oscuro': '#d97706',
+    'rosa claro': '#f9a8d4',
+    'rosa oscuro': '#be185d',
+    'morado claro': '#c4b5fd',
+    'morado oscuro': '#5b21b6',
+    'naranja claro': '#fdba74',
+    'naranja oscuro': '#ea580c',
+    'marron claro': '#d97706',
+    'marron oscuro': '#78350f',
+    'gris claro': '#d1d5db',
+    'gris oscuro': '#374151',
+    
+    // Colores de moda
+    'fucsia': '#e91e63',
+    'magenta': '#ec4899',
+    'cian': '#06b6d4',
+    'indigo': '#6366f1',
+    'púrpura': '#9333ea',
+    'carmesí': '#dc2626',
+    'bermellón': '#ef4444',
+    'ocre': '#d97706',
+    'sepia': '#92400e',
+    'caqui': '#84cc16',
+    'mostaza': '#f59e0b',
+    'aqua': '#14b8a6',
+    'teal': '#0f766e',
+    'slate': '#475569',
+    'zinc': '#71717a',
+    'neutral': '#737373',
+    'stone': '#78716c',
+    
+    // Colores en inglés (por si acaso)
+    'red': '#ef4444',
+    'orange': '#f97316',
+    'amber': '#f59e0b',
+    'yellow': '#eab308',
+    'lime': '#84cc16',
+    'green': '#22c55e',
+    'emerald': '#10b981',
+    'cyan': '#06b6d4',
+    'sky': '#0ea5e9',
+    'blue': '#3b82f6',
+    'violet': '#8b5cf6',
+    'purple': '#a855f7',
+    'fuchsia': '#d946ef',
+    'pink': '#ec4899',
+    'rose': '#f43f5e',
+  };
+  
+  // Buscar coincidencia exacta
+  if (colorMap[colorNameLower]) {
+    return colorMap[colorNameLower];
+  }
+  
+  // Buscar coincidencia parcial (por ejemplo, "rojo" en "rojo claro")
+  for (const [key, value] of Object.entries(colorMap)) {
+    if (colorNameLower.includes(key) || key.includes(colorNameLower)) {
+      return value;
+    }
+  }
+  
+  // Si no encuentra coincidencia, generar un color único basado en el hash del nombre
+  let hash = 0;
+  for (let i = 0; i < colorNameLower.length; i++) {
+    hash = colorNameLower.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  // Generar un color pastel único basado en el hash
+  const hue = Math.abs(hash) % 360;
+  const saturation = 60 + (Math.abs(hash) % 30); // 60-90%
+  const lightness = 65 + (Math.abs(hash) % 20); // 65-85%
+  
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+};
+
 export default function VariantesProductosPage() {
   const { variantes, addVariante, editVariante, deleteVariante, error, fetchVariantes } = useVariantes();
   const { articles } = useArticles();
@@ -29,6 +161,8 @@ export default function VariantesProductosPage() {
     fk_id_talle: 0,
     fk_id_color: 0,
     stock_unitario: 0,
+    stock_minimo: 0,
+    stock_maximo: 0,
     stockNuevo: 0,
     stockDescontar: 0,
   });
@@ -55,7 +189,7 @@ export default function VariantesProductosPage() {
   // Abrir dialog para crear o editar
   const openNew = () => {
     setEditing(null);
-    setForm({ fk_id_articulo: 0, fk_id_talle: 0, fk_id_color: 0, stock_unitario: 0, stockNuevo: 0, stockDescontar: 0 });
+    setForm({ fk_id_articulo: 0, fk_id_talle: 0, fk_id_color: 0, stock_unitario: 0, stock_minimo: 0, stock_maximo: 0, stockNuevo: 0, stockDescontar: 0 });
     setShowDialog(true);
   };
   const openEdit = (v: Variante) => {
@@ -65,6 +199,8 @@ export default function VariantesProductosPage() {
       fk_id_talle: v.fk_id_talle,
       fk_id_color: v.fk_id_color,
       stock_unitario: v.stock_unitario,
+      stock_minimo: v.stock_minimo ?? 0,
+      stock_maximo: v.stock_maximo ?? 0,
       stockNuevo: 0,
       stockDescontar: 0,
     });
@@ -83,6 +219,11 @@ export default function VariantesProductosPage() {
       return;
     }
     
+    if (form.stock_maximo < form.stock_minimo) {
+      setErrorForm("El stock máximo no puede ser menor que el stock mínimo");
+      return;
+    }
+    
     setIsSubmitting(true);
     setErrorForm("");
     
@@ -93,6 +234,8 @@ export default function VariantesProductosPage() {
       if (editing) {
         await editVariante(editing.id, {
           stock_unitario: newStock,
+          stock_minimo: form.stock_minimo,
+          stock_maximo: form.stock_maximo,
           fk_id_talle: form.fk_id_talle,
           fk_id_color: form.fk_id_color,
         });
@@ -125,6 +268,8 @@ export default function VariantesProductosPage() {
           fk_id_talle: form.fk_id_talle,
           fk_id_color: form.fk_id_color,
           stock_unitario: newStock,
+          stock_minimo: form.stock_minimo,
+          stock_maximo: form.stock_maximo,
         });
         if (form.stockNuevo > 0) {
           await createMovimientoStock({
@@ -292,6 +437,20 @@ export default function VariantesProductosPage() {
         </Button>
       </div>
       <div className="rounded-lg border bg-card p-4">
+        <div className="mb-4 flex flex-wrap gap-4 text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-green-100 border border-green-300 rounded"></div>
+            <span>Stock normal</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-red-100 border border-red-300 rounded"></div>
+            <span>Stock bajo (≤ mínimo)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-yellow-100 border border-yellow-300 rounded"></div>
+            <span>Stock alto (≥ máximo)</span>
+          </div>
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
@@ -300,18 +459,34 @@ export default function VariantesProductosPage() {
               <TableHead>Talle</TableHead>
               <TableHead>Color</TableHead>
               <TableHead>Stock unitario</TableHead>
+              <TableHead>Stock mínimo</TableHead>
+              <TableHead>Stock máximo</TableHead>
               <TableHead>Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {variantesPaginadas.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center">No hay variantes.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center">No hay variantes.</TableCell></TableRow>
             ) : variantesPaginadas.map(v => (
               <TableRow key={v.id}>
                 <TableCell>{v.id}</TableCell>
                 <TableCell>{v.articulo_descripcion}</TableCell>
                 <TableCell>{v.talle_descripcion}</TableCell>
-                <TableCell>{v.color_descripcion}</TableCell>
+                                 <TableCell>
+                   <div className="flex items-center gap-3">
+                     <div 
+                       className="w-8 h-8 rounded-lg border-2 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+                       style={{ 
+                         backgroundColor: getColorHex(v.color_descripcion),
+                         borderColor: ['blanco', 'beige', 'crema', 'amarillo claro', 'rosa claro', 'celeste'].includes(v.color_descripcion?.toLowerCase()) 
+                           ? '#d1d5db' 
+                           : '#e5e7eb'
+                       }}
+                       title={`Color: ${v.color_descripcion}`}
+                     />
+                     <span className="text-sm font-medium">{v.color_descripcion}</span>
+                   </div>
+                 </TableCell>
                 <TableCell>
                   {editingStockId === v.id ? (
                     <div className="flex items-center gap-1">
@@ -341,11 +516,37 @@ export default function VariantesProductosPage() {
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
                         </div>
                       ) : (
-                        v.stock_unitario
+                                                 <span className={`px-2 py-1 rounded text-xs font-medium ${
+                           v.stock_unitario <= (v.stock_minimo ?? 0)
+                             ? 'bg-red-100 text-red-800' 
+                             : v.stock_unitario >= (v.stock_maximo ?? 0)
+                             ? 'bg-yellow-100 text-yellow-800'
+                             : 'bg-green-100 text-green-800'
+                         }`}>
+                           {v.stock_unitario}
+                         </span>
                       )}
                     </div>
                   )}
                 </TableCell>
+                                 <TableCell>
+                   <span className={`px-2 py-1 rounded text-xs font-medium ${
+                     v.stock_unitario <= (v.stock_minimo ?? 0)
+                       ? 'bg-red-100 text-red-800' 
+                       : 'bg-green-100 text-green-800'
+                   }`}>
+                     {v.stock_minimo ?? 0}
+                   </span>
+                 </TableCell>
+                                 <TableCell>
+                   <span className={`px-2 py-1 rounded text-xs font-medium ${
+                     v.stock_unitario >= (v.stock_maximo ?? 0)
+                       ? 'bg-yellow-100 text-yellow-800' 
+                       : 'bg-blue-100 text-blue-800'
+                   }`}>
+                     {v.stock_maximo ?? 0}
+                   </span>
+                 </TableCell>
                 <TableCell>
                   <Button 
                     variant="ghost" 
@@ -437,6 +638,31 @@ export default function VariantesProductosPage() {
                   disabled={!!editing}
                 />
               </div>
+                             <div>
+                 <label className="block text-sm font-medium mb-1">Stock mínimo</label>
+                 <Input
+                   type="number"
+                   min={0}
+                   max={form.stock_maximo}
+                   value={form.stock_minimo || 0}
+                   onChange={e => setForm(f => ({ ...f, stock_minimo: Number(e.target.value) || 0 }))}
+                 />
+                 {form.stock_minimo > form.stock_maximo && form.stock_maximo > 0 && (
+                   <div className="text-red-600 text-xs mt-1">El stock mínimo debe ser menor o igual al stock máximo</div>
+                 )}
+               </div>
+                             <div>
+                 <label className="block text-sm font-medium mb-1">Stock máximo</label>
+                 <Input
+                   type="number"
+                   min={form.stock_minimo}
+                   value={form.stock_maximo || 0}
+                   onChange={e => setForm(f => ({ ...f, stock_maximo: Number(e.target.value) || 0 }))}
+                 />
+                 {form.stock_maximo < form.stock_minimo && (
+                   <div className="text-red-600 text-xs mt-1">El stock máximo debe ser mayor o igual al stock mínimo</div>
+                 )}
+               </div>
               {editing && (
                 <>
                   <div>

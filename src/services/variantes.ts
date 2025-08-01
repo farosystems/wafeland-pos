@@ -7,7 +7,7 @@ export async function getVariantes(): Promise<Variante[]> {
   const { data, error } = await supabase
     .from("variantes-articulos")
     .select(`*,
-      articulo:fk_id_articulo(descripcion),
+      articulo:fk_id_articulo(descripcion, precio_unitario),
       talle:fk_id_talle(descripcion),
       color:fk_id_color(descripcion)
     `)
@@ -15,6 +15,12 @@ export async function getVariantes(): Promise<Variante[]> {
   if (error) throw error;
   return (data as any[]).map(v => ({
     ...v,
+    stock_minimo: v.stock_minimo ?? 0,
+    stock_maximo: v.stock_maximo ?? 0,
+    articulo_id: v.fk_id_articulo, // Mapear para el Excel
+    talle_id: v.fk_id_talle, // Mapear para el Excel
+    color_id: v.fk_id_color, // Mapear para el Excel
+    precio_venta: v.articulo?.precio_unitario || 0, // Obtener precio_unitario del artículo
     articulo_descripcion: v.articulo?.descripcion || '',
     talle_descripcion: v.talle?.descripcion || '',
     color_descripcion: v.color?.descripcion || '',
@@ -22,9 +28,16 @@ export async function getVariantes(): Promise<Variante[]> {
 }
 
 export async function addVariante(variante: CreateVarianteData): Promise<Variante> {
+  // Set default values for stock_minimo and stock_maximo if not provided
+  const varianteData = {
+    ...variante,
+    stock_minimo: variante.stock_minimo || 0,
+    stock_maximo: variante.stock_maximo || 0,
+  };
+  
   const { data, error } = await supabase
     .from("variantes-articulos")
-    .insert([variante])
+    .insert([varianteData])
     .select()
     .single();
   if (error) throw error;
@@ -32,9 +45,16 @@ export async function addVariante(variante: CreateVarianteData): Promise<Variant
 }
 
 export async function editVariante(id: number, variante: UpdateVarianteData): Promise<Variante> {
+  // Ensure stock_minimo and stock_maximo are numbers
+  const varianteData = {
+    ...variante,
+    stock_minimo: typeof variante.stock_minimo === 'number' ? variante.stock_minimo : undefined,
+    stock_maximo: typeof variante.stock_maximo === 'number' ? variante.stock_maximo : undefined,
+  };
+  
   const { data, error } = await supabase
     .from("variantes-articulos")
-    .update(variante)
+    .update(varianteData)
     .eq("id", id)
     .select()
     .single();

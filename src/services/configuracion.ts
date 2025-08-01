@@ -4,6 +4,7 @@ export interface ConfiguracionEmpresa {
   id: number;
   nombre: string;
   imagen: string | null;
+  color_primario?: string;
   creado_el?: string;
 }
 
@@ -17,10 +18,10 @@ export async function getConfiguracionEmpresa(): Promise<ConfiguracionEmpresa | 
   return data as ConfiguracionEmpresa;
 }
 
-export async function updateConfiguracionEmpresa(nombre: string, imagen: string | null) {
+export async function updateConfiguracionEmpresa(nombre: string, imagen: string | null, color_primario?: string) {
   const { data, error } = await supabase
     .from("configuracion")
-    .update({ nombre, imagen })
+    .update({ nombre, imagen, color_primario })
     .eq("id", 1)
     .select()
     .single();
