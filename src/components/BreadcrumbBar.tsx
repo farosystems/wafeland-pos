@@ -11,7 +11,7 @@ export function BreadcrumbBar() {
     </span>
   ));
   const routeMap: Record<string, { menu: string; submenu: string }> = {
-    "clientes": { menu: "Contactos", submenu: "Clientes" },
+    "clientes": { menu: "Contactos", submenu: "Clientes y Proveedores" },
     "usuarios": { menu: "Contactos", submenu: "Usuarios" },
     "articles": { menu: "Stock", submenu: "Productos" },
     "agrupadores": { menu: "Stock", submenu: "Agrupadores" },

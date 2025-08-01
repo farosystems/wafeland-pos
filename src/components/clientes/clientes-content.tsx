@@ -152,7 +152,7 @@ export function ClientesContent() {
         <div className="flex items-center gap-3 mb-6">
           <Users className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-3xl font-bold leading-tight">Gestión de Clientes</h1>
+            <h1 className="text-3xl font-bold leading-tight">Gestión de Clientes y Proveedores</h1>
             <p className="text-muted-foreground text-base">Administra tu base de datos de clientes y proveedores.</p>
           </div>
         </div>
@@ -209,25 +209,33 @@ export function ClientesContent() {
 
         <table className="min-w-full text-sm border mb-4">
           <thead>
-            <tr className="bg-gray-100">
-              <th className="px-2 py-1">ID</th>
-              <th className="px-2 py-1">Razón social</th>
-              <th className="px-2 py-1">Email</th>
-              <th className="px-2 py-1">Teléfono</th>
-              <th className="px-2 py-1">Categoría IVA</th>
-              <th className="px-2 py-1 text-center">Máximo cuenta corriente</th>
-              <th className="px-2 py-1">Acciones</th>
-            </tr>
+                         <tr className="bg-gray-100">
+                              <th className="px-2 py-1">ID</th>
+                <th className="px-2 py-1">Razón social</th>
+                <th className="px-2 py-1">Tipo</th>
+                <th className="px-2 py-1">Email</th>
+                <th className="px-2 py-1">Teléfono</th>
+                <th className="px-2 py-1">Categoría IVA</th>
+                <th className="px-2 py-1 text-center">Máximo cuenta corriente</th>
+                <th className="px-2 py-1">Acciones</th>
+             </tr>
           </thead>
           <tbody>
             {clientesPagina.map((cliente) => (
-              <tr key={cliente.id} className="border-b hover:bg-blue-50 transition-colors">
-                <td className="px-2 py-1">{cliente.id}</td>
-                <td className="px-2 py-1">{cliente.razon_social}</td>
-                <td className="px-2 py-1">{cliente.email}</td>
-                <td className="px-2 py-1">{cliente.telefono}</td>
-                <td className="px-2 py-1">{cliente.categoria_iva}</td>
-                <td className="px-2 py-1 text-center">
+                             <tr key={cliente.id} className="border-b hover:bg-blue-50 transition-colors">
+                 <td className="px-2 py-1">{cliente.id}</td>
+                 <td className="px-2 py-1">{cliente.razon_social}</td>
+                 <td className="px-2 py-1">
+                   <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                     cliente.tipo === 'cliente' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                   }`}>
+                     {cliente.tipo === 'cliente' ? 'Cliente' : 'Proveedor'}
+                   </span>
+                 </td>
+                 <td className="px-2 py-1">{cliente.email}</td>
+                 <td className="px-2 py-1">{cliente.telefono}</td>
+                                  <td className="px-2 py-1">{cliente.categoria_iva}</td>
+                  <td className="px-2 py-1 text-center">
                   {cliente.maximo_cuenta_corriente !== undefined && cliente.maximo_cuenta_corriente !== null
                     ? `$${cliente.maximo_cuenta_corriente.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                     : '-'}
@@ -370,6 +378,7 @@ export function ClientesContent() {
                 placeholder="Ej: 50000.00"
               />
             </div>
+            
             {formError && <div className="text-red-600 text-sm">{formError}</div>}
             <div className="flex justify-end space-x-2">
               <Button type="button" variant="outline" onClick={closeDialog}>

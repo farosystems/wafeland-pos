@@ -53,6 +53,8 @@ interface DetalleLinea {
   talle: number | null; // Nuevo campo para el talle
   color: number | null; // Nuevo campo para el color
   variante: number | null; // Nuevo campo para la variante
+  descuentoPorcentaje: number; // Nuevo campo para descuento por porcentaje
+  descuentoFijo: number; // Nuevo campo para descuento por importe fijo
 }
 
 // Función para formatear número con separadores de miles
@@ -124,11 +126,11 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   }, [open, user]);
 
   // Estado de tabs y formulario (simplificado, estructura)
-  const [tab, setTab] = useState("cabecera");
+  const [tab, setTab] = useState("detalle");
 
   // Estado para el detalle de la venta
   const [detalle, setDetalle] = useState<DetalleLinea[]>([
-    { articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null },
+    { articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null, descuentoPorcentaje: 0, descuentoFijo: 0 },
   ]);
   const [showSugerencias, setShowSugerencias] = useState<number | null>(null); // idx de línea con sugerencias abiertas
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -136,14 +138,33 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   // Limpiar el detalle cuando se cierra el popup
   useEffect(() => {
     if (!open) {
-      setDetalle([{ articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null }]);
+      setDetalle([{ articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null, descuentoPorcentaje: 0, descuentoFijo: 0 }]);
       setShowSugerencias(null);
       // Resetear a valores por defecto
       setClienteSeleccionado(1); // Consumidor final
       setUsuarioSeleccionado(1); // Jony
       setTipoComprobanteSeleccionado(1); // Factura
+      setIsClosing(false);
+      // Limpiar búsqueda de cliente
+      setBusquedaCliente("");
+      setMostrarSugerenciasCliente(false);
     }
   }, [open]);
+
+  // Cerrar sugerencias de cliente cuando se hace clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.cliente-search-container')) {
+        setMostrarSugerenciasCliente(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Filtrar solo artículos activos
   const articulosActivos = useMemo(() => articulos.filter(a => a.activo), [articulos]);
@@ -154,8 +175,35 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   // Filtrar solo tipos de comprobante activos y con reingresa_stock = false
   const tiposComprobantesValidos = tiposComprobantes.filter(tc => tc.activo && tc.descripcion && tc.descripcion.trim() !== "" && tc.reingresa_stock === false);
 
-  // Calcular total
-  const total = detalle.reduce((acc, d) => acc + (d.cantidad && d.precio ? d.cantidad * d.precio : 0), 0);
+  // Filtrar solo clientes (tipo = "cliente")
+  const clientesFiltrados = useMemo(() => clientes.filter(c => c.tipo === "cliente"), [clientes]);
+
+  // Estado para búsqueda de clientes
+  const [busquedaCliente, setBusquedaCliente] = useState("");
+  const [mostrarSugerenciasCliente, setMostrarSugerenciasCliente] = useState(false);
+
+  // Filtrar clientes por búsqueda
+  const clientesParaMostrar = useMemo(() => {
+    if (!busquedaCliente.trim()) return clientesFiltrados;
+    const busqueda = busquedaCliente.toLowerCase();
+    return clientesFiltrados.filter(c => 
+      c.razon_social.toLowerCase().includes(busqueda) ||
+      c.email.toLowerCase().includes(busqueda) ||
+      c.num_doc.toLowerCase().includes(busqueda)
+    );
+  }, [clientesFiltrados, busquedaCliente]);
+
+  // Calcular total con descuentos
+  const total = detalle.reduce((acc, d) => {
+    if (d.cantidad && d.precio) {
+      const subtotalSinDescuento = d.cantidad * d.precio;
+      const descuentoPorcentaje = (subtotalSinDescuento * d.descuentoPorcentaje) / 100;
+      const descuentoFijo = d.descuentoFijo;
+      const subtotalConDescuento = subtotalSinDescuento - descuentoPorcentaje - descuentoFijo;
+      return acc + Math.max(0, subtotalConDescuento);
+    }
+    return acc;
+  }, 0);
 
   // Función para manejar cambios en el detalle
   function handleDetalleChange(idx: number, field: string, value: string | number) {
@@ -178,8 +226,26 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
       } else if (field === "input") {
         nuevo[idx].input = String(value);
         setShowSugerencias(idx); // Abrir sugerencias al escribir
+      } else if (field === "descuentoPorcentaje") {
+        const numValue = Number(value);
+        if (isNaN(numValue)) {
+          nuevo[idx].descuentoPorcentaje = 0;
+        } else {
+          nuevo[idx].descuentoPorcentaje = Math.max(0, Math.min(100, numValue));
+        }
+      } else if (field === "descuentoFijo") {
+        const numValue = Number(value);
+        if (isNaN(numValue)) {
+          nuevo[idx].descuentoFijo = 0;
+        } else {
+          nuevo[idx].descuentoFijo = Math.max(0, numValue);
+        }
       }
-      nuevo[idx].subtotal = nuevo[idx].cantidad * nuevo[idx].precio;
+      // Calcular subtotal con descuentos
+      const subtotalSinDescuento = nuevo[idx].cantidad * nuevo[idx].precio;
+      const descuentoPorcentaje = (subtotalSinDescuento * nuevo[idx].descuentoPorcentaje) / 100;
+      const descuentoFijo = nuevo[idx].descuentoFijo;
+      nuevo[idx].subtotal = Math.max(0, subtotalSinDescuento - descuentoPorcentaje - descuentoFijo);
       return nuevo;
     });
   }
@@ -189,12 +255,12 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
     if (!input) return [];
     return articulosActivos.filter(a =>
       a.descripcion.toLowerCase().includes(input.toLowerCase())
-    ).slice(0, 8);
+    ).slice(0, 3);
   }
 
   // Agregar línea
   function agregarLinea() {
-    setDetalle(detalle => [...detalle, { articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null }]);
+    setDetalle(detalle => [...detalle, { articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null, descuentoPorcentaje: 0, descuentoFijo: 0 }]);
     setTimeout(() => {
       const idx = detalle.length;
       if (inputRefs.current[idx]) inputRefs.current[idx]?.focus();
@@ -307,6 +373,14 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
     setTimeout(() => setToast({ show: false, message: "" }), 2500);
   }
   const [showStockError, setShowStockError] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [showConfirmClose, setShowConfirmClose] = useState(false);
+
+  // Función para verificar si hay datos sin guardar
+  const hasUnsavedData = () => {
+    return detalle.some(d => d.articulo && d.cantidad > 0) || 
+           mediosPago.some(m => m.cuenta && m.monto > 0);
+  };
 
   // Utilidad para formatear fecha local a 'YYYY-MM-DD HH:mm:ss'
   function formatLocalDateTime(date: Date) {
@@ -355,7 +429,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
           return;
         }
         // Validar máximo cuenta corriente
-        const cliente = clientes.find(c => c.id === clienteSeleccionado);
+        const cliente = clientesFiltrados.find(c => c.id === clienteSeleccionado);
         if (cliente && typeof cliente.maximo_cuenta_corriente === 'number' && cliente.maximo_cuenta_corriente > 0 && total > cliente.maximo_cuenta_corriente) {
           setShowMaxCuentaCorrienteError(true);
           setLoading(false);
@@ -495,8 +569,46 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl" preventOutsideClose>
+      <Dialog open={open} onOpenChange={(newOpen) => {
+        // Si está intentando cerrar
+        if (!newOpen) {
+          // Si está cargando o hay errores críticos, no permitir cerrar
+          if (loading || isClosing || showLoteError || showMediosPagoError || showTrialEnded || showClienteConsumidorFinalError || showMaxCuentaCorrienteError || showStockError) {
+            return;
+          }
+          
+          // Si hay datos sin guardar, mostrar confirmación
+          if (hasUnsavedData()) {
+            setShowConfirmClose(true);
+            return;
+          }
+          
+          // Cerrar normalmente
+          setIsClosing(true);
+          setTimeout(() => {
+            setIsClosing(false);
+            onOpenChange(false);
+          }, 100);
+        } else {
+          onOpenChange(newOpen);
+        }
+      }}>
+        <div style={{ maxHeight: 'none', overflow: 'visible' }}>
+        <DialogContent 
+          className="max-w-6xl max-h-none h-auto overflow-visible" 
+          style={{ maxHeight: 'none', overflow: 'visible' }}
+          preventOutsideClose 
+          onEscapeKeyDown={(e) => {
+            if (loading || isClosing) {
+              e.preventDefault();
+            }
+          }}
+          onInteractOutside={(e) => {
+            if (loading || isClosing) {
+              e.preventDefault();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Nueva Venta</DialogTitle>
             <DialogDescription>
@@ -507,73 +619,33 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
             <div className="text-center py-8">Cargando datos...</div>
           ) : (
             <Tabs value={tab} onValueChange={setTab} className="mt-2">
-              <TabsList>
-                <TabsTrigger value="cabecera">Cabecera</TabsTrigger>
-                <TabsTrigger value="detalle">Detalle</TabsTrigger>
-                <TabsTrigger value="medios">Medios de pago</TabsTrigger>
-                {/* <TabsTrigger value="impuestos">Impuestos</TabsTrigger> */}
-                <TabsTrigger value="verificacion">Verificación</TabsTrigger>
-              </TabsList>
-              <TabsContent value="cabecera">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block mb-1 font-medium">Cliente</label>
-                    <select className="w-full border rounded px-2 py-1" value={clienteSeleccionado ?? ""} onChange={e => setClienteSeleccionado(Number(e.target.value) || null)}>
-                      <option value="">Seleccionar cliente</option>
-                      {clientes.map(c => (
-                        <option key={c.id} value={c.id}>{c.razon_social}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block mb-1 font-medium">Usuario</label>
-                    <select
-                      className="w-full border rounded px-2 py-1"
-                      value={usuarioSeleccionado ?? ""}
-                      onChange={e => setUsuarioSeleccionado(Number(e.target.value) || null)}
-                      disabled={usuarioActual?.rol !== "supervisor"}
-                    >
-                      <option value="">Seleccionar usuario</option>
-                      {usuariosParaSelect.map(u => (
-                        <option key={u.id} value={u.id}>{u.nombre}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block mb-1 font-medium">Tipo de comprobante</label>
-                    <select className="w-full border rounded px-2 py-1" value={tipoComprobanteSeleccionado ?? ""} onChange={e => setTipoComprobanteSeleccionado(Number(e.target.value) || null)}>
-                      <option value="">Seleccionar tipo</option>
-                      {tiposComprobantesValidos.map((tc) => (
-                        <option key={tc.id} value={tc.id}>{tc.descripcion}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block mb-1 font-medium">Fecha</label>
-                    <input type="date" className="w-full border rounded px-2 py-1" value={format(new Date(), "yyyy-MM-dd")}
-                      readOnly disabled />
-                  </div>
-                </div>
-                {error && <div className="text-red-600 mt-2">{error}</div>}
-              </TabsContent>
-              <TabsContent value="detalle">
+                <TabsList>
+                  <TabsTrigger value="detalle">Artículos</TabsTrigger>
+                  <TabsTrigger value="medios">Medios de pago</TabsTrigger>
+                  <TabsTrigger value="cabecera">Cliente</TabsTrigger>
+                  <TabsTrigger value="verificacion">Verificación</TabsTrigger>
+                </TabsList>
+                              <TabsContent value="detalle">
                 <div className="mb-2">Agrega artículos, cantidad y precio:</div>
-                <table className="min-w-full text-sm border mb-2">
+                <div className="overflow-visible">
+                  <table className="w-full text-sm border mb-2">
                   <thead>
                     <tr className="bg-gray-100">
-                      <th className="px-2 py-1">Artículo</th>
-                      <th className="px-2 py-1">Talle</th>
-                      <th className="px-2 py-1">Color</th>
-                      <th className="px-2 py-1">Cantidad</th>
-                      <th className="px-2 py-1">Precio</th>
-                      <th className="px-2 py-1">Subtotal</th>
-                      <th className="px-2 py-1"></th>
+                      <th className="px-3 py-2 w-1/4">Artículo</th>
+                      <th className="px-3 py-2 w-20">Talle</th>
+                      <th className="px-3 py-2 w-20">Color</th>
+                      <th className="px-3 py-2 w-20">Cantidad</th>
+                      <th className="px-3 py-2 w-24">Precio</th>
+                      <th className="px-3 py-2 w-20">Desc. %</th>
+                      <th className="px-3 py-2 w-20">Desc. $</th>
+                      <th className="px-3 py-2 w-24">Subtotal</th>
+                      <th className="px-3 py-2 w-16"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {detalle.map((d, idx) => (
-                      <tr key={idx}>
-                        <td className="px-2 py-1">
+                      <tr key={idx} className="hover:bg-gray-50">
+                        <td className="px-3 py-2">
                           <div className="relative">
                             <input
                               type="text"
@@ -587,22 +659,22 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                               onBlur={() => setTimeout(() => setShowSugerencias(s => (s === idx ? null : s)), 120)}
                             />
                             {d.input && showSugerencias === idx && getSugerencias(d.input).length > 0 && (
-                              <div className="absolute z-10 bg-white border rounded shadow w-full max-h-40 overflow-auto">
+                              <div className="absolute z-50 bg-white border rounded shadow-lg w-full mt-1" style={{ maxHeight: 'none', overflow: 'visible' }}>
                                 {getSugerencias(d.input).map(a => (
                                   <div
                                     key={a.id}
-                                    className="px-2 py-1 hover:bg-gray-100 cursor-pointer flex justify-between"
+                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer flex justify-between border-b last:border-b-0"
                                     onClick={() => handleDetalleChange(idx, "articulo", a.id)}
                                   >
-                                    <span>{a.descripcion}</span>
-                                    <span className="text-xs text-muted-foreground">${a.precio_unitario}</span>
+                                    <span className="font-medium">{a.descripcion}</span>
+                                    <span className="text-xs text-gray-500">${a.precio_unitario}</span>
                                   </div>
                                 ))}
                               </div>
                             )}
                           </div>
                         </td>
-                        <td className="px-2 py-1">
+                        <td className="px-3 py-2">
                           <select
                             className="w-full border rounded px-2 py-1"
                             value={d.talle ?? ""}
@@ -619,7 +691,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                             })}
                           </select>
                         </td>
-                        <td className="px-2 py-1">
+                        <td className="px-3 py-2">
                           <select
                             className="w-full border rounded px-2 py-1"
                             value={d.color ?? ""}
@@ -636,7 +708,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                             })}
                           </select>
                         </td>
-                        <td className="px-2 py-1">
+                        <td className="px-3 py-2">
                           <input
                             type="number"
                             min="1"
@@ -649,7 +721,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                             placeholder="Cantidad"
                           />
                         </td>
-                        <td className="px-2 py-1">
+                        <td className="px-3 py-2">
                           <input
                             type="number"
                             min={0}
@@ -659,8 +731,65 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                             disabled={!d.articulo}
                           />
                         </td>
-                        <td className="px-2 py-1">{formatCurrency(d.subtotal, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
-                        <td className="px-2 py-1">
+                        <td className="px-3 py-2">
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.01}
+                              className="w-20 border rounded px-2 py-1 text-right pr-7"
+                              value={d.descuentoPorcentaje || ""}
+                              onChange={e => handleDetalleChange(idx, "descuentoPorcentaje", e.target.value)}
+                              placeholder="0"
+                              title="Descuento por porcentaje (0-100%)"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                }
+                              }}
+                            />
+                            <span className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-sm font-medium text-gray-700">%</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              className="w-20 border rounded px-2 py-1 text-right pr-7"
+                              value={d.descuentoFijo || ""}
+                              onChange={e => handleDetalleChange(idx, "descuentoFijo", e.target.value)}
+                              placeholder="0"
+                              title="Descuento por importe fijo"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                }
+                              }}
+                            />
+                            <span className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-sm font-medium text-gray-700">$</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="text-right">
+                            <div className={cn(
+                              "font-medium",
+                              (d.descuentoPorcentaje > 0 || d.descuentoFijo > 0) ? "text-green-600" : ""
+                            )}>
+                              {formatCurrency(d.subtotal, DEFAULT_CURRENCY, DEFAULT_LOCALE)}
+                            </div>
+                            {(d.descuentoPorcentaje > 0 || d.descuentoFijo > 0) && (
+                              <div className="text-xs text-gray-500">
+                                {d.descuentoPorcentaje > 0 && `-${d.descuentoPorcentaje}%`}
+                                {d.descuentoPorcentaje > 0 && d.descuentoFijo > 0 && " "}
+                                {d.descuentoFijo > 0 && `-$${d.descuentoFijo}`}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
                           <button
                             className="text-red-600 hover:underline"
                             onClick={() => quitarLinea(idx)}
@@ -673,6 +802,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                     ))}
                   </tbody>
                 </table>
+                </div>
                 <div className="flex justify-between items-center">
                   <button className="text-blue-600 hover:underline" onClick={agregarLinea}>+ Agregar línea</button>
                   <div className="font-bold">Total: {formatCurrency(total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</div>
@@ -734,6 +864,80 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                   </div>
                 )}
               </TabsContent>
+              <TabsContent value="cabecera">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block mb-1 font-medium">Cliente</label>
+                    <div className="relative cliente-search-container">
+                      <input
+                        type="text"
+                        className="w-full border rounded px-2 py-1"
+                        placeholder="Buscar cliente..."
+                        value={busquedaCliente}
+                        onChange={(e) => {
+                          setBusquedaCliente(e.target.value);
+                          setMostrarSugerenciasCliente(true);
+                        }}
+                        onFocus={() => setMostrarSugerenciasCliente(true)}
+                      />
+                      {mostrarSugerenciasCliente && clientesParaMostrar.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                          {clientesParaMostrar.map(c => (
+                            <div
+                              key={c.id}
+                              className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                              onClick={() => {
+                                setClienteSeleccionado(c.id);
+                                setBusquedaCliente(c.razon_social);
+                                setMostrarSugerenciasCliente(false);
+                              }}
+                            >
+                              <div className="font-medium">{c.razon_social}</div>
+                              <div className="text-sm text-gray-500">
+                                {c.email} • {c.tipo_doc}: {c.num_doc}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {clienteSeleccionado && (
+                                                 <div className="mt-1 text-sm text-gray-600">
+                           Cliente seleccionado: {clientesFiltrados.find(c => c.id === clienteSeleccionado)?.razon_social}
+                         </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block mb-1 font-medium">Usuario</label>
+                    <select
+                      className="w-full border rounded px-2 py-1"
+                      value={usuarioSeleccionado ?? ""}
+                      onChange={e => setUsuarioSeleccionado(Number(e.target.value) || null)}
+                      disabled={usuarioActual?.rol !== "supervisor"}
+                    >
+                      <option value="">Seleccionar usuario</option>
+                      {usuariosParaSelect.map(u => (
+                        <option key={u.id} value={u.id}>{u.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block mb-1 font-medium">Tipo de comprobante</label>
+                    <select className="w-full border rounded px-2 py-1" value={tipoComprobanteSeleccionado ?? ""} onChange={e => setTipoComprobanteSeleccionado(Number(e.target.value) || null)}>
+                      <option value="">Seleccionar tipo</option>
+                      {tiposComprobantesValidos.map((tc) => (
+                        <option key={tc.id} value={tc.id}>{tc.descripcion}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block mb-1 font-medium">Fecha</label>
+                    <input type="date" className="w-full border rounded px-2 py-1" value={format(new Date(), "yyyy-MM-dd")}
+                      readOnly disabled />
+                  </div>
+                </div>
+                {error && <div className="text-red-600 mt-2">{error}</div>}
+              </TabsContent>
               {/* <TabsContent value="impuestos">
                 <div className="mb-2">Detalle de impuestos:</div>
                 <table className="min-w-full text-sm border mb-2">
@@ -776,7 +980,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block mb-1 font-medium">Cliente</label>
-                    <div className="border rounded px-2 py-1 bg-gray-50">{clientes.find(c => c.id === clienteSeleccionado)?.razon_social || "-"}</div>
+                    <div className="border rounded px-2 py-1 bg-gray-50">{clientesFiltrados.find(c => c.id === clienteSeleccionado)?.razon_social || "-"}</div>
                   </div>
                   <div>
                     <label className="block mb-1 font-medium">Usuario</label>
@@ -806,12 +1010,26 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                 <div className="mb-4">
                   <div className="font-semibold text-sm mb-2">Artículos ({detalle.filter(d => d.articulo && d.cantidad > 0).length}):</div>
                   <div className="border rounded p-2 bg-gray-50 max-h-32 overflow-y-auto">
-                    {detalle.filter(d => d.articulo && d.cantidad > 0).map((d, idx) => (
-                      <div key={idx} className="flex justify-between text-sm py-1">
-                        <span>{d.articulo?.descripcion}</span>
-                        <span>{d.cantidad} x ${formatCurrency(d.precio, DEFAULT_CURRENCY, DEFAULT_LOCALE)} = ${formatCurrency(d.subtotal, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
-                      </div>
-                    ))}
+                    {detalle.filter(d => d.articulo && d.cantidad > 0).map((d, idx) => {
+                      const subtotalSinDescuento = d.cantidad * d.precio;
+                      const descuentoPorcentaje = (subtotalSinDescuento * d.descuentoPorcentaje) / 100;
+                      const descuentoFijo = d.descuentoFijo;
+                      const totalDescuentos = descuentoPorcentaje + descuentoFijo;
+                      
+                      return (
+                        <div key={idx} className="flex justify-between text-sm py-1">
+                          <span>{d.articulo?.descripcion}</span>
+                          <div className="text-right">
+                            <div>{d.cantidad} x ${formatCurrency(d.precio, DEFAULT_CURRENCY, DEFAULT_LOCALE)} = ${formatCurrency(subtotalSinDescuento, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</div>
+                            {(d.descuentoPorcentaje > 0 || d.descuentoFijo > 0) && (
+                              <div className="text-xs text-red-600">
+                                -${formatCurrency(totalDescuentos, DEFAULT_CURRENCY, DEFAULT_LOCALE)} = ${formatCurrency(d.subtotal, DEFAULT_CURRENCY, DEFAULT_LOCALE)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                     {detalle.filter(d => d.articulo && d.cantidad > 0).length === 0 && (
                       <div className="text-gray-500 text-sm">No hay artículos agregados</div>
                     )}
@@ -866,20 +1084,37 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
             </Tabs>
           )}
           <div className="flex justify-end gap-2 mt-6">
-            <DialogClose asChild>
-              <Button variant="outline">Cancelar</Button>
-            </DialogClose>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                if (!loading && !isClosing) {
+                  if (hasUnsavedData()) {
+                    setShowConfirmClose(true);
+                  } else {
+                    setIsClosing(true);
+                    setTimeout(() => {
+                      setIsClosing(false);
+                      onOpenChange(false);
+                    }, 100);
+                  }
+                }
+              }}
+              disabled={loading || isClosing}
+            >
+              Cancelar
+            </Button>
             <Button
               onClick={handleGuardarVenta}
-              disabled={loading || !detalle.some(linea => linea.cantidad > 0) || detalle.some(linea => !linea.cantidad || isNaN(linea.cantidad) || Number(linea.cantidad) <= 0) || mediosPagoIncompletos || hayCuentasDuplicadas}
+              disabled={loading || isClosing || !detalle.some(linea => linea.cantidad > 0) || detalle.some(linea => !linea.cantidad || isNaN(linea.cantidad) || Number(linea.cantidad) <= 0) || mediosPagoIncompletos || hayCuentasDuplicadas}
             >
-              Guardar venta
+              {loading ? "Guardando..." : "Guardar venta"}
             </Button>
             {detalle.some(linea => !linea.cantidad || isNaN(linea.cantidad) || Number(linea.cantidad) <= 0) && (
               <div className="text-red-600 text-xs mt-1">Todas las líneas deben tener una cantidad válida mayor a 0.</div>
             )}
           </div>
         </DialogContent>
+        </div>
       </Dialog>
       {/* Modal de error de caja/lote */}
       <Dialog open={showLoteError} onOpenChange={setShowLoteError}>
@@ -965,6 +1200,39 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
           </DialogHeader>
           <div className="flex justify-end mt-4">
             <Button onClick={() => setShowStockError(false)}>Cerrar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de confirmación de cierre */}
+      <Dialog open={showConfirmClose} onOpenChange={setShowConfirmClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Cerrar sin guardar?</DialogTitle>
+            <DialogDescription>
+              Hay datos sin guardar en el formulario. ¿Estás seguro de que quieres cerrar sin guardar la venta?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowConfirmClose(false)}
+            >
+              Continuar editando
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                setShowConfirmClose(false);
+                setIsClosing(true);
+                setTimeout(() => {
+                  setIsClosing(false);
+                  onOpenChange(false);
+                }, 100);
+              }}
+            >
+              Cerrar sin guardar
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -118,7 +118,7 @@ export function AppSidebar() {
   };
 
   return (
-    <aside className="flex flex-col h-full w-60 bg-white border-r">
+          <aside className="flex flex-col h-full w-72 bg-white border-r">
       <div className="px-4 pt-4 pb-2">
         <Dialog open={modalOpen} onOpenChange={setModalOpen}>
           <DialogTrigger asChild>
@@ -239,7 +239,7 @@ export function AppSidebar() {
                     prefetch={false}
                   >
                     <IconCalendar className="w-4 h-4" />
-                    <span>Clientes</span>
+                    <span>Clientes/Proveedores</span>
                   </Link>
                 </li>
                 <li className={`${pathname === "/usuarios" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>

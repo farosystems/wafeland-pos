@@ -198,7 +198,7 @@ export function ClientesContentSecure() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Cargando clientes...</span>
+        <span className="ml-2">Cargando clientes y proveedores...</span>
       </div>
     );
   }
@@ -209,7 +209,7 @@ export function ClientesContentSecure() {
         <div className="flex items-center gap-3">
           <Users className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-3xl font-bold leading-tight">Gestión de Clientes</h1>
+            <h1 className="text-3xl font-bold leading-tight">Clientes y Proveedores</h1>
             <p className="text-muted-foreground text-base">Administra tu base de datos de clientes.</p>
           </div>
         </div>
@@ -233,7 +233,7 @@ export function ClientesContentSecure() {
       <div className="mb-4">
         <input
           type="text"
-          placeholder="Buscar clientes..."
+          placeholder="Buscar clientes o proveedores..."
           value={filtro}
           onChange={(e) => setFiltro(e.target.value)}
           className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -246,50 +246,57 @@ export function ClientesContentSecure() {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Cliente
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Email
-                </th>
+                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                   Cliente
+                 </th>
+                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                   Tipo
+                 </th>
+                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                   Email
+                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Documento
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Teléfono
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Categoría IVA
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Acciones
-                </th>
+                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                   Categoría IVA
+                 </th>
+                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                   Acciones
+                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {clientesPagina.map((cliente) => (
                 <tr key={cliente.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {cliente.razon_social}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {cliente.tipo}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {cliente.email}
-                  </td>
+                                     <td className="px-6 py-4 whitespace-nowrap">
+                     <div className="text-sm font-medium text-gray-900">
+                       {cliente.razon_social}
+                     </div>
+                   </td>
+                   <td className="px-6 py-4 whitespace-nowrap">
+                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                       cliente.tipo === 'cliente' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                     }`}>
+                       {cliente.tipo === 'cliente' ? 'Cliente' : 'Proveedor'}
+                     </span>
+                   </td>
+                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                     {cliente.email}
+                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {cliente.tipo_doc}: {cliente.num_doc}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {cliente.telefono}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {cliente.categoria_iva}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                     {cliente.categoria_iva}
+                   </td>
+                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center gap-2">
                       <Button
                         variant="ghost"
@@ -468,6 +475,8 @@ export function ClientesContentSecure() {
                 </select>
               </div>
             </div>
+            
+            
             
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={closeDialog}>

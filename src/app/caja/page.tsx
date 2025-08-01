@@ -942,6 +942,9 @@ export default function CajaPage() {
             <div className="mb-4 text-xs text-gray-600">
               Nota: Los ingresos de &quot;CUENTA CORRIENTE&quot; son informativos y no se suman al total de ingresos de caja. Ese total se reparte en los otros medios de pago a medida que el cliente paga su deuda.
             </div>
+            <div className="mb-4 text-xs text-gray-600">
+              Saldo inicial del lote abierto: {formatCurrency(loteAbiertoGlobal?.saldo_inicial || 0, DEFAULT_CURRENCY, DEFAULT_LOCALE)}
+            </div>
             <div className="flex justify-end gap-2">
               <button className={`bg-gray-300 px-4 py-2 rounded ${pressClass}`} onClick={() => setShowCierreModal(false)}>Cancelar</button>
               <button className={`bg-blue-600 text-white px-4 py-2 rounded ${pressClass}`} onClick={confirmarCierreCaja}>Confirmar cierre</button>
