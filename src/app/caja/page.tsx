@@ -37,6 +37,7 @@ import { BreadcrumbBar } from "@/components/BreadcrumbBar";
 import { getClientes } from "@/services/clientes";
 import { getPagosCuentaCorriente } from "@/services/pagosCuentaCorriente";
 import { LoteOperacion } from "@/types/loteOperacion";
+import { generateGastosPDF } from "@/utils/generateGastosPDF";
 
 interface AperturaCaja {
   caja: string;
@@ -340,15 +341,31 @@ export default function CajaPage() {
       setAperturaActual(null);
       setRefreshLotes(x => x + 1);
       showToast("Cierre de caja confirmado");
+      
+      // 3. Generar ambos PDFs automáticamente
+      setLoadingMessage("Generando reportes...");
+      try {
+        const cajaDescripcion = cajas.find(c => c.id === Number(loteACerrar.fk_id_caja))?.descripcion || "N/A";
+        const fechaApertura = loteACerrar.fecha_apertura || aperturaActual?.fechaApertura || "";
+        
+        // Generar PDF de cierre de caja (ventas)
+        await generarPDFCierreCaja(loteACerrar.id_lote);
+        
+        // Generar PDF de gastos
+        await generateGastosPDF(loteACerrar.id_lote, fechaApertura, hoyCierre, cajaDescripcion);
+        
+        showToast("Reportes generados correctamente");
+      } catch (error) {
+        console.error("Error generando PDFs:", error);
+        showToast("Error generando reportes");
+      }
     } finally {
       setLoading(false);
       setLoadingMessage("");
     }
-    // 3. (Opcional) Calcula movimientos o genera PDF en segundo plano si es necesario
-    // calcularMovimientosYGenerarPDF();
   }
 
-  async function generarPDFCierreCaja() {
+  async function generarPDFCierreCaja(loteId?: number) {
     const doc = new jsPDF();
     // Encabezado compacto
     // Título grande
@@ -357,8 +374,14 @@ export default function CajaPage() {
     // Datos de caja en dos columnas, fuente pequeña
     doc.setFontSize(9);
     let yDatos = 30;
-    doc.text(`Caja: ${cajaAbierta || aperturaActual?.caja || "N/A"}`, 20, yDatos);
-    doc.text(`Saldo inicial: ${formatCurrency(parseFloat(aperturaActual?.saldoInicial || '0'), DEFAULT_CURRENCY, DEFAULT_LOCALE)}`, 120, yDatos);
+    
+    // Usar datos del lote actual si no se proporciona loteId
+    const loteACerrar = loteId ? { id_lote: loteId } : (loteAbiertoGlobal || (aperturaActual && aperturaActual.id_lote ? { id_lote: aperturaActual.id_lote } : null));
+    const cajaDescripcion = cajaAbierta || aperturaActual?.caja || "N/A";
+    const saldoInicial = parseFloat(aperturaActual?.saldoInicial || '0');
+    
+    doc.text(`Caja: ${cajaDescripcion}`, 20, yDatos);
+    doc.text(`Saldo inicial: ${formatCurrency(saldoInicial, DEFAULT_CURRENCY, DEFAULT_LOCALE)}`, 120, yDatos);
     yDatos += 6;
     doc.text(`Fecha apertura: ${aperturaActual?.fechaApertura || "N/A"}`, 20, yDatos);
     doc.text(`Hora apertura: ${aperturaActual?.horaApertura || "N/A"}`, 120, yDatos);
@@ -537,6 +560,24 @@ export default function CajaPage() {
     // Descargar el PDF
     const fileName = `cierre_caja_${format(new Date(), "yyyy-MM-dd_HH-mm")}.pdf`;
     doc.save(fileName);
+  }
+
+  async function generarPDFGastos() {
+    const loteACerrar = loteAbiertoGlobal || (aperturaActual && aperturaActual.id_lote ? { id_lote: aperturaActual.id_lote } : null);
+    if (!loteACerrar || !loteACerrar.id_lote) return;
+    
+    const now = new Date();
+    const hoyCierre = format(now, "yyyy-MM-dd");
+    const cajaDescripcion = cajas.find(c => c.id === Number(loteACerrar.fk_id_caja))?.descripcion || "N/A";
+    const fechaApertura = loteACerrar.fecha_apertura || aperturaActual?.fechaApertura || "";
+    
+    try {
+      await generateGastosPDF(loteACerrar.id_lote, fechaApertura, hoyCierre, cajaDescripcion);
+      showToast("Reporte de gastos generado correctamente");
+    } catch (error) {
+      console.error("Error generando PDF de gastos:", error);
+      showToast("Error generando reporte de gastos");
+    }
   }
 
   // Imprimir cierre de caja para cualquier lote
@@ -951,6 +992,10 @@ export default function CajaPage() {
               <button className={`bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 ${pressClass}`} onClick={generarPDFCierreCaja}>
                 <FileText className="h-4 w-4" />
                 Imprimir PDF
+              </button>
+              <button className={`bg-orange-600 text-white px-4 py-2 rounded flex items-center gap-2 ${pressClass}`} onClick={generarPDFGastos}>
+                <FileText className="h-4 w-4" />
+                Imprimir reporte de gastos
               </button>
             </div>
           </DialogContent>

@@ -110,3 +110,20 @@ export async function getTotalAdelantosEnPeriodo(empleadoId: number, desde: stri
     const total = data.reduce((sum, g) => sum + (g.monto || 0), 0);
     return total;
 } 
+
+export async function getGastosPorLote(idLote: number) {
+  const { data, error } = await supabase
+    .from("gastos_empleados")
+    .select(`
+      *,
+      tipo_gasto:fk_tipo_gasto(id, descripcion),
+      empleado:fk_empleado(id, nombre, apellido),
+      usuario:fk_usuario(id, nombre),
+      cuenta_tesoreria:fk_cuenta_tesoreria(id, descripcion)
+    `)
+    .eq("fk_lote_operaciones", idLote)
+    .order("creado_el", { ascending: false });
+  
+  if (error) throw error;
+  return data;
+} 

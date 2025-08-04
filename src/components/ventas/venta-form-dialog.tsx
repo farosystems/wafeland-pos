@@ -784,7 +784,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                               <div className="text-xs text-gray-500">
                                 {d.descuentoPorcentaje > 0 && `-${d.descuentoPorcentaje}%`}
                                 {d.descuentoPorcentaje > 0 && d.descuentoFijo > 0 && " "}
-                                {d.descuentoFijo > 0 && `-$${d.descuentoFijo}`}
+                                {d.descuentoFijo > 0 && `-${formatCurrency(d.descuentoFijo, DEFAULT_CURRENCY, DEFAULT_LOCALE)}`}
                               </div>
                             )}
                           </div>
@@ -1020,10 +1020,10 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                         <div key={idx} className="flex justify-between text-sm py-1">
                           <span>{d.articulo?.descripcion}</span>
                           <div className="text-right">
-                            <div>{d.cantidad} x ${formatCurrency(d.precio, DEFAULT_CURRENCY, DEFAULT_LOCALE)} = ${formatCurrency(subtotalSinDescuento, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</div>
+                            <div>{d.cantidad} x {formatCurrency(d.precio, DEFAULT_CURRENCY, DEFAULT_LOCALE)} = {formatCurrency(subtotalSinDescuento, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</div>
                             {(d.descuentoPorcentaje > 0 || d.descuentoFijo > 0) && (
                               <div className="text-xs text-red-600">
-                                -${formatCurrency(totalDescuentos, DEFAULT_CURRENCY, DEFAULT_LOCALE)} = ${formatCurrency(d.subtotal, DEFAULT_CURRENCY, DEFAULT_LOCALE)}
+                                -{formatCurrency(totalDescuentos, DEFAULT_CURRENCY, DEFAULT_LOCALE)} = {formatCurrency(d.subtotal, DEFAULT_CURRENCY, DEFAULT_LOCALE)}
                               </div>
                             )}
                           </div>
@@ -1043,7 +1043,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                     {mediosPago.filter(m => m.cuenta && m.monto > 0).map((m, idx) => (
                       <div key={idx} className="flex justify-between text-sm py-1">
                         <span>{m.cuenta?.descripcion}</span>
-                        <span>${formatCurrency(m.monto, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
+                        <span>{formatCurrency(m.monto, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
                       </div>
                     ))}
                     {mediosPago.filter(m => m.cuenta && m.monto > 0).length === 0 && (
@@ -1053,11 +1053,11 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                       <div className="border-t pt-2 mt-2">
                         <div className="flex justify-between font-semibold">
                           <span>Total medios de pago:</span>
-                          <span>${formatCurrency(sumaMediosPago, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
+                          <span>{formatCurrency(sumaMediosPago, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>Total venta:</span>
-                          <span>${formatCurrency(total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
+                          <span>{formatCurrency(total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
                         </div>
                         <div className={`flex justify-between text-sm ${diferenciaMediosPago === 0 ? 'text-green-600' : 'text-red-600'}`}>
                           <span>Diferencia:</span>

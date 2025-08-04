@@ -32,12 +32,11 @@ export function useGastosEmpleados(tiposGasto: TipoGasto[]) {
     try {
       const newGasto = await createGastoEmpleado(data);
       setGastos((prev) => [newGasto, ...prev]);
-      // Registrar egreso en detalle_lotes_operaciones si corresponde
+      // Registrar egreso en detalle_lotes_operaciones si el tipo de gasto afecta la caja
       const tipo = tiposGasto.find(t => t.id === data.fk_tipo_gasto);
       if (
         tipo &&
-        tipo.descripcion &&
-        ["adelanto", "sueldo", "otros"].includes(tipo.descripcion) &&
+        tipo.afecta_caja === true &&
         data.fk_lote_operaciones &&
         data.fk_cuenta_tesoreria
       ) {
