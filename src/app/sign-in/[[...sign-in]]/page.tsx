@@ -21,7 +21,7 @@ export default function CustomSignIn() {
         password,
       });
       await setActive({ session: result.createdSessionId });
-      window.location.href = "/dashboard";
+      window.location.href = "/home";
     } catch {
       setError("Usuario o contraseña incorrectos");
     } finally {

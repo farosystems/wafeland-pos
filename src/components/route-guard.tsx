@@ -23,7 +23,9 @@ export function RouteGuard({ children, requiredModule }: RouteGuardProps) {
   const [usuarioDB, setUsuarioDB] = useState<Usuario | null>(null);
   const [modulosPermitidos, setModulosPermitidos] = useState<Modulo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hasAccess, setHasAccess] = useState(false); // Cambiar a false por defecto
+  const [hasAccess, setHasAccess] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+  const [lastCheckedUser, setLastCheckedUser] = useState<string | null>(null);
 
   // Rutas públicas que no requieren verificación de permisos
   const publicRoutes = ['/home', '/sign-in', '/sign-up', '/'];
@@ -58,6 +60,9 @@ export function RouteGuard({ children, requiredModule }: RouteGuardProps) {
 
   useEffect(() => {
     async function checkPermissions() {
+      // Evitar múltiples llamadas simultáneas
+      if (isChecking) return;
+      
       // Si es una ruta pública, permitir acceso
       if (publicRoutes.includes(pathname)) {
         setHasAccess(true);
@@ -70,13 +75,34 @@ export function RouteGuard({ children, requiredModule }: RouteGuardProps) {
         return;
       }
 
+      setIsChecking(true);
       try {
-        const usuarios = await getUsuarios();
         const userEmail = user.emailAddresses[0]?.emailAddress;
+        
+        // Verificar si ya tenemos los datos del usuario y no han cambiado
+        if (lastCheckedUser === userEmail && usuarioDB && modulosPermitidos.length > 0) {
+          // Usar datos en cache
+          const esAdmin = usuarioDB.rol === 'admin' || usuarioDB.rol === 'supervisor';
+          
+          if (esAdmin) {
+            setHasAccess(true);
+          } else {
+            const route = pathname.replace('/', '');
+            const moduleName = getModuleNameFromRoute(route);
+            const tieneAcceso = modulosPermitidos.some(modulo => modulo.nombre === moduleName);
+            setHasAccess(tieneAcceso);
+          }
+          setLoading(false);
+          setIsChecking(false);
+          return;
+        }
+        
+        const usuarios = await getUsuarios();
         const usuario = usuarios.find(u => u.email === userEmail);
         
         if (usuario) {
           setUsuarioDB(usuario);
+          setLastCheckedUser(userEmail);
           const modulos = await getModulosUsuario(usuario.id);
           setModulosPermitidos(modulos);
           
@@ -90,7 +116,6 @@ export function RouteGuard({ children, requiredModule }: RouteGuardProps) {
             const route = pathname.replace('/', '');
             const moduleName = getModuleNameFromRoute(route);
             const tieneAcceso = modulos.some(modulo => modulo.nombre === moduleName);
-            console.log('Verificando ruta:', route, 'Nombre módulo:', moduleName, 'Módulos disponibles:', modulos.map(m => m.nombre), 'Resultado:', tieneAcceso);
             setHasAccess(tieneAcceso);
           }
         } else {
@@ -103,11 +128,12 @@ export function RouteGuard({ children, requiredModule }: RouteGuardProps) {
         setHasAccess(false);
       } finally {
         setLoading(false);
+        setIsChecking(false);
       }
     }
 
     checkPermissions();
-  }, [isSignedIn, user, pathname, requiredModule, publicRoutes]);
+  }, [isSignedIn, user, pathname, requiredModule, isChecking]);
 
   if (!isLoaded || loading) {
     return (
