@@ -113,8 +113,19 @@ export function ArticlesContent() {
             </div>
           )}
 
-          <div className="rounded-lg border bg-card p-4">
+          {/* Tabla de Artículos */}
+          <div className="rounded-lg border bg-card p-4 mb-8">
             <ArticlesTable data={articles} onEdit={openEditDialog} />
+          </div>
+
+          {/* Tablas de Agrupadores y Marcas debajo de Artículos */}
+          <div className="space-y-8">
+            <div className="rounded-lg border bg-card p-4">
+              <AgrupadoresContent />
+            </div>
+            <div className="rounded-lg border bg-card p-4">
+              <MarcasContent />
+            </div>
           </div>
         </>
       )}
@@ -140,13 +151,6 @@ export function ArticlesContent() {
           />
         </DialogContent>
       </Dialog>
-
-      <div className="mt-10">
-        <AgrupadoresContent />
-      </div>
-      <div className="mt-10">
-        <MarcasContent />
-      </div>
     </div>
   );
 } 

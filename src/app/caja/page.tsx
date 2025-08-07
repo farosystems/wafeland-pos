@@ -127,7 +127,7 @@ export default function CajaPage() {
         if (actual) fetchCajaAbierta(actual.id);
       }
     });
-  }, [user]);
+  }, [user, fetchCajaAbierta]);
 
   // Al cargar usuarios, si es supervisor y no hay usuario seleccionado, seleccionar el primero y mostrar su caja abierta
   React.useEffect(() => {
@@ -345,11 +345,13 @@ export default function CajaPage() {
       // 3. Generar ambos PDFs automáticamente
       setLoadingMessage("Generando reportes...");
       try {
-        const cajaDescripcion = cajas.find(c => c.id === Number(loteACerrar.fk_id_caja))?.descripcion || "N/A";
-        const fechaApertura = loteACerrar.fecha_apertura || aperturaActual?.fechaApertura || "";
+        // Get the full lote object if we only have id_lote
+        const loteCompleto = loteAbiertoGlobal || (aperturaActual && aperturaActual.id_lote ? await getLotesOperaciones().then(lotes => lotes.find(l => l.id_lote === aperturaActual.id_lote)) : null);
+        const cajaDescripcion = cajas.find(c => c.id === Number(loteCompleto?.fk_id_caja))?.descripcion || "N/A";
+        const fechaApertura = loteCompleto?.fecha_apertura || aperturaActual?.fechaApertura || "";
         
         // Generar PDF de cierre de caja (ventas)
-        await generarPDFCierreCaja(loteACerrar.id_lote);
+        await generarPDFCierreCaja();
         
         // Generar PDF de gastos
         await generateGastosPDF(loteACerrar.id_lote, fechaApertura, hoyCierre, cajaDescripcion);
@@ -365,7 +367,7 @@ export default function CajaPage() {
     }
   }
 
-  async function generarPDFCierreCaja(loteId?: number) {
+  async function generarPDFCierreCaja() {
     const doc = new jsPDF();
     // Encabezado compacto
     // Título grande
@@ -376,7 +378,7 @@ export default function CajaPage() {
     let yDatos = 30;
     
     // Usar datos del lote actual si no se proporciona loteId
-    const loteACerrar = loteId ? { id_lote: loteId } : (loteAbiertoGlobal || (aperturaActual && aperturaActual.id_lote ? { id_lote: aperturaActual.id_lote } : null));
+    // const loteACerrar = loteId ? { id_lote: loteId } : (loteAbiertoGlobal || (aperturaActual && aperturaActual.id_lote ? { id_lote: aperturaActual.id_lote } : null));
     const cajaDescripcion = cajaAbierta || aperturaActual?.caja || "N/A";
     const saldoInicial = parseFloat(aperturaActual?.saldoInicial || '0');
     
@@ -392,9 +394,12 @@ export default function CajaPage() {
     // --- Bloque resumen de ventas y notas de crédito ---
     doc.setFontSize(10);
     // Obtener catálogos necesarios
-    const clientesArr = await getClientes();
-    const usuariosArr = await getUsuarios();
-    const tiposComprobantes = await getTiposComprobantes();
+    const [clientesArr, usuariosArr, tiposComprobantes, cuentasTesoreriaArr] = await Promise.all([
+      getClientes(),
+      getUsuarios(),
+      getTiposComprobantes(),
+      getCuentasTesoreria()
+    ]);
     // Definir ventasLote antes de usarla en el resumen de ventas
     let ventasLote: OrdenVenta[] = [];
     if (aperturaActual && aperturaActual.id_lote) {
@@ -451,7 +456,7 @@ export default function CajaPage() {
         startY: afterTotalesY + 3,
         head: [["ID", "Fecha", "Cliente", "Cuenta Tesorería", "Monto"]],
         body: pagosLote.map(pago => {
-          const cuentaTesoreria = cuentasTesoreria.find(ct => ct.id === pago.fk_id_cuenta_tesoreria);
+          const cuentaTesoreria = cuentasTesoreriaArr.find(ct => ct.id === pago.fk_id_cuenta_tesoreria);
           let clienteNombre = "-";
           const cuentaCorriente = clientesArr.find(c => c.id === pago.fk_id_cuenta_corriente);
           if (cuentaCorriente) clienteNombre = cuentaCorriente.razon_social || "-";
@@ -497,6 +502,7 @@ export default function CajaPage() {
       ];
       const ordenesBody: string[][] = [];
       for (const orden of ventasLote) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const clienteObj = clientesArr.find((c: unknown) => (c as any).id === orden.fk_id_entidades);
         const usuarioObj = usuariosArr.find((u: Usuario) => u.id === orden.fk_id_usuario);
         const tipoCompObj = tiposComprobantes.find((t: TipoComprobante) => t.id === orden.fk_id_tipo_comprobante);
@@ -568,8 +574,10 @@ export default function CajaPage() {
     
     const now = new Date();
     const hoyCierre = format(now, "yyyy-MM-dd");
-    const cajaDescripcion = cajas.find(c => c.id === Number(loteACerrar.fk_id_caja))?.descripcion || "N/A";
-    const fechaApertura = loteACerrar.fecha_apertura || aperturaActual?.fechaApertura || "";
+    // Get the full lote object if we only have id_lote
+    const loteCompleto = loteAbiertoGlobal || (aperturaActual && aperturaActual.id_lote ? await getLotesOperaciones().then(lotes => lotes.find(l => l.id_lote === aperturaActual.id_lote)) : null);
+    const cajaDescripcion = cajas.find(c => c.id === Number(loteCompleto?.fk_id_caja))?.descripcion || "N/A";
+    const fechaApertura = loteCompleto?.fecha_apertura || aperturaActual?.fechaApertura || "";
     
     try {
       await generateGastosPDF(loteACerrar.id_lote, fechaApertura, hoyCierre, cajaDescripcion);

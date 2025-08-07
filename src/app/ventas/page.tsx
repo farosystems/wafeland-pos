@@ -157,12 +157,21 @@ export default function VentasPage() {
         // Procesar ventas anuladas
         const ventasAnuladasSet = new Set<number>();
         const notasCreditoPorVentaMap = new Map<number, number>();
-        const notasCredito = ventasData.filter(v => v.fk_id_tipo_comprobante === 2);
         
-        for (const notaCredito of notasCredito) {
-          if (notaCredito.fk_id_orden_anulada) {
-            ventasAnuladasSet.add(notaCredito.fk_id_orden_anulada);
-            notasCreditoPorVentaMap.set(notaCredito.fk_id_orden_anulada, notaCredito.id);
+        // Buscar el tipo de comprobante "NOTA DE CREDITO"
+        const tipoNotaCredito = tiposData.find(tc => 
+          tc.descripcion.toUpperCase().includes('NOTA DE CREDITO') || 
+          tc.descripcion.toUpperCase().includes('NOTA DE CRÉDITO')
+        );
+        
+        if (tipoNotaCredito) {
+          const notasCredito = ventasData.filter(v => v.fk_id_tipo_comprobante === tipoNotaCredito.id);
+          
+          for (const notaCredito of notasCredito) {
+            if (notaCredito.fk_id_orden_anulada) {
+              ventasAnuladasSet.add(notaCredito.fk_id_orden_anulada);
+              notasCreditoPorVentaMap.set(notaCredito.fk_id_orden_anulada, notaCredito.id);
+            }
           }
         }
         setNotasCreditoPorVenta(notasCreditoPorVentaMap);
@@ -194,12 +203,21 @@ export default function VentasPage() {
       // Reprocesar ventas anuladas
       const ventasAnuladasSet = new Set<number>();
       const notasCreditoPorVentaMap = new Map<number, number>();
-      const notasCredito = data.filter(v => v.fk_id_tipo_comprobante === 2);
       
-      for (const notaCredito of notasCredito) {
-        if (notaCredito.fk_id_orden_anulada) {
-          ventasAnuladasSet.add(notaCredito.fk_id_orden_anulada);
-          notasCreditoPorVentaMap.set(notaCredito.fk_id_orden_anulada, notaCredito.id);
+      // Buscar el tipo de comprobante "NOTA DE CREDITO"
+      const tipoNotaCredito = tiposComprobantes.find(tc => 
+        tc.descripcion.toUpperCase().includes('NOTA DE CREDITO') || 
+        tc.descripcion.toUpperCase().includes('NOTA DE CRÉDITO')
+      );
+      
+      if (tipoNotaCredito) {
+        const notasCredito = data.filter(v => v.fk_id_tipo_comprobante === tipoNotaCredito.id);
+        
+        for (const notaCredito of notasCredito) {
+          if (notaCredito.fk_id_orden_anulada) {
+            ventasAnuladasSet.add(notaCredito.fk_id_orden_anulada);
+            notasCreditoPorVentaMap.set(notaCredito.fk_id_orden_anulada, notaCredito.id);
+          }
         }
       }
       setNotasCreditoPorVenta(notasCreditoPorVentaMap);
@@ -445,7 +463,11 @@ export default function VentasPage() {
 
   // Función para verificar si una venta es una factura (no nota de crédito)
   function esFactura(venta: OrdenVenta) {
-    return venta.fk_id_tipo_comprobante !== 2; // 2 = NOTA DE CREDITO
+    // Buscar el tipo de comprobante de la venta
+    const tipoComp = tiposComprobantes.find(tc => tc.id === venta.fk_id_tipo_comprobante);
+    // Es factura si no es nota de crédito
+    return !tipoComp?.descripcion.toUpperCase().includes('NOTA DE CREDITO') && 
+           !tipoComp?.descripcion.toUpperCase().includes('NOTA DE CRÉDITO');
   }
 
   // Función para manejar la anulación de venta
@@ -658,7 +680,7 @@ export default function VentasPage() {
               Cliente: {getClienteNombre(ventaSeleccionada?.fk_id_entidades || null)}<br />
               Usuario: {getUsuarioNombre(ventaSeleccionada?.fk_id_usuario || null)}<br />
               Tipo de comprobante: {getTipoComprobanteNombre(ventaSeleccionada?.fk_id_tipo_comprobante || null)}<br />
-              Total: ${formatCurrency(ventaSeleccionada?.total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}
+              Total: {formatCurrency(ventaSeleccionada?.total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}
             </DialogDescription>
             {ventaSeleccionada && ventaSeleccionada.anulada && (
               <div className="mt-2 p-3 bg-red-100 border border-red-300 rounded">
@@ -693,8 +715,8 @@ export default function VentasPage() {
                 <tr key={idx}>
                   <td className="px-2 py-1 text-left">{articulos.find(a => a.id === d.fk_id_articulo)?.descripcion || d.fk_id_articulo}</td>
                   <td className="px-2 py-1 text-right">{d.cantidad}</td>
-                  <td className="px-2 py-1 text-right">${formatCurrency(d.precio_unitario, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
-                  <td className="px-2 py-1 text-right">${formatCurrency(d.cantidad * d.precio_unitario, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
+                  <td className="px-2 py-1 text-right">{formatCurrency(d.precio_unitario, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
+                  <td className="px-2 py-1 text-right">{formatCurrency(d.cantidad * d.precio_unitario, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
                 </tr>
               ))}
             </tbody>
@@ -711,7 +733,7 @@ export default function VentasPage() {
               {mediosPagoVenta.map((m, idx) => (
                 <tr key={idx}>
                   <td className="px-2 py-1 text-left">{cuentas.find(c => c.id === m.fk_id_cuenta_tesoreria)?.descripcion || m.fk_id_cuenta_tesoreria}</td>
-                  <td className="px-2 py-1 text-right">${formatCurrency(m.monto_pagado, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
+                  <td className="px-2 py-1 text-right">{formatCurrency(m.monto_pagado, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
                 </tr>
               ))}
             </tbody>
@@ -729,8 +751,8 @@ export default function VentasPage() {
               {impuestosVenta.map((imp, idx) => (
                 <tr key={idx}>
                   <td className="px-2 py-1 text-right">{imp.porcentaje_iva}</td>
-                  <td className="px-2 py-1 text-right">${formatCurrency(imp.base_gravada, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
-                  <td className="px-2 py-1 text-right">${formatCurrency(imp.monto_iva, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
+                  <td className="px-2 py-1 text-right">{formatCurrency(imp.base_gravada, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
+                  <td className="px-2 py-1 text-right">{formatCurrency(imp.monto_iva, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
                 </tr>
               ))}
             </tbody>

@@ -16,12 +16,13 @@ import {
 import { useUser } from "@clerk/nextjs";
 
 const ROLES = [
+  { label: "Administrador", value: "admin" },
   { label: "Vendedor", value: "vendedor" },
   { label: "Cobrador", value: "cobrador" },
   { label: "Supervisor", value: "supervisor" },
 ];
 
-const allowedRoles = ["vendedor", "cobrador", "supervisor"] as const;
+const allowedRoles = ["admin", "vendedor", "cobrador", "supervisor"] as const;
 
 export function UsuariosContent() {
   const { user } = useUser();

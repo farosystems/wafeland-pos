@@ -31,7 +31,7 @@ export function TiposComprobantesContent() {
     }
   };
 
-  React.useEffect(() => { fetchTipos(); }, []);
+  React.useEffect(() => { fetchTipos(); }, [fetchTipos]);
 
   const openCreateDialog = () => { setEditing(null); setIsDialogOpen(true); };
   const openEditDialog = (tipo: TipoComprobante) => { setEditing(tipo); setIsDialogOpen(true); };

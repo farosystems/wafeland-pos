@@ -11,7 +11,6 @@ export async function generateOrdenCompraPDF(orden: OrdenCompra): Promise<void> 
   
   // Configuración de colores profesionales
   const primaryColor = [59, 130, 246]; // Azul profesional
-  const secondaryColor = [107, 114, 128]; // Gris
   const textColor = [31, 41, 55]; // Gris oscuro
   
   // Configuración de fuentes
@@ -86,7 +85,7 @@ export async function generateOrdenCompraPDF(orden: OrdenCompra): Promise<void> 
   let currentProductY = productsY + 12;
   
   if (orden.items && orden.items.length > 0) {
-    orden.items.forEach((item, index) => {
+    orden.items.forEach((item) => {
       if (currentProductY < 250) { // Evitar que se salga de la página
         productX = 20;
         
@@ -135,7 +134,7 @@ export async function generateOrdenCompraPDF(orden: OrdenCompra): Promise<void> 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   
-  let summaryX = 125;
+  const summaryX = 125;
   let summaryCurrentY = summaryY + 8;
   
   doc.text('SUBTOTAL:', summaryX, summaryCurrentY);

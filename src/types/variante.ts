@@ -14,6 +14,7 @@ export interface Variante {
   articulo_descripcion?: string;
   talle_descripcion?: string;
   color_descripcion?: string;
+  codigo_barras?: string;
 }
 
 export interface CreateVarianteData {
@@ -23,6 +24,7 @@ export interface CreateVarianteData {
   stock_maximo: number;
   fk_id_talle: number;
   fk_id_color: number;
+  codigo_barras?: string;
 }
 
 export interface UpdateVarianteData {
@@ -31,4 +33,5 @@ export interface UpdateVarianteData {
   stock_maximo?: number;
   fk_id_talle?: number;
   fk_id_color?: number;
+  codigo_barras?: string;
 } 

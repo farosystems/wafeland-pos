@@ -1,19 +1,20 @@
 import { supabase } from "@/lib/supabaseClient";
-import { OrdenCompra, CreateOrdenCompraData, UpdateOrdenCompraData, OrdenCompraItem } from "@/types/ordenCompra";
+import { OrdenCompra, CreateOrdenCompraData, UpdateOrdenCompraData } from "@/types/ordenCompra";
 
 export async function getOrdenesCompra(): Promise<OrdenCompra[]> {
   const { data, error } = await supabase
     .from('ordenes_compra')
     .select(`
       *,
-      proveedor:clientes!fk_id_proveedor(razon_social),
-      empresa:configuracion_empresa!fk_id_empresa(nombre),
+      proveedor:clientes!fk_id_proveedor(*),
+      empresa:configuracion_empresa!fk_id_empresa(*),
       items:ordenes_compra_items(
         *,
-        variante:variantes_articulos!fk_id_variante(
-          articulo:articulos(descripcion),
-          talle:talles(descripcion),
-          color:colores(descripcion)
+        variante:variantes(
+          *,
+          articulo:articulos(*),
+          talle:talles(*),
+          color:colores(*)
         )
       )
     `)
@@ -21,11 +22,11 @@ export async function getOrdenesCompra(): Promise<OrdenCompra[]> {
 
   if (error) throw error;
 
-  return data.map(orden => ({
+  return data.map((orden: any) => ({
     ...orden,
     proveedor_razon_social: orden.proveedor?.razon_social,
     empresa_nombre: orden.empresa?.nombre,
-    items: orden.items?.map(item => ({
+    items: orden.items?.map((item: any) => ({
       ...item,
       articulo_descripcion: item.variante?.articulo?.descripcion,
       talle_descripcion: item.variante?.talle?.descripcion,
@@ -105,7 +106,7 @@ export async function deleteOrdenCompra(id: number): Promise<void> {
   if (error) throw error;
 }
 
-export async function getProveedores(): Promise<any[]> {
+export async function getProveedores(): Promise<unknown[]> {
   const { data, error } = await supabase
     .from('clientes')
     .select('*')
@@ -116,7 +117,7 @@ export async function getProveedores(): Promise<any[]> {
   return data;
 }
 
-export async function getConfiguracionEmpresa(): Promise<any> {
+export async function getConfiguracionEmpresa(): Promise<unknown> {
   const { data, error } = await supabase
     .from('configuracion_empresa')
     .select('*')

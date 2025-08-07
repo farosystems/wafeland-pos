@@ -19,7 +19,7 @@ export function CuentasTesoreriaContent() {
     }
   };
 
-  React.useEffect(() => { fetchCuentas(); }, []);
+  React.useEffect(() => { fetchCuentas(); }, [fetchCuentas]);
 
   return (
     <div className="flex flex-col gap-6 p-6">

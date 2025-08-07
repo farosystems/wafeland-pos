@@ -6,7 +6,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogClose,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -35,6 +34,7 @@ import { useTalles } from "@/hooks/use-talles";
 import { useColores } from "@/hooks/use-colores";
 import { useVariantes } from "@/hooks/use-variantes";
 import { editVariante } from "@/services/variantes";
+import { Scan, X } from "lucide-react";
 
 interface VentaFormDialogProps {
   open: boolean;
@@ -95,6 +95,14 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   const { talles } = useTalles();
   const { colores } = useColores();
   const { variantes } = useVariantes();
+  
+  // Log para verificar si el hook se está ejecutando
+  console.log('🔧 VentaFormDialog - Hook useVariantes ejecutado, variantes:', variantes.length);
+  
+  // Estados para el picking
+  const [modoPicking, setModoPicking] = useState(false);
+  const [codigoBarrasInput, setCodigoBarrasInput] = useState("");
+  const [pickingInputRef] = useState(useRef<HTMLInputElement>(null));
 
   useEffect(() => {
     if (open) {
@@ -138,6 +146,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   // Limpiar el detalle cuando se cierra el popup
   useEffect(() => {
     if (!open) {
+      // Al cerrar el modal, siempre resetear a una línea vacía (modo manual)
       setDetalle([{ articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null, descuentoPorcentaje: 0, descuentoFijo: 0 }]);
       setShowSugerencias(null);
       // Resetear a valores por defecto
@@ -148,8 +157,24 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
       // Limpiar búsqueda de cliente
       setBusquedaCliente("");
       setMostrarSugerenciasCliente(false);
+      // Limpiar modo picking
+      setModoPicking(false);
+      setCodigoBarrasInput("");
     }
   }, [open]);
+
+  // Log para verificar datos cargados
+  useEffect(() => {
+    if (open && variantes.length > 0) {
+      console.log('📊 Datos cargados en el modal de venta:');
+      console.log('📦 Variantes totales:', variantes.length);
+      console.log('🏷️ Variantes con códigos de barras:', variantes.filter(v => v.codigo_barras).length);
+      console.log('📋 Primeras 5 variantes con códigos:', variantes.filter(v => v.codigo_barras).slice(0, 5).map(v => ({ id: v.id, codigo: v.codigo_barras, articulo: v.articulo_descripcion })));
+      console.log('🛍️ Artículos totales:', articulos.length);
+      console.log('🔍 Verificando si hay variantes con stock > 0:', variantes.filter(v => v.codigo_barras && v.stock_unitario > 0).length);
+      console.log('📋 Variantes con stock y códigos:', variantes.filter(v => v.codigo_barras && v.stock_unitario > 0).map(v => ({ id: v.id, codigo: v.codigo_barras, stock: v.stock_unitario, articulo: v.articulo_descripcion })));
+    }
+  }, [open, variantes, articulos]);
 
   // Cerrar sugerencias de cliente cuando se hace clic fuera
   useEffect(() => {
@@ -268,7 +293,19 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   }
   // Quitar línea
   function quitarLinea(idx: number) {
-    setDetalle(detalle => detalle.length > 1 ? detalle.filter((_, i) => i !== idx) : detalle);
+    setDetalle(detalle => {
+      const nuevoDetalle = detalle.filter((_, i) => i !== idx);
+      // Si estamos en modo picking y no quedan artículos, mantener el array vacío
+      // Si no estamos en modo picking y no quedan artículos, agregar una línea vacía
+      if (nuevoDetalle.length === 0) {
+        if (modoPicking) {
+          return []; // En modo picking, mantener vacío
+        } else {
+          return [{ articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null, descuentoPorcentaje: 0, descuentoFijo: 0 }];
+        }
+      }
+      return nuevoDetalle;
+    });
   }
 
   // Estado para el detalle de medios de pago
@@ -369,6 +406,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   const [showMaxCuentaCorrienteError, setShowMaxCuentaCorrienteError] = useState(false);
   const [toast, setToast] = useState<{ show: boolean, message: string }>({ show: false, message: "" });
   function showToast(message: string) {
+    console.log('🍞 Toast:', message);
     setToast({ show: true, message });
     setTimeout(() => setToast({ show: false, message: "" }), 2500);
   }
@@ -567,6 +605,123 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
     return variantes.filter(v => v.fk_id_articulo === articuloId && v.stock_unitario > 0);
   }
 
+  // Función para buscar variante por código de barras
+  function buscarVariantePorCodigoBarras(codigo: string) {
+    console.log('🔍 Buscando código de barras:', codigo);
+    console.log('📦 Variantes disponibles:', variantes.length);
+    console.log('📋 Variantes con códigos:', variantes.filter(v => v.codigo_barras).map(v => ({ id: v.id, codigo: v.codigo_barras, stock: v.stock_unitario })));
+    
+    // Buscar por código exacto (sin verificar stock inicialmente)
+    const variante = variantes.find(v => v.codigo_barras === codigo);
+    console.log('✅ Variante encontrada:', variante);
+    
+    return variante;
+  }
+
+  // Función para agregar artículo desde picking
+  function agregarArticuloDesdePicking(codigoBarras: string) {
+    console.log('🚀 Iniciando agregarArticuloDesdePicking con código:', codigoBarras);
+    
+    const variante = buscarVariantePorCodigoBarras(codigoBarras);
+    if (!variante) {
+      console.log('❌ Variante no encontrada');
+      showToast("Código de barras no encontrado");
+      return;
+    }
+
+    // Verificar stock pero ser más permisivo
+    if (variante.stock_unitario <= 0) {
+      console.log('⚠️ Variante encontrada pero sin stock:', variante.stock_unitario);
+      showToast(`Artículo encontrado pero sin stock disponible (Stock: ${variante.stock_unitario})`);
+      // Continuar de todas formas para permitir agregar el artículo
+    }
+
+    console.log('📦 Variante encontrada:', variante);
+    const articulo = articulos.find(a => a.id === variante.fk_id_articulo);
+    console.log('🛍️ Artículos disponibles:', articulos.length);
+    console.log('🎯 Artículo encontrado:', articulo);
+    
+    if (!articulo) {
+      console.log('❌ Artículo no encontrado');
+      showToast("Artículo no encontrado");
+      return;
+    }
+
+    // Verificar si ya existe en el detalle
+    const existeEnDetalle = detalle.find(d => 
+      d.articulo?.id === articulo.id && 
+      d.talle === variante.fk_id_talle && 
+      d.color === variante.fk_id_color
+    );
+
+    if (existeEnDetalle) {
+      // Incrementar cantidad si ya existe
+      setDetalle(detalle => detalle.map(d => 
+        d.articulo?.id === articulo.id && 
+        d.talle === variante.fk_id_talle && 
+        d.color === variante.fk_id_color
+          ? { ...d, cantidad: d.cantidad + 1 }
+          : d
+      ));
+    } else {
+      // Agregar nueva línea
+      setDetalle(detalle => [...detalle, {
+        articulo: articulo,
+        cantidad: 1,
+        precio: articulo.precio_unitario,
+        subtotal: articulo.precio_unitario,
+        input: articulo.descripcion,
+        talle: variante.fk_id_talle,
+        color: variante.fk_id_color,
+        variante: variante.id,
+        descuentoPorcentaje: 0,
+        descuentoFijo: 0,
+      }]);
+    }
+
+    showToast(`Agregado: ${articulo.descripcion} (${talles.find(t => t.id === variante.fk_id_talle)?.descripcion || 'Sin talle'} - ${colores.find(c => c.id === variante.fk_id_color)?.descripcion || 'Sin color'})`);
+  }
+
+  // Función para manejar el cambio en el input de código de barras
+  function handleCodigoBarrasChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const valor = e.target.value;
+    setCodigoBarrasInput(valor);
+  }
+
+  // Función para agregar artículo desde el botón
+  function handleAgregarCodigoBarras() {
+    if (codigoBarrasInput.trim()) {
+      console.log('🎯 Botón Agregar presionado con valor:', codigoBarrasInput.trim());
+      console.log('🔍 Llamando a agregarArticuloDesdePicking...');
+      agregarArticuloDesdePicking(codigoBarrasInput.trim());
+      setCodigoBarrasInput("");
+      // Mantener el foco en el input para continuar escaneando
+      setTimeout(() => pickingInputRef.current?.focus(), 100);
+    }
+  }
+
+  // Función para activar/desactivar modo picking
+  function toggleModoPicking() {
+    setModoPicking(!modoPicking);
+    if (!modoPicking) {
+      // Activar modo picking - limpiar el detalle para que no queden líneas vacías
+      console.log('🔍 Activando modo picking...');
+      console.log('📦 Variantes disponibles:', variantes.length);
+      console.log('🏷️ Variantes con códigos:', variantes.filter(v => v.codigo_barras).length);
+      console.log('📋 Códigos disponibles:', variantes.filter(v => v.codigo_barras).map(v => v.codigo_barras));
+      // Limpiar el detalle para que solo se agreguen artículos por picking
+      setDetalle([]);
+      setTimeout(() => pickingInputRef.current?.focus(), 100);
+    } else {
+      // Desactivar modo picking
+      setCodigoBarrasInput("");
+      // Si no hay artículos en el detalle, agregar una línea vacía para el modo manual
+      if (detalle.length === 0) {
+        setDetalle([{ articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null, descuentoPorcentaje: 0, descuentoFijo: 0 }]);
+      }
+    }
+  }
+
   return (
     <>
       <Dialog open={open} onOpenChange={(newOpen) => {
@@ -626,7 +781,65 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                   <TabsTrigger value="verificacion">Verificación</TabsTrigger>
                 </TabsList>
                               <TabsContent value="detalle">
-                <div className="mb-2">Agrega artículos, cantidad y precio:</div>
+                <div className="mb-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span>Agrega artículos, cantidad y precio:</span>
+                    <Button
+                      type="button"
+                      variant={modoPicking ? "destructive" : "outline"}
+                      size="sm"
+                      onClick={toggleModoPicking}
+                      className="flex items-center gap-2"
+                    >
+                      {modoPicking ? (
+                        <>
+                          <X className="w-4 h-4" />
+                          Desactivar Picking
+                        </>
+                      ) : (
+                        <>
+                          <Scan className="w-4 h-4" />
+                          Activar Picking
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {modoPicking && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Scan className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm font-medium text-blue-800">Modo Picking Activo</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={pickingInputRef}
+                          type="text"
+                          className="flex-1 border border-blue-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Escanee el código de barras..."
+                          value={codigoBarrasInput}
+                          onChange={handleCodigoBarrasChange}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAgregarCodigoBarras();
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleAgregarCodigoBarras}
+                          disabled={!codigoBarrasInput.trim()}
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          Agregar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <div className="overflow-visible">
                   <table className="w-full text-sm border mb-2">
                   <thead>

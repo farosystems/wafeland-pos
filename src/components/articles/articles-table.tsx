@@ -58,6 +58,22 @@ export function ArticlesTable({ data, onEdit, onNewArticle }: ArticlesTableProps
       cell: ({ row }) => <div>{row.getValue("descripcion")}</div>,
     },
     {
+      accessorKey: "precio_costo",
+      header: "Precio Costo",
+      cell: ({ row }) => {
+        const costo = parseFloat(row.getValue("precio_costo"));
+        return <div>{formatCurrency(costo, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</div>;
+      },
+    },
+    {
+      accessorKey: "mark_up",
+      header: "Mark Up (%)",
+      cell: ({ row }) => {
+        const markup = parseFloat(row.getValue("mark_up"));
+        return <div>{markup}%</div>;
+      },
+    },
+    {
       accessorKey: "precio_unitario",
       header: "Precio Unitario",
       cell: ({ row }) => {
@@ -91,6 +107,17 @@ export function ArticlesTable({ data, onEdit, onNewArticle }: ArticlesTableProps
       cell: ({ row }) => <div>{row.getValue("marca_nombre") || "-"}</div>,
     },
     {
+      accessorKey: "rentabilidad",
+      header: "Rentabilidad (%)",
+      cell: ({ row }) => {
+        const precioUnitario = parseFloat(row.getValue("precio_unitario"));
+        const precioCosto = parseFloat(row.getValue("precio_costo"));
+        if (!precioCosto || isNaN(precioCosto) || precioCosto === 0) return "-";
+        const rentabilidad = ((precioUnitario - precioCosto) / precioCosto) * 100;
+        return <div>{rentabilidad.toFixed(2)}%</div>;
+      },
+    },
+    {
       id: "actions",
       header: "Acciones",
       cell: ({ row }) => (
@@ -122,26 +149,29 @@ export function ArticlesTable({ data, onEdit, onNewArticle }: ArticlesTableProps
 
   return (
     <div className="w-full">
-      <div className="flex items-center py-4">
-        <Input
-          placeholder="Filtrar por descripción..."
-          value={(table.getColumn("descripcion")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("descripcion")?.setFilterValue(event.target.value)
-          }
-          className="max-w-sm mr-2"
-        />
-        <Input
-          placeholder="Filtrar por agrupador..."
-          value={(table.getColumn("agrupador_nombre")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("agrupador_nombre")?.setFilterValue(event.target.value)
-          }
-          className="max-w-sm"
-        />
-        
+      <div className="flex items-center justify-between py-4">
+        {/* Campos de filtro */}
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Filtrar por descripción..."
+            value={(table.getColumn("descripcion")?.getFilterValue() as string) ?? ""}
+            onChange={(event) =>
+              table.getColumn("descripcion")?.setFilterValue(event.target.value)
+            }
+            className="max-w-sm"
+          />
+          <Input
+            placeholder="Filtrar por agrupador..."
+            value={(table.getColumn("agrupador_nombre")?.getFilterValue() as string) ?? ""}
+            onChange={(event) =>
+              table.getColumn("agrupador_nombre")?.setFilterValue(event.target.value)
+            }
+            className="max-w-sm"
+          />
+        </div>
+
         {/* Botones de acción */}
-        <div className="flex items-center gap-2 ml-8">
+        <div className="flex items-center gap-2">
           {onNewArticle && (
             <Button onClick={onNewArticle}>
               <Plus className="mr-2 h-4 w-4" />

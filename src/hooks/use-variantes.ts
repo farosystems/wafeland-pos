@@ -10,10 +10,14 @@ export function useVariantes() {
   const fetchVariantes = React.useCallback(async () => {
     setLoading(true);
     try {
+      console.log('🔄 Fetching variantes...');
       const data = await getVariantes();
+      console.log('✅ Variantes fetched:', data.length);
+      console.log('📋 Variantes con códigos de barras:', data.filter(v => v.codigo_barras).length);
       setVariantes(data);
       setError(null);
     } catch (e: any) {
+      console.error('❌ Error fetching variantes:', e);
       setError(e.message || "Error al cargar variantes");
     } finally {
       setLoading(false);

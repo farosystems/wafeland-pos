@@ -298,7 +298,15 @@ export default function StockFaltantePage() {
       const { subtotal, subtotalMenosDescuento, totalImpuestos, total } = calcularTotales();
       
       // Crear items de la orden
-      const items = [];
+      const items: {
+        fk_id_variante: number;
+        cantidad: number;
+        precio_unitario: number;
+        subtotal: number;
+        articulo_descripcion: string;
+        talle_descripcion: string;
+        color_descripcion: string;
+      }[] = [];
       
       variantesConStockFaltante.forEach(variante => {
         if (selectedVariantes.has(variante.id)) {
@@ -311,9 +319,9 @@ export default function StockFaltantePage() {
             cantidad,
             precio_unitario: precio,
             subtotal: precio * cantidad,
-            articulo_descripcion: variante.articulo_descripcion,
-            talle_descripcion: variante.talle_descripcion,
-            color_descripcion: variante.color_descripcion,
+            articulo_descripcion: variante.articulo_descripcion ?? '',
+            talle_descripcion: variante.talle_descripcion ?? '',
+            color_descripcion: variante.color_descripcion ?? '',
           });
         }
       });
@@ -336,7 +344,7 @@ export default function StockFaltantePage() {
         total_impuestos: totalImpuestos,
         envio_almacenaje: envioAlmacenaje,
         total,
-        estado: 'generando',
+        estado: 'borrador' as const,
         notas,
         proveedor_razon_social: clientes.find(p => p.id === selectedProveedor)?.razon_social,
                  empresa_nombre: configEmpresa.nombre,
@@ -480,14 +488,14 @@ export default function StockFaltantePage() {
                       <div 
                         className="w-8 h-8 rounded-lg border-2 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
                         style={{ 
-                          backgroundColor: getColorHex(v.color_descripcion),
-                          borderColor: ['blanco', 'beige', 'crema', 'amarillo claro', 'rosa claro', 'celeste'].includes(v.color_descripcion?.toLowerCase()) 
+                          backgroundColor: getColorHex(v.color_descripcion ?? ''),
+                          borderColor: ['blanco', 'beige', 'crema', 'amarillo claro', 'rosa claro', 'celeste'].includes(v.color_descripcion?.toLowerCase() ?? '') 
                             ? '#d1d5db' 
                             : '#e5e7eb'
                         }}
-                        title={`Color: ${v.color_descripcion}`}
+                        title={`Color: ${v.color_descripcion ?? ''}`}
                       />
-                      <span className="text-sm font-medium">{v.color_descripcion}</span>
+                      <span className="text-sm font-medium">{v.color_descripcion ?? ''}</span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -617,13 +625,13 @@ export default function StockFaltantePage() {
                               <div 
                                 className="w-6 h-6 rounded border shadow-sm"
                                 style={{ 
-                                  backgroundColor: getColorHex(variante.color_descripcion),
-                                  borderColor: ['blanco', 'beige', 'crema', 'amarillo claro', 'rosa claro', 'celeste'].includes(variante.color_descripcion?.toLowerCase()) 
+                                  backgroundColor: getColorHex(variante.color_descripcion ?? ''),
+                                  borderColor: ['blanco', 'beige', 'crema', 'amarillo claro', 'rosa claro', 'celeste'].includes(variante.color_descripcion?.toLowerCase() ?? '') 
                                     ? '#d1d5db' 
                                     : '#e5e7eb'
                                 }}
                               />
-                              <span className="text-sm">{variante.color_descripcion}</span>
+                              <span className="text-sm">{variante.color_descripcion ?? ''}</span>
                             </div>
                           </TableCell>
                           <TableCell>

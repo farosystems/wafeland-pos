@@ -4,7 +4,7 @@ export interface Usuario {
   email: string;
   telefono: string;
   password_hash: string;
-  rol: 'vendedor' | 'cobrador' | 'supervisor';
+  rol: 'admin' | 'vendedor' | 'cobrador' | 'supervisor';
   creado_el: string; // timestamp ISO
   prueba_gratis: boolean;
 }

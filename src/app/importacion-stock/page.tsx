@@ -8,11 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { IconUpload, IconFileSpreadsheet, IconDownload, IconCheck, IconAlertTriangle, IconArrowRight } from '@tabler/icons-react';
 import { BreadcrumbBar } from '@/components/BreadcrumbBar';
 import { generateStockTemplate, validateAndImportStock } from '@/utils/generateStockTemplate';
-import { Variante } from '@/types/variante';
+
 
 export default function ImportacionStockPage() {
   const { isSignedIn, isLoaded } = useUser();
@@ -23,7 +23,7 @@ export default function ImportacionStockPage() {
   const [templateGenerated, setTemplateGenerated] = useState(false);
   const [importingStock, setImportingStock] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
+
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorModalMessage, setErrorModalMessage] = useState('');
@@ -77,6 +77,7 @@ export default function ImportacionStockPage() {
 
     setGeneratingTemplate(true);
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const selectedVariantesData = variantes.filter(v => selectedVariantes.has(v.id)) as any[];
       await generateStockTemplate(selectedVariantesData);
       setTemplateGenerated(true);
@@ -99,7 +100,6 @@ export default function ImportacionStockPage() {
           file.name.endsWith('.xlsx') || 
           file.name.endsWith('.xls')) {
         setExcelFile(file);
-        setImportError(null);
       } else {
         setErrorModalMessage('Por favor selecciona un archivo Excel válido (.xlsx o .xls)');
         setShowErrorModal(true);
@@ -117,7 +117,6 @@ export default function ImportacionStockPage() {
     }
 
     setImportingStock(true);
-    setImportError(null);
 
     try {
       await validateAndImportStock(excelFile, variantes);
@@ -125,9 +124,12 @@ export default function ImportacionStockPage() {
       setExcelFile(null);
       // Recargar variantes para mostrar los cambios
       await fetchVariantes();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error importando stock:', error);
-      setErrorModalMessage(error.message || 'Error al importar el stock. Verifica el formato del archivo.');
+      const errorMessage = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' 
+        ? error.message 
+        : 'Error al importar el stock. Verifica el formato del archivo.';
+      setErrorModalMessage(errorMessage);
       setShowErrorModal(true);
     } finally {
       setImportingStock(false);
@@ -176,10 +178,22 @@ export default function ImportacionStockPage() {
             ¿Ya tienes un Excel con stock cargado?
           </CardTitle>
           <CardDescription>
-            Si ya completaste la plantilla Excel con los datos de stock, puedes subirla directamente aquí
+            Si ya completaste la plantilla Excel con los datos de stock, puedes subirla directamente aquí. El stock se sumará al stock actual existente.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <IconAlertTriangle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <h4 className="font-medium text-blue-800 mb-1">Información importante:</h4>
+                <p className="text-blue-700 text-sm">
+                  El stock que ingreses en el Excel se <strong>sumará</strong> al stock actual existente. 
+                  Si quieres reemplazar el stock, primero debes poner el stock actual en 0.
+                </p>
+              </div>
+            </div>
+          </div>
           <div className="flex items-center gap-4">
             <Input
               type="file"
@@ -216,7 +230,7 @@ export default function ImportacionStockPage() {
             Seleccionar Artículos
           </CardTitle>
           <CardDescription>
-            Selecciona los artículos que deseas incluir en la plantilla de importación de stock
+            Selecciona los artículos que deseas incluir en la plantilla de importación de stock. <strong>Importante:</strong> El stock que ingreses en el Excel se sumará al stock actual existente.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -393,7 +407,7 @@ export default function ImportacionStockPage() {
               <h4 className="font-medium text-green-800 mb-2">Próximos pasos:</h4>
               <ol className="text-sm text-green-700 space-y-1">
                 <li>1. Abre el archivo Excel descargado</li>
-                <li>2. Completa las columnas: stock_unitario, stock_minimo, stock_maximo</li>
+                <li>2. Completa las columnas: stock_unitario (se sumará al actual), stock_minimo, stock_maximo</li>
                 <li>3. Guarda el archivo</li>
                 <li>4. Regresa aquí para la etapa 2 de importación</li>
               </ol>
@@ -416,7 +430,7 @@ export default function ImportacionStockPage() {
               Stock Importado Exitosamente
             </DialogTitle>
             <DialogDescription>
-              Los datos de stock han sido actualizados correctamente en la base de datos.
+              Los datos de stock han sido sumados correctamente al stock existente en la base de datos.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -425,7 +439,8 @@ export default function ImportacionStockPage() {
               <ul className="text-sm text-green-700 space-y-1">
                 <li>• Validación del formato del archivo Excel</li>
                 <li>• Verificación de campos requeridos</li>
-                <li>• Actualización de stock_unitario, stock_minimo y stock_maximo</li>
+                <li>• Suma del stock_unitario al stock existente</li>
+                <li>• Actualización de stock_minimo y stock_maximo</li>
                 <li>• Recarga automática de datos</li>
               </ul>
             </div>

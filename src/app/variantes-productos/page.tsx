@@ -7,12 +7,13 @@ import { useColores } from "@/hooks/use-colores";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Edit, Trash, Plus, Palette } from "lucide-react";
+import { Edit, Trash, Plus, Palette, Printer } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Variante } from "@/types/variante";
 import { createMovimientoStock } from "@/services/movimientosStock";
 import { updateArticle } from "@/services/articles";
 import { getVariantes } from "@/services/variantes";
+import { BarcodeLabelGenerator } from "@/components/variantes/barcode-label-generator";
 
 // Función helper para obtener el color hexadecimal basado en el nombre del color
 const getColorHex = (colorName: string): string => {
@@ -165,6 +166,7 @@ export default function VariantesProductosPage() {
     stock_maximo: 0,
     stockNuevo: 0,
     stockDescontar: 0,
+    codigo_barras: '',
   });
   const [errorForm, setErrorForm] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -174,6 +176,7 @@ export default function VariantesProductosPage() {
   const [editingStockId, setEditingStockId] = React.useState<number | null>(null);
   const [editingStockValue, setEditingStockValue] = React.useState<string>("");
   const [updatingStockId, setUpdatingStockId] = React.useState<number | null>(null);
+  const [showBarcodeGenerator, setShowBarcodeGenerator] = React.useState(false);
 
   // Filtro
   const variantesFiltradas = variantes.filter(v =>
@@ -186,10 +189,64 @@ export default function VariantesProductosPage() {
   const variantesPaginadas = variantesFiltradas.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
   const totalPages = Math.ceil(variantesFiltradas.length / rowsPerPage);
 
+  // Función para generar código de barras automáticamente
+  const generarCodigoBarras = () => {
+    if (form.fk_id_articulo && form.fk_id_talle && form.fk_id_color) {
+      const codigo = `SOL-${form.fk_id_articulo.toString().padStart(3, '0')}-${form.fk_id_talle.toString().padStart(2, '0')}-${form.fk_id_color.toString().padStart(2, '0')}`;
+      setForm(f => ({ ...f, codigo_barras: codigo }));
+    }
+  };
+
+  // Generar código automáticamente cuando se seleccionan todos los campos
+  React.useEffect(() => {
+    if (form.fk_id_articulo && form.fk_id_talle && form.fk_id_color && !form.codigo_barras) {
+      generarCodigoBarras();
+    }
+  }, [form.fk_id_articulo, form.fk_id_talle, form.fk_id_color]);
+
+  // Función para generar códigos de barras faltantes masivamente
+  const generarCodigosFaltantes = async () => {
+    const variantesSinCodigo = variantes.filter(v => !v.codigo_barras);
+    
+    if (variantesSinCodigo.length === 0) {
+      alert('Todas las variantes ya tienen códigos de barras asignados');
+      return;
+    }
+
+    if (!confirm(`¿Generar códigos de barras para ${variantesSinCodigo.length} variantes sin código?`)) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      for (const variante of variantesSinCodigo) {
+        const codigo = `SOL-${variante.fk_id_articulo.toString().padStart(3, '0')}-${variante.fk_id_talle.toString().padStart(2, '0')}-${variante.fk_id_color.toString().padStart(2, '0')}`;
+        
+        await editVariante(variante.id, {
+          stock_unitario: variante.stock_unitario,
+          stock_minimo: variante.stock_minimo,
+          stock_maximo: variante.stock_maximo,
+          fk_id_talle: variante.fk_id_talle,
+          fk_id_color: variante.fk_id_color,
+          codigo_barras: codigo,
+        });
+      }
+      
+      await fetchVariantes();
+      alert(`Se generaron códigos de barras para ${variantesSinCodigo.length} variantes`);
+    } catch (error) {
+      console.error('Error generando códigos:', error);
+      alert('Error al generar códigos de barras');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Abrir dialog para crear o editar
   const openNew = () => {
     setEditing(null);
-    setForm({ fk_id_articulo: 0, fk_id_talle: 0, fk_id_color: 0, stock_unitario: 0, stock_minimo: 0, stock_maximo: 0, stockNuevo: 0, stockDescontar: 0 });
+    setForm({ fk_id_articulo: 0, fk_id_talle: 0, fk_id_color: 0, stock_unitario: 0, stock_minimo: 0, stock_maximo: 0, stockNuevo: 0, stockDescontar: 0, codigo_barras: '' });
     setShowDialog(true);
   };
   const openEdit = (v: Variante) => {
@@ -203,6 +260,7 @@ export default function VariantesProductosPage() {
       stock_maximo: v.stock_maximo ?? 0,
       stockNuevo: 0,
       stockDescontar: 0,
+      codigo_barras: v.codigo_barras || '',
     });
     setShowDialog(true);
   };
@@ -223,6 +281,17 @@ export default function VariantesProductosPage() {
       setErrorForm("El stock máximo no puede ser menor que el stock mínimo");
       return;
     }
+
+    // Validar código de barras único (solo si se proporciona)
+    if (form.codigo_barras && form.codigo_barras.trim()) {
+      const codigoExistente = variantes.find(v => 
+        v.codigo_barras === form.codigo_barras && v.id !== editing?.id
+      );
+      if (codigoExistente) {
+        setErrorForm("Este código de barras ya está asignado a otra variante");
+        return;
+      }
+    }
     
     setIsSubmitting(true);
     setErrorForm("");
@@ -238,6 +307,7 @@ export default function VariantesProductosPage() {
           stock_maximo: form.stock_maximo,
           fk_id_talle: form.fk_id_talle,
           fk_id_color: form.fk_id_color,
+          codigo_barras: form.codigo_barras,
         });
         // Registrar movimiento de stock
         if (form.stockNuevo !== 0) {
@@ -270,6 +340,7 @@ export default function VariantesProductosPage() {
           stock_unitario: newStock,
           stock_minimo: form.stock_minimo,
           stock_maximo: form.stock_maximo,
+          codigo_barras: form.codigo_barras,
         });
         if (form.stockNuevo > 0) {
           await createMovimientoStock({
@@ -427,14 +498,31 @@ export default function VariantesProductosPage() {
         <div className="flex gap-2 items-center">
           <Input placeholder="Filtrar por artículo, talle o color..." value={filter} onChange={e => setFilter(e.target.value)} className="max-w-xs" />
         </div>
-        <Button 
-          onClick={openNew} 
-          className="bg-primary hover:bg-primary/90"
-          disabled={isSubmitting || deletingId !== null || editingStockId !== null || updatingStockId !== null}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Nueva variante
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={openNew} 
+            className="bg-primary hover:bg-primary/90"
+            disabled={isSubmitting || deletingId !== null || editingStockId !== null || updatingStockId !== null}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Nueva variante
+          </Button>
+          <Button 
+            onClick={generarCodigosFaltantes}
+            variant="outline"
+            disabled={isSubmitting || deletingId !== null || editingStockId !== null || updatingStockId !== null}
+          >
+            Generar Códigos Faltantes
+          </Button>
+          <Button 
+            onClick={() => setShowBarcodeGenerator(true)}
+            variant="outline"
+            disabled={isSubmitting || deletingId !== null || editingStockId !== null || updatingStockId !== null}
+          >
+            <Printer className="mr-2 h-4 w-4" />
+            Generar Etiquetas
+          </Button>
+        </div>
       </div>
       <div className="rounded-lg border bg-card p-4">
         <div className="mb-4 flex flex-wrap gap-4 text-xs">
@@ -458,6 +546,7 @@ export default function VariantesProductosPage() {
               <TableHead>Artículo</TableHead>
               <TableHead>Talle</TableHead>
               <TableHead>Color</TableHead>
+              <TableHead>Código de Barras</TableHead>
               <TableHead>Stock unitario</TableHead>
               <TableHead>Stock mínimo</TableHead>
               <TableHead>Stock máximo</TableHead>
@@ -466,7 +555,7 @@ export default function VariantesProductosPage() {
           </TableHeader>
           <TableBody>
             {variantesPaginadas.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center">No hay variantes.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center">No hay variantes.</TableCell></TableRow>
             ) : variantesPaginadas.map(v => (
               <TableRow key={v.id}>
                 <TableCell>{v.id}</TableCell>
@@ -477,14 +566,38 @@ export default function VariantesProductosPage() {
                      <div 
                        className="w-8 h-8 rounded-lg border-2 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
                        style={{ 
-                         backgroundColor: getColorHex(v.color_descripcion),
-                         borderColor: ['blanco', 'beige', 'crema', 'amarillo claro', 'rosa claro', 'celeste'].includes(v.color_descripcion?.toLowerCase()) 
+                         backgroundColor: getColorHex(v.color_descripcion ?? ''),
+                         borderColor: ['blanco', 'beige', 'crema', 'amarillo claro', 'rosa claro', 'celeste'].includes(v.color_descripcion?.toLowerCase() ?? '') 
                            ? '#d1d5db' 
                            : '#e5e7eb'
                        }}
-                       title={`Color: ${v.color_descripcion}`}
+                       title={`Color: ${v.color_descripcion ?? ''}`}
                      />
-                     <span className="text-sm font-medium">{v.color_descripcion}</span>
+                     <span className="text-sm font-medium">{v.color_descripcion ?? ''}</span>
+                   </div>
+                 </TableCell>
+                 <TableCell>
+                   <div className="text-sm font-mono">
+                     {v.codigo_barras ? (
+                       <div className="flex items-center gap-2">
+                         <span className="px-2 py-1 bg-gray-100 rounded text-xs">
+                           {v.codigo_barras}
+                         </span>
+                         <Button
+                           variant="ghost"
+                           size="sm"
+                           onClick={() => navigator.clipboard.writeText(v.codigo_barras!)}
+                           className="h-6 w-6 p-0"
+                           title="Copiar código"
+                         >
+                           <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                           </svg>
+                         </Button>
+                       </div>
+                     ) : (
+                       <span className="text-gray-400 text-xs">Sin código</span>
+                     )}
                    </div>
                  </TableCell>
                 <TableCell>
@@ -663,6 +776,30 @@ export default function VariantesProductosPage() {
                    <div className="text-red-600 text-xs mt-1">El stock máximo debe ser mayor o igual al stock mínimo</div>
                  )}
                </div>
+               <div>
+                 <label className="block text-sm font-medium mb-1">Código de Barras</label>
+                 <div className="flex gap-2">
+                   <Input
+                     type="text"
+                     value={form.codigo_barras}
+                     onChange={e => setForm(f => ({ ...f, codigo_barras: e.target.value }))}
+                     placeholder="Ingrese código o escanee"
+                     maxLength={50}
+                   />
+                   <Button 
+                     type="button" 
+                     onClick={generarCodigoBarras}
+                     variant="outline"
+                     disabled={!form.fk_id_articulo || !form.fk_id_talle || !form.fk_id_color}
+                     className="whitespace-nowrap"
+                   >
+                     Generar
+                   </Button>
+                 </div>
+                 <div className="text-xs text-muted-foreground mt-1">
+                   Deje vacío para generar automáticamente o ingrese manualmente
+                 </div>
+               </div>
               {editing && (
                 <>
                   <div>
@@ -756,6 +893,14 @@ export default function VariantesProductosPage() {
       </Dialog>
 
       {error && <div className="text-red-600 text-xs mt-2">{error}</div>}
+
+      {/* Generador de etiquetas de códigos de barras */}
+      {showBarcodeGenerator && (
+        <BarcodeLabelGenerator
+          variantes={variantes}
+          onClose={() => setShowBarcodeGenerator(false)}
+        />
+      )}
     </div>
   );
 } 

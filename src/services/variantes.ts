@@ -4,6 +4,7 @@ import { createMovimientoStock } from "@/services/movimientosStock";
 import { updateArticle } from "@/services/articles";
 
 export async function getVariantes(): Promise<Variante[]> {
+  console.log('🔄 getVariantes: Iniciando consulta...');
   const { data, error } = await supabase
     .from("variantes-articulos")
     .select(`*,
@@ -12,8 +13,16 @@ export async function getVariantes(): Promise<Variante[]> {
       color:fk_id_color(descripcion)
     `)
     .order("id", { ascending: true });
-  if (error) throw error;
-  return (data as any[]).map(v => ({
+  
+  if (error) {
+    console.error('❌ Error en getVariantes:', error);
+    throw error;
+  }
+  
+  console.log('✅ getVariantes: Datos obtenidos:', data?.length || 0);
+  console.log('📋 getVariantes: Variantes con códigos de barras:', data?.filter((v: any) => v.codigo_barras).length || 0);
+  
+  const mappedData = (data as any[]).map(v => ({
     ...v,
     stock_minimo: v.stock_minimo ?? 0,
     stock_maximo: v.stock_maximo ?? 0,
@@ -25,6 +34,9 @@ export async function getVariantes(): Promise<Variante[]> {
     talle_descripcion: v.talle?.descripcion || '',
     color_descripcion: v.color?.descripcion || '',
   })) as Variante[];
+  
+  console.log('✅ getVariantes: Datos mapeados:', mappedData.length);
+  return mappedData;
 }
 
 export async function addVariante(variante: CreateVarianteData): Promise<Variante> {

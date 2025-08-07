@@ -15,6 +15,8 @@ import { getUsuarios } from "@/services/usuarios";
 import { getTiposComprobantes } from "@/services/tiposComprobantes";
 import { getCuentasTesoreria } from "@/services/cuentasTesoreria";
 import { getArticles } from "@/services/articles";
+import { getTalles } from "@/services/talles";
+import { getColores } from "@/services/colores";
 import { createOrdenVenta } from "@/services/ordenesVenta";
 import { createOrdenVentaDetalle } from "@/services/ordenesVentaDetalle";
 import { createOrdenVentaMediosPago } from "@/services/ordenesVentaMediosPago";
@@ -27,6 +29,8 @@ import { Usuario } from "@/types/usuario";
 import { TipoComprobante } from "@/types/tipoComprobante";
 import { CuentaTesoreria } from "@/types/cuentaTesoreria";
 import { Article } from "@/types/article";
+import { Talle } from "@/types/talle";
+import { Color } from "@/types/color";
 import { OrdenVenta, OrdenVentaDetalle } from "@/types/ordenVenta";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -47,6 +51,8 @@ interface DetalleLinea {
   precio: number;
   subtotal: number;
   input: string;
+  talle: number | null;
+  color: number | null;
 }
 
 export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, ventaAAnular }: NotaCreditoDialogProps) {
@@ -55,6 +61,8 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
   const [tiposComprobantes, setTiposComprobantes] = useState<TipoComprobante[]>([]);
   const [cuentasTesoreria, setCuentasTesoreria] = useState<CuentaTesoreria[]>([]);
   const [articulos, setArticulos] = useState<Article[]>([]);
+  const [talles, setTalles] = useState<Talle[]>([]);
+  const [colores, setColores] = useState<Color[]>([]);
   const [loading, setLoading] = useState(true);
   const [detalleOriginal, setDetalleOriginal] = useState<OrdenVentaDetalle[]>([]);
   const { checkTrial } = useTrialCheck();
@@ -69,13 +77,17 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
         getTiposComprobantes(),
         getCuentasTesoreria(),
         getArticles(),
+        getTalles(),
+        getColores(),
         getOrdenesVentaDetalle(ventaAAnular.id),
-      ]).then(([c, u, tc, ct, a, detalle]) => {
+      ]).then(([c, u, tc, ct, a, t, col, detalle]) => {
         setClientes(c);
         setUsuarios(u);
         setTiposComprobantes(tc);
         setCuentasTesoreria(ct);
         setArticulos(a);
+        setTalles(t);
+        setColores(col);
         setDetalleOriginal(detalle);
         setLoading(false);
       });
@@ -98,6 +110,8 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
           precio: d.precio_unitario,
           subtotal: d.cantidad * d.precio_unitario,
           input: articulo?.descripcion || "",
+          talle: d.fk_id_talle || null,
+          color: d.fk_id_color || null,
         };
       });
       setDetalle(detalleCargado);
@@ -134,6 +148,10 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
       } else if (field === "input") {
         nuevo[idx].input = String(value);
         setShowSugerencias(idx);
+      } else if (field === "talle") {
+        nuevo[idx].talle = Number(value) || null;
+      } else if (field === "color") {
+        nuevo[idx].color = Number(value) || null;
       }
       nuevo[idx].subtotal = nuevo[idx].cantidad * nuevo[idx].precio;
       return nuevo;
@@ -148,7 +166,7 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
   }
 
   function agregarLinea() {
-    setDetalle(detalle => [...detalle, { articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "" }]);
+    setDetalle(detalle => [...detalle, { articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null }]);
     setTimeout(() => {
       const idx = detalle.length;
       if (inputRefs.current[idx]) inputRefs.current[idx]?.focus();
@@ -265,12 +283,22 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
       const totalNotaCredito = detalle.reduce((acc, d) => acc + (d.cantidad && d.precio ? d.cantidad * d.precio : 0), 0);
       const hoy = format(new Date(), "yyyy-MM-dd");
 
+      // Buscar el tipo de comprobante "NOTA DE CREDITO"
+      const tipoNotaCredito = tiposComprobantes.find(tc => 
+        tc.descripcion.toUpperCase().includes('NOTA DE CREDITO') || 
+        tc.descripcion.toUpperCase().includes('NOTA DE CRÉDITO')
+      );
+      
+      if (!tipoNotaCredito) {
+        throw new Error('No se encontró el tipo de comprobante "NOTA DE CREDITO" en la base de datos');
+      }
+
       // Crear la nota de crédito (total negativo)
       const notaCredito = await createOrdenVenta({
         fk_id_entidades: clienteSeleccionado,
         fk_id_usuario: usuarioSeleccionado,
         fk_id_lote: loteAbierto,
-        fk_id_tipo_comprobante: 2, // NOTA DE CREDITO
+        fk_id_tipo_comprobante: tipoNotaCredito.id, // ID dinámico del tipo de comprobante
         fecha: hoy,
         total: -totalNotaCredito, // Total negativo
         subtotal: -totalNotaCredito, // Subtotal negativo
@@ -285,6 +313,8 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
             fk_id_articulo: d.articulo.id,
             cantidad: d.cantidad,
             precio_unitario: d.precio,
+            fk_id_talle: d.talle,
+            fk_id_color: d.color,
           });
 
           // Registrar movimiento de stock (NOTA DE CREDITO)
@@ -294,6 +324,8 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
             origen: "NOTA DE CREDITO",
             tipo: "entrada",
             cantidad: Math.abs(d.cantidad),
+            fk_id_talle: d.talle,
+            fk_id_color: d.color,
           });
         }
       }
@@ -397,11 +429,13 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
               </TabsContent>
 
               <TabsContent value="detalle">
-                <div className="mb-2">Artículos de la venta original (puedes modificar cantidades):</div>
+                <div className="mb-2">Artículos de la venta original (puedes modificar cantidades, talles y colores):</div>
                 <table className="min-w-full text-sm border mb-2">
                   <thead>
                     <tr className="bg-gray-100">
                       <th className="px-2 py-1">Artículo</th>
+                      <th className="px-2 py-1">Talle</th>
+                      <th className="px-2 py-1">Color</th>
                       <th className="px-2 py-1">Cantidad</th>
                       <th className="px-2 py-1">Precio</th>
                       <th className="px-2 py-1">Subtotal</th>
@@ -439,6 +473,30 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
                               </div>
                             )}
                           </div>
+                        </td>
+                        <td className="px-2 py-1">
+                          <select
+                            className="w-full border rounded px-2 py-1 text-sm"
+                            value={d.talle || ""}
+                            onChange={e => handleDetalleChange(idx, "talle", e.target.value)}
+                          >
+                            <option value="">Seleccionar talle</option>
+                            {talles.map(t => (
+                              <option key={t.id} value={t.id}>{t.descripcion}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-2 py-1">
+                          <select
+                            className="w-full border rounded px-2 py-1 text-sm"
+                            value={d.color || ""}
+                            onChange={e => handleDetalleChange(idx, "color", e.target.value)}
+                          >
+                            <option value="">Seleccionar color</option>
+                            {colores.map(c => (
+                              <option key={c.id} value={c.id}>{c.descripcion}</option>
+                            ))}
+                          </select>
                         </td>
                         <td className="px-2 py-1">
                           <input
@@ -567,19 +625,26 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
                   </div>
                   <div>
                     <label className="block mb-1 font-medium">Total a devolver</label>
-                    <div className="border rounded px-2 py-1 bg-gray-50 font-bold text-red-600">${formatCurrency(total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</div>
+                    <div className="border rounded px-2 py-1 bg-gray-50 font-bold text-red-600">{formatCurrency(total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</div>
                   </div>
                 </div>
 
                 <div className="mb-4">
                   <div className="font-semibold text-sm mb-2">Artículos a reingresar ({detalle.filter(d => d.articulo && d.cantidad > 0).length}):</div>
                   <div className="border rounded p-2 bg-gray-50 max-h-32 overflow-y-auto">
-                    {detalle.filter(d => d.articulo && d.cantidad > 0).map((d, idx) => (
-                      <div key={idx} className="flex justify-between text-sm py-1">
-                        <span>{d.articulo?.descripcion}</span>
-                        <span>{d.cantidad} x ${d.precio.toFixed(2)} = ${d.subtotal.toFixed(2)}</span>
-                      </div>
-                    ))}
+                    {detalle.filter(d => d.articulo && d.cantidad > 0).map((d, idx) => {
+                      const talleDesc = talles.find(t => t.id === d.talle)?.descripcion || "Sin talle";
+                      const colorDesc = colores.find(c => c.id === d.color)?.descripcion || "Sin color";
+                      return (
+                        <div key={idx} className="flex justify-between text-sm py-1">
+                          <div>
+                            <span className="font-medium">{d.articulo?.descripcion}</span>
+                            <span className="text-gray-600 ml-2">({talleDesc} - {colorDesc})</span>
+                          </div>
+                          <span>{d.cantidad} x {formatCurrency(d.precio, DEFAULT_CURRENCY, DEFAULT_LOCALE)} = {formatCurrency(d.subtotal, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
+                        </div>
+                      );
+                    })}
                     {detalle.filter(d => d.articulo && d.cantidad > 0).length === 0 && (
                       <div className="text-gray-500 text-sm">No hay artículos para reingresar</div>
                     )}
@@ -592,7 +657,7 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
                     {mediosPago.filter(m => m.cuenta && m.monto > 0).map((m, idx) => (
                       <div key={idx} className="flex justify-between text-sm py-1">
                         <span>{m.cuenta?.descripcion}</span>
-                        <span>${m.monto.toFixed(2)}</span>
+                        <span>{formatCurrency(m.monto, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
                       </div>
                     ))}
                     {mediosPago.filter(m => m.cuenta && m.monto > 0).length === 0 && (
@@ -602,11 +667,11 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
                       <div className="border-t pt-2 mt-2">
                         <div className="flex justify-between font-semibold">
                           <span>Total medios de cobro:</span>
-                          <span>${sumaMediosPago.toFixed(2)}</span>
+                          <span>{formatCurrency(sumaMediosPago, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>Total a devolver:</span>
-                          <span>${total.toFixed(2)}</span>
+                          <span>{formatCurrency(total, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
                         </div>
                         <div className={`flex justify-between text-sm ${diferenciaMediosPago === 0 ? 'text-green-600' : 'text-red-600'}`}>
                           <span>Diferencia:</span>

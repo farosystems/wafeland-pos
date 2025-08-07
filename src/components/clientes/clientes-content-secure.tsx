@@ -36,7 +36,7 @@ export function ClientesContentSecure() {
   const [paginaActual, setPaginaActual] = useState(1);
   const CLIENTES_POR_PAGINA = 10;
   const { checkTrial } = useTrialCheck();
-  const [showTrialEnded, setShowTrialEnded] = useState(false);
+  const [, setShowTrialEnded] = useState(false);
 
   // Memoizar clientes filtrados
   const clientesFiltrados = useMemo(() => {
@@ -398,7 +398,7 @@ export function ClientesContentSecure() {
                 </label>
                 <select
                   value={form.tipo}
-                  onChange={(e) => setForm({ ...form, tipo: e.target.value })}
+                  onChange={(e) => setForm({ ...form, tipo: e.target.value as "cliente" | "proveedor" })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="cliente">Cliente</option>
@@ -425,7 +425,7 @@ export function ClientesContentSecure() {
                 </label>
                 <select
                   value={form.tipo_doc}
-                  onChange={(e) => setForm({ ...form, tipo_doc: e.target.value })}
+                  onChange={(e) => setForm({ ...form, tipo_doc: e.target.value as "dni" | "cuit" | "cuil" })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="dni">DNI</option>
@@ -465,7 +465,7 @@ export function ClientesContentSecure() {
                 </label>
                 <select
                   value={form.categoria_iva}
-                  onChange={(e) => setForm({ ...form, categoria_iva: e.target.value })}
+                  onChange={(e) => setForm({ ...form, categoria_iva: e.target.value as "Consumidor Final" | "Responsable Inscripto" | "Responsable Monotributo" | "Exento" | "No Responsable" | "Sujeto no Categorizado" })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="Consumidor Final">Consumidor Final</option>

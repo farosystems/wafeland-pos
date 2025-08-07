@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Package, Loader2 } from "lucide-react";
+import { Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,16 +23,16 @@ export function ArticlesContentSecure() {
   const { isSignedIn } = useUser();
   const {
     articles,
-    loading,
     error,
     addArticle,
     editArticle,
-    fetchArticles,
   } = useArticlesSecure();
 
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editingArticle, setEditingArticle] = React.useState<Article | undefined>();
   const [isLoading, setIsLoading] = React.useState(false);
+  const [showPermErrorModal, setShowPermErrorModal] = React.useState(false);
+  const [permErrorMsg, setPermErrorMsg] = React.useState("");
 
   const openCreateDialog = () => {
     setEditingArticle(undefined);
@@ -62,7 +62,13 @@ export function ArticlesContentSecure() {
       closeDialog();
     } catch (error) {
       console.error("Error al guardar artículo:", error);
-      toast.error((error as Error).message || "Error al guardar artículo");
+      const msg = (error as Error).message || "Error al guardar artículo";
+      if (msg.includes("No tienes permisos para actualizar artículos")) {
+        setPermErrorMsg("No tienes permisos para actualizar artículos. Consulta con un administrador.");
+        setShowPermErrorModal(true);
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -97,32 +103,28 @@ export function ArticlesContentSecure() {
 
       {/* Tabs para diferentes secciones */}
       <div className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Artículos */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-sm border">
-              <div className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Artículos</h2>
-                <ArticlesTable 
-                  data={articles} 
-                  onEdit={openEditDialog}
-                  onNewArticle={openCreateDialog}
-                />
-              </div>
+        {/* Artículos */}
+        <div className="bg-white rounded-lg shadow-sm border">
+          <div className="p-6">
+            <h2 className="text-xl font-semibold mb-4">Artículos</h2>
+            <ArticlesTable 
+              data={articles} 
+              onEdit={openEditDialog}
+              onNewArticle={openCreateDialog}
+            />
+          </div>
+        </div>
+
+        {/* Marcas y Agrupadores debajo de Artículos */}
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow-sm border">
+            <div className="p-6">
+              <MarcasContent />
             </div>
           </div>
-
-          {/* Marcas y Agrupadores */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm border">
-              <div className="p-6">
-                <MarcasContent />
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow-sm border">
-              <div className="p-6">
-                <AgrupadoresContent />
-              </div>
+          <div className="bg-white rounded-lg shadow-sm border">
+            <div className="p-6">
+              <AgrupadoresContent />
             </div>
           </div>
         </div>
@@ -148,6 +150,18 @@ export function ArticlesContentSecure() {
             onCancel={closeDialog}
             isLoading={isLoading}
           />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPermErrorModal} onOpenChange={setShowPermErrorModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Error de permisos</DialogTitle>
+            <DialogDescription>{permErrorMsg}</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end mt-4">
+            <Button onClick={() => setShowPermErrorModal(false)}>Cerrar</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

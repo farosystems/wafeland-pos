@@ -28,6 +28,8 @@ const articleSchema = z.object({
   fk_id_agrupador: z.union([z.string(), z.number()]).transform(Number).refine(val => !isNaN(val) && val >= 1, { message: "El agrupador es requerido" }),
   fk_id_marca: z.union([z.string(), z.number()]).transform(val => val === "" ? null : Number(val)).nullable(),
   activo: z.boolean(),
+  mark_up: z.union([z.string(), z.number()]).transform(val => val === '' ? 0 : Number(val)).refine(val => !isNaN(val) && val >= 0, { message: "El mark up debe ser mayor o igual a 0" }).optional(),
+  precio_costo: z.union([z.string(), z.number()]).transform(val => val === '' ? 0 : Number(val)).refine(val => !isNaN(val) && val >= 0, { message: "El precio de costo debe ser mayor o igual a 0" }).optional(),
 });
 
 // type ArticleFormValues = z.infer<typeof articleSchema>;
@@ -51,6 +53,8 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
       fk_id_agrupador: article?.fk_id_agrupador || 1,
       fk_id_marca: article?.fk_id_marca ?? null,
       activo: article?.activo ?? true,
+      mark_up: article?.mark_up ?? 0,
+      precio_costo: article?.precio_costo ?? 0,
     },
   });
 
@@ -66,11 +70,42 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
       ...values,
       precio_unitario: Number(values.precio_unitario),
       fk_id_agrupador: Number(values.fk_id_agrupador),
+      mark_up: Number(values.mark_up),
+      precio_costo: Number(values.precio_costo),
     });
   };
 
   // Calcular stock total como sumatoria de variantes
   const stockTotal = article ? variantes.filter(v => v.fk_id_articulo === article.id).reduce((acc, v) => acc + v.stock_unitario, 0) : 0;
+
+  const [precioUnitarioManual, setPrecioUnitarioManual] = React.useState(false);
+
+  // Calcular rentabilidad
+  const precioCosto = form.watch('precio_costo');
+  const markUp = form.watch('mark_up');
+  const precioUnitario = form.watch('precio_unitario');
+  let rentabilidad = '-';
+  if (precioCosto && !isNaN(Number(precioCosto)) && Number(precioCosto) > 0 && precioUnitario && !isNaN(Number(precioUnitario))) {
+    rentabilidad = (((Number(precioUnitario) - Number(precioCosto)) / Number(precioCosto)) * 100).toFixed(2) + '%';
+  }
+
+  // Calcular precio unitario automáticamente si precio_costo y mark_up cambian y el usuario no lo editó manualmente
+  React.useEffect(() => {
+    if (!precioUnitarioManual && precioCosto !== undefined && markUp !== undefined && !isNaN(Number(precioCosto)) && !isNaN(Number(markUp))) {
+      const costo = Number(precioCosto);
+      const markup = Number(markUp);
+      if (costo > 0 && markup >= 0) {
+        const nuevoPrecio = (costo * (1 + markup / 100)).toFixed(2);
+        form.setValue('precio_unitario', nuevoPrecio);
+      }
+    }
+  }, [precioCosto, markUp]);
+
+  // Si el usuario edita el precio unitario manualmente, no recalcular automáticamente
+  const handlePrecioUnitarioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPrecioUnitarioManual(true);
+    form.setValue('precio_unitario', e.target.value);
+  };
 
     return (
     <Form {...form}>
@@ -98,13 +133,18 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
                 <FormItem>
                   <FormLabel>Precio Unitario</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                    <Input type="number" step="0.01" placeholder="0.00" {...field} onChange={handlePrecioUnitarioChange} />
                   </FormControl>
-                  <FormDescription>Precio unitario del artículo</FormDescription>
+                  <FormDescription>Precio unitario del artículo (se calcula automáticamente si completas costo y mark up, pero puedes modificarlo manualmente)</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            <div>
+              <label className="block text-sm font-medium mb-1">Rentabilidad (%)</label>
+              <Input type="text" value={rentabilidad} readOnly disabled className="bg-gray-100" />
+              <div className="text-xs text-muted-foreground mt-1">Rentabilidad calculada según precio de costo y unitario</div>
+            </div>
             <FormField
               control={form.control}
               name="fk_id_agrupador"
@@ -147,6 +187,34 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
                     </select>
                   </FormControl>
                   <FormDescription>Selecciona la marca del artículo</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="precio_costo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Precio Costo</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                  </FormControl>
+                  <FormDescription>Precio de costo del artículo</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="mark_up"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mark Up (%)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                  </FormControl>
+                  <FormDescription>Porcentaje de mark up aplicado al costo</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

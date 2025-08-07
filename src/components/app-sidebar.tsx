@@ -13,21 +13,26 @@ import {
   IconPalette,
   IconReportAnalytics,
   IconUpload,
+  IconShield,
 } from "@tabler/icons-react";
+import { Shield } from "lucide-react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { useUser } from "@clerk/nextjs";
 import { User } from "lucide-react";
 import React from "react";
 import { getUsuarios } from "@/services/usuarios";
+import { getModulosUsuario } from "@/services/permisos";
 import { Usuario } from "@/types/usuario";
+import { Modulo } from "@/types/permisos";
 import { usePathname } from "next/navigation";
-import { Card } from "@/components/ui/card";
+
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { getConfiguracionEmpresa, updateConfiguracionEmpresa, uploadLogoEmpresa, ConfiguracionEmpresa } from "@/services/configuracion";
 import { useColor } from "@/contexts/ColorContext";
+import { Home } from "lucide-react";
 
 // Paleta de colores para el selector
 const DATABASE_COLORS = [
@@ -46,7 +51,7 @@ const DATABASE_COLORS = [
 
 export function AppSidebar() {
   const { user, isSignedIn, isLoaded } = useUser();
-  const { selectedColor, setSelectedColor, config: colorConfig } = useColor();
+  const { selectedColor, setSelectedColor } = useColor();
   const [usuarioDB, setUsuarioDB] = React.useState<Usuario | null>(null);
   const [diasRestantes, setDiasRestantes] = React.useState<number | null>(null);
   const [stockOpen, setStockOpen] = React.useState(false);
@@ -56,12 +61,14 @@ export function AppSidebar() {
   const [sueldosOpen, setSueldosOpen] = React.useState(false);
   const [informesOpen, setInformesOpen] = React.useState(false);
   const [importacionesOpen, setImportacionesOpen] = React.useState(false);
+  const [seguridadOpen, setSeguridadOpen] = React.useState(false);
   const [config, setConfig] = React.useState<ConfiguracionEmpresa | null>(null);
   const [modalOpen, setModalOpen] = React.useState(false);
   const [nombreEmpresa, setNombreEmpresa] = React.useState("");
   const [logoFile, setLogoFile] = React.useState<File | null>(null);
   const [logoPreview, setLogoPreview] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const [modulosPermitidos, setModulosPermitidos] = React.useState<Modulo[]>([]);
   const pathname = usePathname();
 
   // Utilidades para saber si algún submenú está activo
@@ -72,6 +79,15 @@ export function AppSidebar() {
   const isSueldosActive = ["/liquidaciones", "/empleados"].includes(pathname);
   const isInformesActive = ["/stock-faltante"].includes(pathname);
   const isImportacionesActive = ["/importacion-stock"].includes(pathname);
+  const isSeguridadActive = ["/seguridad", "/seguridad/modulos"].includes(pathname);
+
+  // Función para verificar si un módulo está permitido
+  const isModuloPermitido = (nombreModulo: string): boolean => {
+    if (!usuarioDB || usuarioDB.rol === 'admin' || usuarioDB.rol === 'supervisor') {
+      return true; // Admins y supervisores ven todo
+    }
+    return modulosPermitidos.some(modulo => modulo.nombre === nombreModulo);
+  };
 
   React.useEffect(() => {
     function normalizeEmail(email?: string | null) {
@@ -82,6 +98,19 @@ export function AppSidebar() {
         const usuarios = await getUsuarios();
         const usuario = usuarios.find(u => normalizeEmail(u.email) === normalizeEmail(user.emailAddresses[0].emailAddress));
         setUsuarioDB(usuario || null);
+        
+        // Obtener módulos permitidos para el usuario
+        if (usuario) {
+          try {
+            const modulos = await getModulosUsuario(usuario.id);
+            setModulosPermitidos(modulos);
+          } catch (error) {
+            console.error("Error obteniendo módulos permitidos:", error);
+            // Si hay error, mostrar todos los módulos (fallback)
+            setModulosPermitidos([]);
+          }
+        }
+        
         if (usuario && usuario.prueba_gratis) {
           const creado = new Date(usuario.creado_el);
           const hoy = new Date();
@@ -192,192 +221,286 @@ export function AppSidebar() {
       
       <nav className="flex-1">
         <ul className="flex flex-col gap-1">
+          {/* Enlace a Home - siempre visible */}
           <li>
             <Link
-              href="/dashboard"
-              className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/dashboard" ? "bg-gray-200 text-black font-semibold w-[92%] ml-1" : "hover:bg-gray-100 text-black"}`}
+              href="/home"
+              className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/home" ? "bg-gray-200 text-black font-semibold w-[92%] ml-1" : "hover:bg-gray-100 text-black"}`}
               prefetch={false}
             >
-              <IconHome className="w-5 h-5" />
-              <span>Dashboard</span>
+              <Home className="w-5 h-5" />
+              <span>Inicio</span>
             </Link>
           </li>
+          
+          {isModuloPermitido('dashboard') && (
+            <li>
+              <Link
+                href="/dashboard"
+                className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/dashboard" ? "bg-gray-200 text-black font-semibold w-[92%] ml-1" : "hover:bg-gray-100 text-black"}`}
+                prefetch={false}
+              >
+                <IconHome className="w-5 h-5" />
+                <span>Dashboard</span>
+              </Link>
+            </li>
+          )}
           {/* Menú Stock desplegable */}
-          <li>
-            <button
-              type="button"
-              className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isStockActive ? "text-blue-600" : "text-gray-800"}`}
-              onClick={() => setStockOpen((v) => !v)}
-            >
-              <IconStack className={`w-5 h-5 ${isStockActive ? "text-blue-600" : ""}`} />
-              <span className="font-medium">Stock</span>
-              <svg className={`ml-auto w-4 h-4 transition-transform ${stockOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-            {stockOpen && (
-              <ul className="ml-8 mt-1 flex flex-col gap-1">
-                <li className={`${pathname === "/articles" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                  <Link
-                    href="/articles"
-                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/articles" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                    prefetch={false}
-                  >
-                    <IconPackage className="w-4 h-4" />
-                    <span>Productos</span>
-                  </Link>
-                </li>
-                <li className={`${pathname === "/talles-colores" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                  <Link
-                    href="/talles-colores"
-                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/talles-colores" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                    prefetch={false}
-                  >
-                    <IconPalette className="w-4 h-4" />
-                    <span>Talles y colores</span>
-                  </Link>
-                </li>
-                <li className={`${pathname === "/variantes-productos" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                  <Link
-                    href="/variantes-productos"
-                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/variantes-productos" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                    prefetch={false}
-                  >
-                    <IconStack className="w-4 h-4" />
-                    <span>Variantes de productos</span>
-                  </Link>
-                </li>
-                <li className={`${pathname === "/movimientos-stock" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                  <Link
-                    href="/movimientos-stock"
-                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/movimientos-stock" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                    prefetch={false}
-                  >
-                    <IconTransfer className="w-4 h-4" />
-                    <span>Movimientos de stock</span>
-                  </Link>
-                </li>
-              </ul>
-            )}
-          </li>
+          {(isModuloPermitido('articulos') || isModuloPermitido('talles-colores') || isModuloPermitido('variantes-productos') || isModuloPermitido('movimientos-stock')) && (
+            <li>
+              <button
+                type="button"
+                className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isStockActive ? "text-blue-600" : "text-gray-800"}`}
+                onClick={() => setStockOpen((v) => !v)}
+              >
+                <IconStack className={`w-5 h-5 ${isStockActive ? "text-blue-600" : ""}`} />
+                <span className="font-medium">Stock</span>
+                <svg className={`ml-auto w-4 h-4 transition-transform ${stockOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              {stockOpen && (
+                <ul className="ml-8 mt-1 flex flex-col gap-1">
+                  {isModuloPermitido('articulos') && (
+                    <li className={`${pathname === "/articles" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/articles"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/articles" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconPackage className="w-4 h-4" />
+                        <span>Productos</span>
+                      </Link>
+                    </li>
+                  )}
+                  {isModuloPermitido('talles-colores') && (
+                    <li className={`${pathname === "/talles-colores" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/talles-colores"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/talles-colores" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconPalette className="w-4 h-4" />
+                        <span>Talles y colores</span>
+                      </Link>
+                    </li>
+                  )}
+                  {isModuloPermitido('variantes-productos') && (
+                    <li className={`${pathname === "/variantes-productos" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/variantes-productos"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/variantes-productos" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconStack className="w-4 h-4" />
+                        <span>Variantes de productos</span>
+                      </Link>
+                    </li>
+                  )}
+                  {isModuloPermitido('movimientos-stock') && (
+                    <li className={`${pathname === "/movimientos-stock" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/movimientos-stock"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/movimientos-stock" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconTransfer className="w-4 h-4" />
+                        <span>Movimientos de stock</span>
+                      </Link>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </li>
+          )}
           {/* Menú Contactos desplegable */}
-          <li>
-            <button
-              type="button"
-              className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isContactosActive ? "text-blue-600" : "text-gray-800"}`}
-              onClick={() => setContactosOpen((v) => !v)}
-            >
-              <IconUsers className={`w-5 h-5 ${isContactosActive ? "text-blue-600" : ""}`} />
-              <span className="font-medium">Contactos</span>
-              <svg className={`ml-auto w-4 h-4 transition-transform ${contactosOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-            {contactosOpen && (
-              <ul className="ml-8 mt-1 flex flex-col gap-1">
-                <li className={`${pathname === "/clientes" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                  <Link
-                    href="/clientes"
-                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/clientes" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                    prefetch={false}
-                  >
-                    <IconCalendar className="w-4 h-4" />
-                    <span>Clientes/Proveedores</span>
-                  </Link>
-                </li>
-                <li className={`${pathname === "/usuarios" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                  <Link
-                    href="/usuarios"
-                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/usuarios" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                    prefetch={false}
-                  >
-                    <User className="w-4 h-4" />
-                    <span>Usuarios</span>
-                  </Link>
-                </li>
-              </ul>
-            )}
-          </li>
+          {(isModuloPermitido('clientes') || isModuloPermitido('usuarios')) && (
+            <li>
+              <button
+                type="button"
+                className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isContactosActive ? "text-blue-600" : "text-gray-800"}`}
+                onClick={() => setContactosOpen((v) => !v)}
+              >
+                <IconUsers className={`w-5 h-5 ${isContactosActive ? "text-blue-600" : ""}`} />
+                <span className="font-medium">Contactos</span>
+                <svg className={`ml-auto w-4 h-4 transition-transform ${contactosOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              {contactosOpen && (
+                <ul className="ml-8 mt-1 flex flex-col gap-1">
+                  {isModuloPermitido('clientes') && (
+                    <li className={`${pathname === "/clientes" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/clientes"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/clientes" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconCalendar className="w-4 h-4" />
+                        <span>Clientes/Proveedores</span>
+                      </Link>
+                    </li>
+                  )}
+                  {isModuloPermitido('usuarios') && (
+                    <li className={`${pathname === "/usuarios" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/usuarios"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/usuarios" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <User className="w-4 h-4" />
+                        <span>Usuarios</span>
+                      </Link>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </li>
+          )}
+          {/* Menú Seguridad desplegable - Solo para administradores */}
+          {usuarioDB?.rol === "admin" && (
+            <li>
+              <button
+                type="button"
+                className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isSeguridadActive ? "text-blue-600" : "text-gray-800"}`}
+                onClick={() => setSeguridadOpen((v) => !v)}
+              >
+                <IconShield className={`w-5 h-5 ${isSeguridadActive ? "text-blue-600" : ""}`} />
+                <span className="font-medium">Seguridad</span>
+                <svg className={`ml-auto w-4 h-4 transition-transform ${seguridadOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              {seguridadOpen && (
+                <ul className="ml-8 mt-1 flex flex-col gap-1">
+                  <li className={`${pathname === "/seguridad" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                    <Link
+                      href="/seguridad"
+                      className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/seguridad" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                      prefetch={false}
+                    >
+                      <IconShield className="w-4 h-4" />
+                      <span>Seguridad por Usuario</span>
+                    </Link>
+                  </li>
+                  <li className={`${pathname === "/seguridad/modulos" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                    <Link
+                      href="/seguridad/modulos"
+                      className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/seguridad/modulos" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                      prefetch={false}
+                    >
+                      <Shield className="w-4 h-4" />
+                      <span>Módulos</span>
+                    </Link>
+                  </li>
+                </ul>
+              )}
+            </li>
+          )}
           {/* Menú Ventas desplegable */}
-          <li>
-            <button
-              type="button"
-              className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isVentasActive ? "text-blue-600" : "text-gray-800"}`}
-              onClick={() => setVentasOpen((v) => !v)}
-            >
-              <IconTransfer className={`w-5 h-5 ${isVentasActive ? "text-blue-600" : ""}`} />
-              <span className="font-medium">Ventas</span>
-              <svg className={`ml-auto w-4 h-4 transition-transform ${ventasOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-            {ventasOpen && (
-              <ul className="ml-8 mt-1 flex flex-col gap-1">
-                <li className={`${pathname === "/ventas" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                  <Link
-                    href="/ventas"
-                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/ventas" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                    prefetch={false}
-                  >
-                    <IconTransfer className="w-4 h-4" />
-                    <span>Ventas</span>
-                  </Link>
-                </li>
-                {/* <li className={`${pathname === "/cuentas-corrientes" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                  <Link
-                    href="/cuentas-corrientes"
-                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/cuentas-corrientes" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                    prefetch={false}
-                  >
-                    <IconCash className="w-4 h-4" />
-                    <span>Cuentas corrientes</span>
-                  </Link>
-                </li>
-                <li className={`${pathname === "/pagos" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                  <Link
-                    href="/pagos"
-                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/pagos" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                    prefetch={false}
-                  >
-                    <IconCash className="w-4 h-4" />
-                    <span>Pagos</span>
-                  </Link>
-                </li> */}
-              </ul>
-            )}
-          </li>
+          {(isModuloPermitido('ventas') || isModuloPermitido('cuentas-corrientes') || isModuloPermitido('pagos') || isModuloPermitido('mis-ventas')) && (
+            <li>
+              <button
+                type="button"
+                className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isVentasActive ? "text-blue-600" : "text-gray-800"}`}
+                onClick={() => setVentasOpen((v) => !v)}
+              >
+                <IconTransfer className={`w-5 h-5 ${isVentasActive ? "text-blue-600" : ""}`} />
+                <span className="font-medium">Ventas</span>
+                <svg className={`ml-auto w-4 h-4 transition-transform ${ventasOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              {ventasOpen && (
+                <ul className="ml-8 mt-1 flex flex-col gap-1">
+                  {isModuloPermitido('ventas') && (
+                    <li className={`${pathname === "/ventas" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/ventas"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/ventas" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconTransfer className="w-4 h-4" />
+                        <span>Ventas</span>
+                      </Link>
+                    </li>
+                  )}
+                  {isModuloPermitido('cuentas-corrientes') && (
+                    <li className={`${pathname === "/cuentas-corrientes" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/cuentas-corrientes"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/cuentas-corrientes" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconCash className="w-4 h-4" />
+                        <span>Cuentas corrientes</span>
+                      </Link>
+                    </li>
+                  )}
+                  {isModuloPermitido('pagos') && (
+                    <li className={`${pathname === "/pagos" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/pagos"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/pagos" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconCash className="w-4 h-4" />
+                        <span>Pagos</span>
+                      </Link>
+                    </li>
+                  )}
+                  {isModuloPermitido('mis-ventas') && (
+                    <li className={`${pathname === "/mis-ventas" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/mis-ventas"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/mis-ventas" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconReportAnalytics className="w-4 h-4" />
+                        <span>Mis ventas</span>
+                      </Link>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </li>
+          )}
           {/* Menú Tesorería desplegable */}
-          <li>
-            <button
-              type="button"
-              className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isTesoreriaActive ? "text-blue-600" : "text-gray-800"}`}
-              onClick={() => setTesoreriaOpen((v) => !v)}
-            >
-              <IconCash className={`w-5 h-5 ${isTesoreriaActive ? "text-blue-600" : ""}`} />
-              <span className="font-medium">Tesorería</span>
-              <svg className={`ml-auto w-4 h-4 transition-transform ${tesoreriaOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-            {tesoreriaOpen && (
-              <ul className="ml-8 mt-1 flex flex-col gap-1">
-                <li className={`${pathname === "/caja" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                  <Link
-                    href="/caja"
-                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/caja" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                    prefetch={false}
-                  >
-                    <IconCash className="w-4 h-4" />
-                    <span>Cajas</span>
-                  </Link>
-                </li>
-                <li className={`${pathname === "/gastos-empleados" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                  <Link
-                    href="/gastos-empleados"
-                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/gastos-empleados" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                    prefetch={false}
-                  >
-                    <IconCash className="w-4 h-4" />
-                    <span>Gastos de mi Comercio</span>
-                  </Link>
-                </li>
-              </ul>
-            )}
-          </li>
+          {(isModuloPermitido('caja') || isModuloPermitido('gastos-empleados')) && (
+            <li>
+              <button
+                type="button"
+                className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isTesoreriaActive ? "text-blue-600" : "text-gray-800"}`}
+                onClick={() => setTesoreriaOpen((v) => !v)}
+              >
+                <IconCash className={`w-5 h-5 ${isTesoreriaActive ? "text-blue-600" : ""}`} />
+                <span className="font-medium">Tesorería</span>
+                <svg className={`ml-auto w-4 h-4 transition-transform ${tesoreriaOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              {tesoreriaOpen && (
+                <ul className="ml-8 mt-1 flex flex-col gap-1">
+                  {isModuloPermitido('caja') && (
+                    <li className={`${pathname === "/caja" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/caja"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/caja" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconCash className="w-4 h-4" />
+                        <span>Cajas</span>
+                      </Link>
+                    </li>
+                  )}
+                  {isModuloPermitido('gastos-empleados') && (
+                    <li className={`${pathname === "/gastos-empleados" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/gastos-empleados"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/gastos-empleados" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconCash className="w-4 h-4" />
+                        <span>Gastos de mi Comercio</span>
+                      </Link>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </li>
+          )}
           {/* Menú Sueldos desplegable */}
-          {usuarioDB?.rol === "supervisor" && (
+          {(usuarioDB?.rol === "supervisor" || isModuloPermitido('empleados') || isModuloPermitido('liquidaciones')) && (
             <li>
               <button
                 type="button"
@@ -390,82 +513,104 @@ export function AppSidebar() {
               </button>
               {sueldosOpen && (
                 <ul className="ml-8 mt-1 flex flex-col gap-1">
-                  <li className={`${pathname === "/liquidaciones" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                  {isModuloPermitido('liquidaciones') && (
+                    <li className={`${pathname === "/liquidaciones" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/liquidaciones"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/liquidaciones" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconCalculator className="w-4 h-4" />
+                        <span>Liquidaciones</span>
+                      </Link>
+                    </li>
+                  )}
+                  {isModuloPermitido('empleados') && (
+                    <li className={`${pathname === "/empleados" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/empleados"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/empleados" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconUsers className="w-4 h-4" />
+                        <span>Empleados</span>
+                      </Link>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </li>
+          )}
+          {/* Menú Informes desplegable */}
+          {(isModuloPermitido('stock-faltante') || isModuloPermitido('informes')) && (
+            <li>
+              <button
+                type="button"
+                className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isInformesActive ? "text-blue-600" : "text-gray-800"}`}
+                onClick={() => setInformesOpen((v) => !v)}
+              >
+                <IconReportAnalytics className={`w-5 h-5 ${isInformesActive ? "text-blue-600" : ""}`} />
+                <span className="font-medium">Informes</span>
+                <svg className={`ml-auto w-4 h-4 transition-transform ${informesOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              {informesOpen && (
+                <ul className="ml-8 mt-1 flex flex-col gap-1">
+                  {isModuloPermitido('stock-faltante') && (
+                    <li className={`${pathname === "/stock-faltante" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/stock-faltante"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/stock-faltante" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconStack className="w-4 h-4" />
+                        <span>Stock Faltante</span>
+                      </Link>
+                    </li>
+                  )}
+                  {isModuloPermitido('informes') && (
+                    <li className={`${pathname === "/informes" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/informes"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/informes" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconReportAnalytics className="w-4 h-4" />
+                        <span>Informes</span>
+                      </Link>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </li>
+          )}
+          {/* Menú Importaciones de datos */}
+          {isModuloPermitido('importacion-stock') && (
+            <li>
+              <button
+                type="button"
+                className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isImportacionesActive ? "text-blue-600" : "text-gray-800"}`}
+                onClick={() => setImportacionesOpen((v) => !v)}
+              >
+                <IconUpload className={`w-5 h-5 ${isImportacionesActive ? "text-blue-600" : ""}`} />
+                <span className="font-medium">Importaciones de datos</span>
+                <svg className={`ml-auto w-4 h-4 transition-transform ${importacionesOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              {importacionesOpen && (
+                <ul className="ml-8 mt-1 flex flex-col gap-1">
+                  <li className={`${pathname === "/importacion-stock" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
                     <Link
-                      href="/liquidaciones"
-                      className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/liquidaciones" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                      href="/importacion-stock"
+                      className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/importacion-stock" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
                       prefetch={false}
                     >
-                      <IconCalculator className="w-4 h-4" />
-                      <span>Liquidaciones</span>
-                    </Link>
-                  </li>
-                  <li className={`${pathname === "/empleados" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                    <Link
-                      href="/empleados"
-                      className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/empleados" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                      prefetch={false}
-                    >
-                      <IconUsers className="w-4 h-4" />
-                      <span>Empleados</span>
+                      <IconUpload className="w-4 h-4" />
+                      <span>Importar Stock</span>
                     </Link>
                   </li>
                 </ul>
               )}
             </li>
           )}
-          {/* Menú Informes desplegable */}
-          <li>
-            <button
-              type="button"
-              className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isInformesActive ? "text-blue-600" : "text-gray-800"}`}
-              onClick={() => setInformesOpen((v) => !v)}
-            >
-              <IconReportAnalytics className={`w-5 h-5 ${isInformesActive ? "text-blue-600" : ""}`} />
-              <span className="font-medium">Informes</span>
-              <svg className={`ml-auto w-4 h-4 transition-transform ${informesOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-            {informesOpen && (
-              <ul className="ml-8 mt-1 flex flex-col gap-1">
-                <li className={`${pathname === "/stock-faltante" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                  <Link
-                    href="/stock-faltante"
-                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/stock-faltante" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                    prefetch={false}
-                  >
-                    <IconStack className="w-4 h-4" />
-                    <span>Stock Faltante</span>
-                  </Link>
-                </li>
-              </ul>
-            )}
-          </li>
-          {/* Menú Importaciones de datos */}
-          <li>
-            <button
-              type="button"
-              className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isImportacionesActive ? "text-blue-600" : "text-gray-800"}`}
-              onClick={() => setImportacionesOpen((v) => !v)}
-            >
-              <IconUpload className={`w-5 h-5 ${isImportacionesActive ? "text-blue-600" : ""}`} />
-              <span className="font-medium">Importaciones de datos</span>
-              <svg className={`ml-auto w-4 h-4 transition-transform ${importacionesOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-            {importacionesOpen && (
-              <ul className="ml-8 mt-1 flex flex-col gap-1">
-                <li className={`${pathname === "/importacion-stock" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                  <Link
-                    href="/importacion-stock"
-                    className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/importacion-stock" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                    prefetch={false}
-                  >
-                    <IconUpload className="w-4 h-4" />
-                    <span>Importar Stock</span>
-                  </Link>
-                </li>
-              </ul>
-            )}
-          </li>
         </ul>
       </nav>
       <div className="mt-auto p-4 flex flex-col items-start gap-2">
@@ -477,7 +622,7 @@ export function AppSidebar() {
             Prueba gratis: {diasRestantes} día{diasRestantes === 1 ? "" : "s"} restante{diasRestantes === 1 ? "" : "s"}
           </span>
         )}
-        <span className="text-[10px] text-gray-400 mt-1">Versión 1.2</span>
+        <span className="text-[10px] text-gray-400 mt-1">Versión 1.3</span>
         <div className="flex items-center gap-2 w-full">
           <UserButton afterSignOutUrl="/sign-in" />
           {isLoaded && isSignedIn && (

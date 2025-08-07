@@ -106,8 +106,8 @@ export async function validateAndImportStock(excelFile: File, variantes: Variant
     const updates: Array<{
       id: number;
       stock_unitario: number;
-      stock_minimo: number;
-      stock_maximo: number;
+      stock_minimo: number | null;
+      stock_maximo: number | null;
     }> = [];
 
     for (let i = 0; i < jsonData.length; i++) {
@@ -121,15 +121,20 @@ export async function validateAndImportStock(excelFile: File, variantes: Variant
       }
 
       // Validar y convertir valores de stock
-      const stockUnitario = parseStockValue(row.Stock_Unitario, `Stock_Unitario en fila ${rowNumber}`);
-      const stockMinimo = parseStockValue(row.Stock_Minimo, `Stock_Minimo en fila ${rowNumber}`);
-      const stockMaximo = parseStockValue(row.Stock_Maximo, `Stock_Maximo en fila ${rowNumber}`);
+      const stockUnitario = parseStockValue(row.Stock_Unitario, `Stock_Unitario en fila ${rowNumber}`, true);
+      const stockMinimo = parseStockValue(row.Stock_Minimo, `Stock_Minimo en fila ${rowNumber}`, false);
+      const stockMaximo = parseStockValue(row.Stock_Maximo, `Stock_Maximo en fila ${rowNumber}`, false);
 
-      // Validar que stock_minimo <= stock_unitario <= stock_maximo
-      if (stockMinimo > stockUnitario) {
+      // stockUnitario nunca será null porque es requerido
+      if (stockUnitario === null) {
+        throw new Error(`Stock_Unitario en fila ${rowNumber}: El valor no puede estar vacío`);
+      }
+
+      // Validar que stock_minimo <= stock_unitario <= stock_maximo (solo si ambos valores están presentes)
+      if (stockMinimo !== null && stockMinimo > stockUnitario) {
         throw new Error(`Fila ${rowNumber}: Stock_Minimo (${stockMinimo}) no puede ser mayor que Stock_Unitario (${stockUnitario})`);
       }
-      if (stockMaximo < stockUnitario) {
+      if (stockMaximo !== null && stockMaximo < stockUnitario) {
         throw new Error(`Fila ${rowNumber}: Stock_Maximo (${stockMaximo}) no puede ser menor que Stock_Unitario (${stockUnitario})`);
       }
 
@@ -141,12 +146,28 @@ export async function validateAndImportStock(excelFile: File, variantes: Variant
       });
     }
 
-    // Actualizar la base de datos
+    // Actualizar la base de datos - SUMAR stock en lugar de reemplazar
     for (const update of updates) {
+      // Obtener el stock actual de la variante
+      const { data: currentVariante, error: fetchError } = await supabase
+        .from('variantes-articulos')
+        .select('stock_unitario')
+        .eq('id', update.id)
+        .single();
+
+      if (fetchError) {
+        throw new Error(`Error obteniendo stock actual de variante ${update.id}: ${fetchError.message}`);
+      }
+
+      // Calcular el nuevo stock sumando el actual con el del Excel
+      const currentStock = currentVariante?.stock_unitario || 0;
+      const newStock = currentStock + update.stock_unitario;
+
+      // Actualizar con el stock sumado
       const { error } = await supabase
         .from('variantes-articulos')
         .update({
-          stock_unitario: update.stock_unitario,
+          stock_unitario: newStock,
           stock_minimo: update.stock_minimo,
           stock_maximo: update.stock_maximo,
         })
@@ -164,9 +185,13 @@ export async function validateAndImportStock(excelFile: File, variantes: Variant
   }
 }
 
-function parseStockValue(value: string | number, fieldName: string): number {
+function parseStockValue(value: string | number, fieldName: string, required: boolean = true): number | null {
   if (value === null || value === undefined || value === '') {
-    throw new Error(`${fieldName}: El valor no puede estar vacío`);
+    if (required) {
+      throw new Error(`${fieldName}: El valor no puede estar vacío`);
+    } else {
+      return null; // Permitir valores vacíos para campos opcionales
+    }
   }
 
   const numValue = typeof value === 'string' ? parseFloat(value) : value;
