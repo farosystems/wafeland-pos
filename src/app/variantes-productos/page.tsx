@@ -319,6 +319,7 @@ export default function VariantesProductosPage() {
             cantidad: form.stockNuevo,
             fk_id_talle: form.fk_id_talle,
             fk_id_color: form.fk_id_color,
+            stock_actual: 0, // Se calculará después del ajuste
           });
         }
         if (form.stockDescontar !== 0) {
@@ -330,6 +331,7 @@ export default function VariantesProductosPage() {
             cantidad: -Math.abs(form.stockDescontar),
             fk_id_talle: form.fk_id_talle,
             fk_id_color: form.fk_id_color,
+            stock_actual: 0, // Se calculará después del ajuste
           });
         }
       } else {
@@ -351,6 +353,7 @@ export default function VariantesProductosPage() {
             cantidad: form.stockNuevo,
             fk_id_talle: form.fk_id_talle,
             fk_id_color: form.fk_id_color,
+            stock_actual: 0, // Se calculará después del ajuste
           });
         }
       }
@@ -448,6 +451,7 @@ export default function VariantesProductosPage() {
           cantidad: Math.abs(stockDifference),
           fk_id_talle: variante.fk_id_talle,
           fk_id_color: variante.fk_id_color,
+          stock_actual: 0, // Se calculará después del ajuste
         });
       }
 

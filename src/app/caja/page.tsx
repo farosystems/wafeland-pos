@@ -127,7 +127,7 @@ export default function CajaPage() {
         if (actual) fetchCajaAbierta(actual.id);
       }
     });
-  }, [user, fetchCajaAbierta]);
+  }, [user]);
 
   // Al cargar usuarios, si es supervisor y no hay usuario seleccionado, seleccionar el primero y mostrar su caja abierta
   React.useEffect(() => {
@@ -135,14 +135,14 @@ export default function CajaPage() {
       setUsuarioSeleccionado(usuarios[0].id.toString());
       fetchCajaAbierta(Number(usuarios[0].id));
     }
-  }, [usuarioDB, usuarios, usuarioSeleccionado, fetchCajaAbierta]);
+  }, [usuarioDB, usuarios, usuarioSeleccionado]);
 
   // Refrescar caja abierta al cambiar usuarioSeleccionado si es supervisor
   React.useEffect(() => {
     if (usuarioDB?.rol === "supervisor" && usuarioSeleccionado) {
       fetchCajaAbierta(Number(usuarioSeleccionado));
     }
-  }, [usuarioSeleccionado, usuarioDB, fetchCajaAbierta]);
+  }, [usuarioSeleccionado, usuarioDB]);
 
   // Estado para el lote abierto global (para supervisor)
   const [loteAbiertoGlobal, setLoteAbiertoGlobal] = useState<LoteOperacion | null>(null);

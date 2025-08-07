@@ -5,11 +5,11 @@ import { CuentaTesoreria } from "@/types/cuentaTesoreria";
 export async function getCuentasTesoreria() {
   const { data, error } = await supabase
     .from("cuentas_tesoreria")
-    .select("id, descripcion, tipo, activo")
+    .select("id, descripcion, activo")
     .eq("activo", true)
     .order("descripcion", { ascending: true });
   if (error) throw error;
-  return data as { id: number; descripcion: string; tipo: string; activo: boolean }[];
+  return data as { id: number; descripcion: string; activo: boolean }[];
 }
 
 export async function createCuentaTesoreria(cuenta: CreateCuentaTesoreriaData) {

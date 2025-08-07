@@ -107,7 +107,7 @@ export function LotesOperacionesContent({ onImprimirCierre }: { onImprimirCierre
     fetchLotes();
     getCajas().then(setCajas);
     getUsuarios().then(setUsuarios);
-  }, [fetchLotes]);
+  }, []);
 
   // Cuando se refrescan los lotes desde el padre (por ejemplo, después de cerrar caja), limpiar y recargar caché
   useEffect(() => {
@@ -117,7 +117,7 @@ export function LotesOperacionesContent({ onImprimirCierre }: { onImprimirCierre
     };
     window.addEventListener('refreshLotesOperaciones', handler);
     return () => window.removeEventListener('refreshLotesOperaciones', handler);
-  }, [fetchLotes]);
+  }, []);
 
   // Función para refrescar datos
   const refreshData = useCallback(async () => {

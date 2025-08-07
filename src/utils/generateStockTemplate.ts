@@ -150,7 +150,7 @@ export async function validateAndImportStock(excelFile: File, variantes: Variant
     for (const update of updates) {
       // Obtener el stock actual de la variante
       const { data: currentVariante, error: fetchError } = await supabase
-        .from('variantes-articulos')
+        .from('variantes_articulos')
         .select('stock_unitario')
         .eq('id', update.id)
         .single();
@@ -165,7 +165,7 @@ export async function validateAndImportStock(excelFile: File, variantes: Variant
 
       // Actualizar con el stock sumado
       const { error } = await supabase
-        .from('variantes-articulos')
+        .from('variantes_articulos')
         .update({
           stock_unitario: newStock,
           stock_minimo: update.stock_minimo,

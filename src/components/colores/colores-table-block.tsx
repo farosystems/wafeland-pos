@@ -12,7 +12,7 @@ import { Color } from "@/types/color";
 export function ColoresTableBlock() {
   const { colores, addColor, editColor, deleteColor, error } = useColores();
   const [filter, setFilter] = React.useState("");
-  const [columnVisibility, setColumnVisibility] = React.useState({ id: true, creado_el: true, descripcion: true });
+  const [columnVisibility, setColumnVisibility] = React.useState({ id: true, descripcion: true });
   const [showDialog, setShowDialog] = React.useState(false);
   const [descripcion, setDescripcion] = React.useState("");
   const [editId, setEditId] = React.useState<number | null>(null);
@@ -64,14 +64,12 @@ export function ColoresTableBlock() {
       <div className="flex gap-2 mb-2">
         <Input placeholder="Filtrar por ID o descripción..." value={filter} onChange={e => setFilter(e.target.value)} className="max-w-xs" />
         <Button variant="outline" size="sm" onClick={() => setColumnVisibility(v => ({ ...v, id: !v.id }))}>ID</Button>
-        <Button variant="outline" size="sm" onClick={() => setColumnVisibility(v => ({ ...v, creado_el: !v.creado_el }))}>Fecha</Button>
         <Button variant="outline" size="sm" onClick={() => setColumnVisibility(v => ({ ...v, descripcion: !v.descripcion }))}>Descripción</Button>
       </div>
       <Table>
         <TableHeader>
           <TableRow>
             {columnVisibility.id && <TableHead>ID</TableHead>}
-            {columnVisibility.creado_el && <TableHead>Fecha creación</TableHead>}
             {columnVisibility.descripcion && <TableHead>Descripción</TableHead>}
             <TableHead>Acciones</TableHead>
           </TableRow>
@@ -82,7 +80,6 @@ export function ColoresTableBlock() {
           ) : filtered.map(color => (
             <TableRow key={color.id}>
               {columnVisibility.id && <TableCell>{color.id}</TableCell>}
-              {columnVisibility.creado_el && <TableCell>{new Date(color.creado_el).toLocaleString()}</TableCell>}
               {columnVisibility.descripcion && <TableCell>{color.descripcion}</TableCell>}
               <TableCell>
                 <Button variant="ghost" size="icon" onClick={() => handleEdit(color)}><Edit className="h-4 w-4" /></Button>

@@ -326,6 +326,7 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
             cantidad: Math.abs(d.cantidad),
             fk_id_talle: d.talle,
             fk_id_color: d.color,
+            stock_actual: 0, // Se calculará después del reingreso
           });
         }
       }

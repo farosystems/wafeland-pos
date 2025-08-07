@@ -6,7 +6,7 @@ import { updateArticle } from "@/services/articles";
 export async function getVariantes(): Promise<Variante[]> {
   console.log('🔄 getVariantes: Iniciando consulta...');
   const { data, error } = await supabase
-    .from("variantes-articulos")
+    .from("variantes_articulos")
     .select(`*,
       articulo:fk_id_articulo(descripcion, precio_unitario),
       talle:fk_id_talle(descripcion),
@@ -48,7 +48,7 @@ export async function addVariante(variante: CreateVarianteData): Promise<Variant
   };
   
   const { data, error } = await supabase
-    .from("variantes-articulos")
+    .from("variantes_articulos")
     .insert([varianteData])
     .select()
     .single();
@@ -65,7 +65,7 @@ export async function editVariante(id: number, variante: UpdateVarianteData): Pr
   };
   
   const { data, error } = await supabase
-    .from("variantes-articulos")
+    .from("variantes_articulos")
     .update(varianteData)
     .eq("id", id)
     .select()
@@ -77,7 +77,7 @@ export async function editVariante(id: number, variante: UpdateVarianteData): Pr
     const varianteCompleta = data as any;
     // Buscar el stock_unitario anterior
     const { data: varianteAnterior } = await supabase
-      .from("variantes-articulos")
+      .from("variantes_articulos")
       .select("stock_unitario")
       .eq("id", id)
       .single();
@@ -92,12 +92,12 @@ export async function editVariante(id: number, variante: UpdateVarianteData): Pr
         cantidad: diferencia,
         fk_id_talle: varianteCompleta.fk_id_talle,
         fk_id_color: varianteCompleta.fk_id_color,
-        stock_actual: variante.stock_unitario,
+        stock_actual: variante.stock_unitario ?? 0,
       });
     }
     // Recalcular el stock total del artículo sumando todas sus variantes
     const { data: variantesArticulo } = await supabase
-      .from("variantes-articulos")
+      .from("variantes_articulos")
       .select("stock_unitario")
       .eq("fk_id_articulo", varianteCompleta.fk_id_articulo);
     const stockTotal = (variantesArticulo || []).reduce((acc, v) => acc + (v.stock_unitario ?? 0), 0);
@@ -109,7 +109,7 @@ export async function editVariante(id: number, variante: UpdateVarianteData): Pr
 
 export async function deleteVariante(id: number): Promise<void> {
   const { error } = await supabase
-    .from("variantes-articulos")
+    .from("variantes_articulos")
     .delete()
     .eq("id", id);
   if (error) throw error;

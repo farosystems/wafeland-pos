@@ -59,7 +59,7 @@ export function AppSidebar() {
   const [ventasOpen, setVentasOpen] = React.useState(false);
   const [tesoreriaOpen, setTesoreriaOpen] = React.useState(false);
   const [sueldosOpen, setSueldosOpen] = React.useState(false);
-  const [informesOpen, setInformesOpen] = React.useState(false);
+
   const [importacionesOpen, setImportacionesOpen] = React.useState(false);
   const [seguridadOpen, setSeguridadOpen] = React.useState(false);
   const [config, setConfig] = React.useState<ConfiguracionEmpresa | null>(null);
@@ -72,12 +72,12 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   // Utilidades para saber si algún submenú está activo
-  const isStockActive = ["/articles", "/movimientos-stock"].includes(pathname);
+  const isStockActive = ["/articles", "/movimientos-stock", "/stock-faltante"].includes(pathname);
   const isContactosActive = ["/clientes", "/usuarios"].includes(pathname);
   const isVentasActive = ["/ventas"].includes(pathname);
   const isTesoreriaActive = ["/caja", "/gastos-empleados"].includes(pathname);
   const isSueldosActive = ["/liquidaciones", "/empleados"].includes(pathname);
-  const isInformesActive = ["/stock-faltante"].includes(pathname);
+
   const isImportacionesActive = ["/importacion-stock"].includes(pathname);
   const isSeguridadActive = ["/seguridad", "/seguridad/modulos"].includes(pathname);
 
@@ -154,13 +154,30 @@ export function AppSidebar() {
     let logoUrl = config?.imagen || null;
     try {
       if (logoFile) {
+        console.log("Iniciando subida de logo...");
         logoUrl = await uploadLogoEmpresa(logoFile);
+        console.log("Logo subido exitosamente:", logoUrl);
       }
+      console.log("Actualizando configuración de empresa...");
       await updateConfiguracionEmpresa(nombreEmpresa, logoUrl, selectedColor);
       setConfig({ ...config!, nombre: nombreEmpresa, imagen: logoUrl, color_primario: selectedColor });
       setModalOpen(false);
+      console.log("Configuración guardada exitosamente");
     } catch (e: any) {
-      alert("Error al guardar la configuración: " + (e?.message || JSON.stringify(e)));
+      console.error("Error completo en handleSave:", e);
+      let errorMessage = "Error al guardar la configuración";
+      
+      if (e?.message) {
+        errorMessage += ": " + e.message;
+      } else if (e?.code) {
+        errorMessage += ` (Código: ${e.code})`;
+      } else if (typeof e === 'string') {
+        errorMessage += ": " + e;
+      } else {
+        errorMessage += ": " + JSON.stringify(e);
+      }
+      
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -246,7 +263,7 @@ export function AppSidebar() {
             </li>
           )}
           {/* Menú Stock desplegable */}
-          {(isModuloPermitido('articulos') || isModuloPermitido('talles-colores') || isModuloPermitido('variantes-productos') || isModuloPermitido('movimientos-stock')) && (
+          {(isModuloPermitido('articulos') || isModuloPermitido('talles-colores') || isModuloPermitido('variantes-productos') || isModuloPermitido('movimientos-stock') || isModuloPermitido('stock-faltante')) && (
             <li>
               <button
                 type="button"
@@ -304,6 +321,18 @@ export function AppSidebar() {
                       >
                         <IconTransfer className="w-4 h-4" />
                         <span>Movimientos de stock</span>
+                      </Link>
+                    </li>
+                  )}
+                  {isModuloPermitido('stock-faltante') && (
+                    <li className={`${pathname === "/stock-faltante" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/stock-faltante"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/stock-faltante" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconStack className="w-4 h-4" />
+                        <span>Stock Faltante</span>
                       </Link>
                     </li>
                   )}
@@ -541,48 +570,7 @@ export function AppSidebar() {
               )}
             </li>
           )}
-          {/* Menú Informes desplegable */}
-          {(isModuloPermitido('stock-faltante') || isModuloPermitido('informes')) && (
-            <li>
-              <button
-                type="button"
-                className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-100 transition-colors w-full focus:outline-none ${isInformesActive ? "text-blue-600" : "text-gray-800"}`}
-                onClick={() => setInformesOpen((v) => !v)}
-              >
-                <IconReportAnalytics className={`w-5 h-5 ${isInformesActive ? "text-blue-600" : ""}`} />
-                <span className="font-medium">Informes</span>
-                <svg className={`ml-auto w-4 h-4 transition-transform ${informesOpen ? "rotate-90" : "rotate-0"}`} viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </button>
-              {informesOpen && (
-                <ul className="ml-8 mt-1 flex flex-col gap-1">
-                  {isModuloPermitido('stock-faltante') && (
-                    <li className={`${pathname === "/stock-faltante" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                      <Link
-                        href="/stock-faltante"
-                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/stock-faltante" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                        prefetch={false}
-                      >
-                        <IconStack className="w-4 h-4" />
-                        <span>Stock Faltante</span>
-                      </Link>
-                    </li>
-                  )}
-                  {isModuloPermitido('informes') && (
-                    <li className={`${pathname === "/informes" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                      <Link
-                        href="/informes"
-                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/informes" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                        prefetch={false}
-                      >
-                        <IconReportAnalytics className="w-4 h-4" />
-                        <span>Informes</span>
-                      </Link>
-                    </li>
-                  )}
-                </ul>
-              )}
-            </li>
-          )}
+
           {/* Menú Importaciones de datos */}
           {isModuloPermitido('importacion-stock') && (
             <li>

@@ -17,7 +17,7 @@ async function migrateStockFields() {
     
     // Update all records where stock_minimo is null to 0
     const { data: updateMinimo, error: errorMinimo } = await supabase
-      .from('variantes-articulos')
+      .from('variantes_articulos')
       .update({ stock_minimo: 0 })
       .is('stock_minimo', null);
     
@@ -29,7 +29,7 @@ async function migrateStockFields() {
     
     // Update all records where stock_maximo is null to 0
     const { data: updateMaximo, error: errorMaximo } = await supabase
-      .from('variantes-articulos')
+      .from('variantes_articulos')
       .update({ stock_maximo: 0 })
       .is('stock_maximo', null);
     

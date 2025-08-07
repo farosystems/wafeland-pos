@@ -507,6 +507,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
             cantidad: -Math.abs(d.cantidad),
             fk_id_talle: d.talle ?? null,
             fk_id_color: d.color ?? null,
+            stock_actual: 0, // Se calculará después del descuento
           });
           // Descontar stock_unitario de la variante si corresponde
           if (d.talle && d.color && d.articulo) {

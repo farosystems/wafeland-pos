@@ -57,7 +57,7 @@ export async function getDashboardData(periodo: string = 'mes'): Promise<Dashboa
         .select("*")
         .gte('fecha', fechaInicio.toISOString())
         .lte('fecha', fechaFin.toISOString()),
-      supabase.from("variantes-articulos").select("*"),
+      supabase.from("variantes_articulos").select("*"),
       supabase.from("articulos").select("*"),
       supabase.from("talles").select("*"),
       supabase.from("color").select("*"),
@@ -76,8 +76,8 @@ export async function getDashboardData(periodo: string = 'mes'): Promise<Dashboa
        throw new Error(`Error obteniendo ventas: ${ventasData.error.message}`);
      }
      if (variantesData.error) {
-       console.error('Error obteniendo variantes-articulos:', variantesData.error);
-       throw new Error(`Error obteniendo variantes-articulos: ${variantesData.error.message}`);
+       console.error('Error obteniendo variantes_articulos:', variantesData.error);
+       throw new Error(`Error obteniendo variantes_articulos: ${variantesData.error.message}`);
      }
      if (articulosData.error) {
        console.error('Error obteniendo artículos:', articulosData.error);

@@ -34,7 +34,6 @@ export function CuentasTesoreriaContent() {
             <tr className="bg-gray-100">
               <th className="px-2 py-1 text-left">ID</th>
               <th className="px-2 py-1 text-left">Descripción</th>
-              <th className="px-2 py-1 text-left">Tipo</th>
               <th className="px-2 py-1 text-left">Activo</th>
             </tr>
           </thead>
@@ -43,12 +42,11 @@ export function CuentasTesoreriaContent() {
               <tr key={c.id} className="border-b">
                 <td className="px-2 py-1">{c.id}</td>
                 <td className="px-2 py-1">{c.descripcion}</td>
-                <td className="px-2 py-1">{c.tipo}</td>
                 <td className="px-2 py-1">{c.activo ? "Sí" : "No"}</td>
               </tr>
             ))}
             {cuentas.length === 0 && (
-              <tr><td colSpan={4} className="text-center py-4 text-muted-foreground">No hay cuentas de tesorería.</td></tr>
+              <tr><td colSpan={3} className="text-center py-4 text-muted-foreground">No hay cuentas de tesorería.</td></tr>
             )}
           </tbody>
         </table>

@@ -49,7 +49,7 @@ export async function getVariantes(): Promise<Variante[]> {
   await checkUserPermissions();
   
   const { data, error } = await supabase
-    .from("variantes-articulos")
+    .from("variantes_articulos")
     .select(`*,
       articulo:fk_id_articulo(descripcion),
       talle:fk_id_talle(descripcion),
@@ -76,7 +76,7 @@ export async function addVariante(variante: CreateVarianteData): Promise<Variant
   }
   
   const { data, error } = await supabase
-    .from("variantes-articulos")
+    .from("variantes_articulos")
     .insert([variante])
     .select()
     .single();
@@ -94,7 +94,7 @@ export async function editVariante(id: number, variante: UpdateVarianteData): Pr
   }
   
   const { data, error } = await supabase
-    .from("variantes-articulos")
+    .from("variantes_articulos")
     .update(variante)
     .eq("id", id)
     .select()
@@ -113,7 +113,7 @@ export async function deleteVariante(id: number): Promise<void> {
   }
   
   const { error } = await supabase
-    .from("variantes-articulos")
+    .from("variantes_articulos")
     .delete()
     .eq("id", id);
     
@@ -124,7 +124,7 @@ export async function getVarianteById(id: number): Promise<Variante | null> {
   await checkUserPermissions();
   
   const { data, error } = await supabase
-    .from("variantes-articulos")
+    .from("variantes_articulos")
     .select(`*,
       articulo:fk_id_articulo(descripcion),
       talle:fk_id_talle(descripcion),
