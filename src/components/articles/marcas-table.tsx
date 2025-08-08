@@ -16,7 +16,6 @@ export function MarcasTable({ data, onEdit }: MarcasTableProps) {
       <TableHeader>
         <TableRow>
           <TableHead>ID</TableHead>
-          <TableHead>Fecha creación</TableHead>
           <TableHead>Descripción</TableHead>
           <TableHead>Acciones</TableHead>
         </TableRow>
@@ -24,13 +23,12 @@ export function MarcasTable({ data, onEdit }: MarcasTableProps) {
       <TableBody>
         {data.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={4} className="text-center">No hay marcas registradas.</TableCell>
+            <TableCell colSpan={3} className="text-center">No hay marcas registradas.</TableCell>
           </TableRow>
         ) : (
           data.map((marca) => (
             <TableRow key={marca.id}>
               <TableCell>{marca.id}</TableCell>
-              <TableCell>{new Date(marca.creado_el).toLocaleString()}</TableCell>
               <TableCell>{marca.descripcion}</TableCell>
               <TableCell>
                 <Button variant="ghost" size="icon" onClick={() => onEdit?.(marca)}>
