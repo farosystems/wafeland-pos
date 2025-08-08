@@ -41,6 +41,17 @@ export async function updateOrdenVenta(id: number, orden: Partial<CreateOrdenVen
   return data as OrdenVenta;
 }
 
+export async function updateOrdenVentaAnulada(id: number, anulada: boolean) {
+  const { data, error } = await supabase
+    .from("ordenes_venta")
+    .update({ anulada })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as OrdenVenta;
+}
+
 export async function deleteOrdenVenta(id: number) {
   const { error } = await supabase.from("ordenes_venta").delete().eq("id", id);
   if (error) throw error;

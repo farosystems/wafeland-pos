@@ -100,8 +100,8 @@ export function GastoEmpleadoForm({ onSubmit, onCancel, isLoading = false }: Gas
       if (user?.emailAddresses?.[0]?.emailAddress) {
         const actual = us.find(u => u.email === user.emailAddresses[0].emailAddress);
         setUsuarioActual(actual || null);
-        // Si no es supervisor, setear automáticamente el usuario en el form
-        if (actual && actual.rol !== "supervisor") {
+        // Siempre establecer el usuario en el form
+        if (actual) {
           setForm((prev: typeof form) => ({ ...prev, fk_usuario: actual.id }));
         }
       }
@@ -189,6 +189,22 @@ export function GastoEmpleadoForm({ onSubmit, onCancel, isLoading = false }: Gas
     }
     if (isEmpleadoRequired && !form.fk_empleado) {
       setErrorModal({ open: true, message: "El campo empleado es obligatorio para este tipo de gasto." });
+      return;
+    }
+    if (!form.fk_lote_operaciones) {
+      setErrorModal({ open: true, message: "No hay un lote de operaciones abierto." });
+      return;
+    }
+    if (!form.fk_usuario) {
+      setErrorModal({ open: true, message: "Usuario no encontrado." });
+      return;
+    }
+    if (!form.fk_cuenta_tesoreria) {
+      setErrorModal({ open: true, message: "Debe seleccionar una cuenta de tesorería." });
+      return;
+    }
+    if (!form.monto || form.monto <= 0) {
+      setErrorModal({ open: true, message: "El monto debe ser mayor a 0." });
       return;
     }
     await onSubmit(form as CreateGastoEmpleadoData);

@@ -50,7 +50,7 @@ export function LiquidacionesTable() {
     doc.setFontSize(12);
     doc.text(`Empleado: ${empleado.nombre}`, 20, 40);
     doc.text(`Período: ${format(new Date(liquidacion.desde), 'dd/MM/yyyy')} - ${format(new Date(liquidacion.hasta), 'dd/MM/yyyy')}`, 20, 50);
-    doc.text(`Fecha de liquidación: ${format(new Date(liquidacion.creado_el), 'dd/MM/yyyy')}`, 20, 60);
+    doc.text(`Fecha de liquidación: ${liquidacion.creado_el ? format(new Date(liquidacion.creado_el), 'dd/MM/yyyy') : 'N/A'}`, 20, 60);
 
     autoTable(doc, {
       startY: 70,

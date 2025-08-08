@@ -26,6 +26,9 @@ import { CreateLiquidacionData } from "@/types/liquidacion";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createDetalleLoteOperacion } from "@/services/detalleLotesOperaciones";
+import { useUser } from "@clerk/nextjs";
+import { getUsuarios } from "@/services/usuarios";
+import { Usuario } from "@/types/usuario";
 
 export function LiquidacionForm({ onLiquidacionGuardada }: { onLiquidacionGuardada: () => void }) {
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
@@ -43,6 +46,8 @@ export function LiquidacionForm({ onLiquidacionGuardada }: { onLiquidacionGuarda
   const [cuentasTesoreria, setCuentasTesoreria] = useState<CuentaTesoreria[]>([]);
   const [loteAbierto, setLoteAbierto] = useState<number | null>(null);
   const [cuentaParaGasto, setCuentaParaGasto] = useState<number | null>(null);
+  const { user } = useUser();
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
 
   useEffect(() => {
     async function fetchEmpleados() {
@@ -68,6 +73,9 @@ export function LiquidacionForm({ onLiquidacionGuardada }: { onLiquidacionGuarda
 
         const lote = await getLoteAbierto();
         setLoteAbierto(lote);
+
+        const usuariosData = await getUsuarios();
+        setUsuarios(usuariosData);
     };
     fetchInitialData();
   }, []);
@@ -163,7 +171,11 @@ export function LiquidacionForm({ onLiquidacionGuardada }: { onLiquidacionGuarda
   };
 
   const handleLiquidar = async () => {
-    if (!empleadoSeleccionado || !periodo.desde || !periodo.hasta || !calculo) return;
+    if (!empleadoSeleccionado || !periodo.desde || !periodo.hasta || !calculo) {
+      setError("Por favor, complete todos los campos requeridos.");
+      setShowErrorModal(true);
+      return;
+    }
     
     setLoading(true);
     setError(null);
@@ -175,9 +187,19 @@ export function LiquidacionForm({ onLiquidacionGuardada }: { onLiquidacionGuarda
       // Validar si ya existe una liquidación para este período
       const desdeStr = format(periodo.desde, "yyyy-MM-dd");
       const hastaStr = format(periodo.hasta, "yyyy-MM-dd");
-      const yaExiste = await checkExistingLiquidacion(empleado.id, desdeStr, hastaStr);
-      if (yaExiste) {
-        setError("Ya existe una liquidación para este empleado en el período seleccionado.");
+      
+      try {
+        const yaExiste = await checkExistingLiquidacion(empleado.id, desdeStr, hastaStr);
+        if (yaExiste) {
+          setError("Ya existe una liquidación para este empleado en el período seleccionado.");
+          setShowErrorModal(true);
+          setLoading(false);
+          return;
+        }
+      } catch (checkError) {
+        console.error("Error al verificar liquidación existente:", checkError);
+        const errorMessage = checkError instanceof Error ? checkError.message : "Error desconocido al verificar liquidaciones existentes";
+        setError(errorMessage);
         setShowErrorModal(true);
         setLoading(false);
         return;
@@ -198,8 +220,9 @@ export function LiquidacionForm({ onLiquidacionGuardada }: { onLiquidacionGuarda
       setShowConfirmGastoModal(true);
 
     } catch (err) {
-      setError("Error al guardar la liquidación.");
-      console.error(err);
+      console.error("Error en handleLiquidar:", err);
+      setError("Error al procesar la liquidación. Intente nuevamente.");
+      setShowErrorModal(true);
     } finally {
       setLoading(false);
     }
@@ -207,16 +230,28 @@ export function LiquidacionForm({ onLiquidacionGuardada }: { onLiquidacionGuarda
 
   const handleConfirmacionFinal = async (registrarGasto: boolean) => {
     setShowConfirmGastoModal(false);
-    if (!pendingLiquidacion) return;
+    if (!pendingLiquidacion) {
+        console.error('No hay liquidación pendiente');
+        return;
+    }
 
     setLoading(true);
     setError(null);
     try {
         const { liquidacion, empleado } = pendingLiquidacion;
+        console.log('Iniciando liquidación:', { liquidacion, empleado });
 
+        console.log('Intentando crear liquidación con datos:', liquidacion);
         await createLiquidacion(liquidacion);
+        console.log('Liquidación creada exitosamente');
 
         if (registrarGasto) {
+            console.log('Verificando condiciones para registrar gasto:', {
+                loteAbierto,
+                cuentaParaGasto,
+                sueldoTipoGastoId
+            });
+            
             if (!loteAbierto) {
                 setError("No hay un lote de caja abierto. No se puede registrar el gasto.");
                 setShowErrorModal(true);
@@ -227,22 +262,48 @@ export function LiquidacionForm({ onLiquidacionGuardada }: { onLiquidacionGuarda
                 setShowErrorModal(true);
                 return;
             }
-            await createGastoEmpleado({
+            
+            // Obtener el usuario actual
+            const userEmail = user?.emailAddresses?.[0]?.emailAddress;
+            console.log('Email del usuario actual:', userEmail);
+            console.log('Usuarios disponibles:', usuarios);
+            
+            const usuarioActual = usuarios.find(u => u.email === userEmail);
+            console.log('Usuario actual encontrado:', usuarioActual);
+            
+            if (!usuarioActual) {
+                setError("No se pudo identificar el usuario actual.");
+                setShowErrorModal(true);
+                return;
+            }
+            
+            const gastoData = {
                 fk_empleado: liquidacion.fk_empleado,
                 monto: liquidacion.neto_liquidado,
                 fk_tipo_gasto: sueldoTipoGastoId!,
                 descripcion: `Pago de sueldo liquidado del ${format(new Date(liquidacion.desde), 'dd/MM/yy')} al ${format(new Date(liquidacion.hasta), 'dd/MM/yy')}`,
                 fk_lote_operaciones: loteAbierto,
                 fk_cuenta_tesoreria: cuentaParaGasto,
-                fk_usuario: 1,
-            });
+                fk_usuario: usuarioActual.id,
+            };
+            
+            console.log('Creando gasto empleado con datos:', gastoData);
+            
+            await createGastoEmpleado(gastoData);
+            console.log('Gasto empleado creado exitosamente');
+            
             // Registrar egreso en detalle_lotes_operaciones
-            await createDetalleLoteOperacion({
+            const egresoData = {
                 fk_id_lote: loteAbierto,
                 fk_id_cuenta_tesoreria: cuentaParaGasto,
-                tipo: 'egreso',
+                tipo: 'egreso' as const,
                 monto: liquidacion.neto_liquidado,
-            });
+            };
+            
+            console.log('Registrando egreso en detalle_lotes_operaciones:', egresoData);
+            
+            await createDetalleLoteOperacion(egresoData);
+            console.log('Egreso registrado exitosamente');
         }
         
         setLiquidatedData({ ...liquidacion, empleado, fecha_liquidacion: new Date() });
@@ -250,8 +311,21 @@ export function LiquidacionForm({ onLiquidacionGuardada }: { onLiquidacionGuarda
         onLiquidacionGuardada(); // Para refrescar la tabla
 
     } catch (err) {
-        setError("Error al procesar la liquidación.");
-        console.error(err);
+        console.error("Error en handleConfirmacionFinal:", {
+            error: err,
+            message: err instanceof Error ? err.message : String(err),
+            stack: err instanceof Error ? err.stack : undefined,
+            liquidacion: pendingLiquidacion?.liquidacion,
+            empleado: pendingLiquidacion?.empleado,
+            registrarGasto,
+            loteAbierto,
+            cuentaParaGasto,
+            sueldoTipoGastoId
+        });
+        
+        const errorMessage = err instanceof Error ? err.message : "Error desconocido al procesar la liquidación";
+        setError(errorMessage);
+        setShowErrorModal(true);
     } finally {
         setLoading(false);
         setPendingLiquidacion(null);

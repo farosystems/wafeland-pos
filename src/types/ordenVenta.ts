@@ -7,10 +7,12 @@ export interface OrdenVenta {
   fecha: string; // ISO
   total: number;
   subtotal: number;
-  anulada?: boolean;
-  fk_id_orden_anulada?: number;
+  anulada: boolean;
+  fk_id_orden_anulada?: number | null;
 }
-export type CreateOrdenVentaData = Omit<OrdenVenta, 'id'>
+export type CreateOrdenVentaData = Omit<OrdenVenta, 'id' | 'anulada'> & {
+  fk_id_orden_anulada?: number | null;
+}
 
 export interface OrdenVentaDetalle {
   idd: number;

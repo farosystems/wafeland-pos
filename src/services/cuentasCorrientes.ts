@@ -16,7 +16,7 @@ export async function cancelarCuentaCorriente(id: number) {
   if (error) throw error;
 }
 
-export async function efectuarPagoCuentaCorriente(id: number) {
+export async function cancelarPagoCuentaCorriente(id: number) {
   const { error } = await supabase
     .from("cuentas_corrientes")
     .update({ estado: "pagada", saldo: 0 })

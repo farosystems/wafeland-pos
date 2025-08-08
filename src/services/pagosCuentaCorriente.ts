@@ -2,18 +2,18 @@ import { supabase } from "@/lib/supabaseClient";
 
 export interface PagoCuentaCorriente {
   id: number;
-  fk_id_cuenta_corriente: number;
+  fk_id_cuenta_corriente: number | null;
   monto: number;
-  fk_id_cuenta_tesoreria: number;
   creado_el: string;
-  fk_id_lote: number;
+  fk_id_cuenta_tesoreria: number | null;
+  fk_id_lote: number | null;
 }
 
 export interface CreatePagoCuentaCorrienteData {
-  fk_id_cuenta_corriente: number;
+  fk_id_cuenta_corriente: number | null;
   monto: number;
-  fk_id_cuenta_tesoreria: number;
-  fk_id_lote: number;
+  fk_id_cuenta_tesoreria: number | null;
+  fk_id_lote: number | null;
 }
 
 export async function getPagosCuentaCorriente() {
@@ -39,7 +39,7 @@ export async function efectuarPagoCuentaCorriente(
   cuentaCorrienteId: number, 
   monto: number, 
   cuentaTesoreriaId: number,
-  fk_id_lote: number
+  fk_id_lote: number | null
 ) {
   // Iniciar transacción
   const { data: cuentaCorriente, error: errorCuenta } = await supabase

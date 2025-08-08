@@ -394,11 +394,10 @@ export default function CajaPage() {
     // --- Bloque resumen de ventas y notas de crédito ---
     doc.setFontSize(10);
     // Obtener catálogos necesarios
-    const [clientesArr, usuariosArr, tiposComprobantes, cuentasTesoreriaArr] = await Promise.all([
+    const [clientesArr, usuariosArr, tiposComprobantes] = await Promise.all([
       getClientes(),
       getUsuarios(),
-      getTiposComprobantes(),
-      getCuentasTesoreria()
+      getTiposComprobantes()
     ]);
     // Definir ventasLote antes de usarla en el resumen de ventas
     let ventasLote: OrdenVenta[] = [];
@@ -456,7 +455,7 @@ export default function CajaPage() {
         startY: afterTotalesY + 3,
         head: [["ID", "Fecha", "Cliente", "Cuenta Tesorería", "Monto"]],
         body: pagosLote.map(pago => {
-          const cuentaTesoreria = cuentasTesoreriaArr.find(ct => ct.id === pago.fk_id_cuenta_tesoreria);
+          // Los pagos de cuenta corriente no tienen fk_id_cuenta_tesoreria, mostrar "-"
           let clienteNombre = "-";
           const cuentaCorriente = clientesArr.find(c => c.id === pago.fk_id_cuenta_corriente);
           if (cuentaCorriente) clienteNombre = cuentaCorriente.razon_social || "-";
@@ -464,7 +463,7 @@ export default function CajaPage() {
             pago.id.toString(),
             new Date(pago.creado_el).toLocaleString(),
             clienteNombre,
-            cuentaTesoreria?.descripcion || "-",
+            "-", // No hay cuenta de tesorería asociada en pagos de cuenta corriente
             formatCurrency(pago.monto, DEFAULT_CURRENCY, DEFAULT_LOCALE)
           ];
         }),

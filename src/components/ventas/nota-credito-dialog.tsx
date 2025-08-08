@@ -17,12 +17,11 @@ import { getCuentasTesoreria } from "@/services/cuentasTesoreria";
 import { getArticles } from "@/services/articles";
 import { getTalles } from "@/services/talles";
 import { getColores } from "@/services/colores";
-import { createOrdenVenta } from "@/services/ordenesVenta";
+import { createOrdenVenta, updateOrdenVentaAnulada } from "@/services/ordenesVenta";
 import { createOrdenVentaDetalle } from "@/services/ordenesVentaDetalle";
 import { createOrdenVentaMediosPago } from "@/services/ordenesVentaMediosPago";
 import { getLoteCajaAbiertaPorUsuario } from "@/services/lotesOperaciones";
 import { getOrdenesVentaDetalle } from "@/services/ordenesVentaDetalle";
-import { updateOrdenVenta } from "@/services/ordenesVenta";
 import { registrarMovimientoCaja } from "@/services/detalleLotesOperaciones";
 import { Cliente } from "@/types/cliente";
 import { Usuario } from "@/types/usuario";
@@ -280,8 +279,11 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
         setLoading(false);
         return;
       }
-      const totalNotaCredito = detalle.reduce((acc, d) => acc + (d.cantidad && d.precio ? d.cantidad * d.precio : 0), 0);
-      const hoy = format(new Date(), "yyyy-MM-dd");
+      if (!ventaAAnular) {
+        setLoading(false);
+        return;
+      }
+      const total = detalle.reduce((acc, d) => acc + (d.cantidad && d.precio ? d.cantidad * d.precio : 0), 0);
 
       // Buscar el tipo de comprobante "NOTA DE CREDITO"
       const tipoNotaCredito = tiposComprobantes.find(tc => 
@@ -293,16 +295,16 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
         throw new Error('No se encontró el tipo de comprobante "NOTA DE CREDITO" en la base de datos');
       }
 
-      // Crear la nota de crédito (total negativo)
+      // Crear la nota de crédito
       const notaCredito = await createOrdenVenta({
-        fk_id_entidades: clienteSeleccionado,
-        fk_id_usuario: usuarioSeleccionado,
-        fk_id_lote: loteAbierto,
-        fk_id_tipo_comprobante: tipoNotaCredito.id, // ID dinámico del tipo de comprobante
-        fecha: hoy,
-        total: -totalNotaCredito, // Total negativo
-        subtotal: -totalNotaCredito, // Subtotal negativo
-        fk_id_orden_anulada: ventaAAnular?.id,
+        fk_id_entidades: ventaAAnular.fk_id_entidades,
+        fk_id_usuario: ventaAAnular.fk_id_usuario,
+        fk_id_lote: loteAbierto!,
+        fk_id_tipo_comprobante: tipoNotaCredito.id,
+        fecha: new Date().toISOString(),
+        total: -total, // Total negativo para nota de crédito
+        subtotal: -total, // Subtotal negativo
+        fk_id_orden_anulada: ventaAAnular.id // Referencia a la venta anulada
       });
 
       // Crear los detalles de artículos
@@ -348,15 +350,18 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
           });
         }
       }
-      if (!ventaAAnular) return;
-      await updateOrdenVenta(ventaAAnular.id, { anulada: true });
+      await updateOrdenVentaAnulada(ventaAAnular.id, true);
 
       if (onNotaCreditoGuardada) onNotaCreditoGuardada();
       onOpenChange(false);
       showToast("Nota de crédito registrada con éxito");
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Error al guardar la nota de crédito:", e);
-      setError(e?.message || e?.error_description || "Error al guardar la nota de crédito");
+      const errorMessage = e instanceof Error ? e.message : 
+        typeof e === 'object' && e !== null && 'error_description' in e ? 
+        String((e as { error_description: unknown }).error_description) : 
+        "Error al guardar la nota de crédito";
+      setError(errorMessage);
     }
     setLoading(false);
   }

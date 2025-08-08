@@ -212,9 +212,9 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
     if (!busquedaCliente.trim()) return clientesFiltrados;
     const busqueda = busquedaCliente.toLowerCase();
     return clientesFiltrados.filter(c => 
-      c.razon_social.toLowerCase().includes(busqueda) ||
-      c.email.toLowerCase().includes(busqueda) ||
-      c.num_doc.toLowerCase().includes(busqueda)
+      (c.razon_social || "").toLowerCase().includes(busqueda) ||
+      (c.email || "").toLowerCase().includes(busqueda) ||
+      (c.num_doc || "").toLowerCase().includes(busqueda)
     );
   }, [clientesFiltrados, busquedaCliente]);
 

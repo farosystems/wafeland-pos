@@ -41,28 +41,98 @@ export async function getGastosEmpleados(): Promise<GastoEmpleado[]> {
 }
 
 export async function createGastoEmpleado(gasto: CreateGastoEmpleadoData): Promise<GastoEmpleado> {
-  const usuario = await checkUserPermissions();
+  await checkUserPermissions();
   
-  if (usuario.rol !== 'admin' && usuario.rol !== 'supervisor') {
-    throw new Error('No tienes permisos para crear gastos de empleados');
+  // Validar campos requeridos
+  if (!gasto.fk_tipo_gasto) {
+    throw new Error('El tipo de gasto es requerido');
+  }
+  if (!gasto.monto || gasto.monto <= 0) {
+    throw new Error('El monto es requerido y debe ser mayor a 0');
+  }
+  if (!gasto.fk_lote_operaciones) {
+    throw new Error('El lote de operaciones es requerido');
+  }
+  if (!gasto.fk_usuario) {
+    throw new Error('El usuario es requerido');
+  }
+  if (!gasto.fk_cuenta_tesoreria) {
+    throw new Error('La cuenta de tesorería es requerida');
   }
   
+  // Verificar si el tipo de gasto requiere empleado
+  const { data: tipoGasto, error: errorTipo } = await supabase
+    .from('tipo_gasto')
+    .select('obliga_empleado, afecta_caja')
+    .eq('id', gasto.fk_tipo_gasto)
+    .single();
+    
+  if (errorTipo) {
+    throw new Error('Error al verificar el tipo de gasto');
+  }
+  
+  console.log('Datos del tipo de gasto:', {
+    id: gasto.fk_tipo_gasto,
+    obliga_empleado: tipoGasto.obliga_empleado,
+    afecta_caja: tipoGasto.afecta_caja
+  });
+  
+  // Solo validar empleado si el tipo de gasto lo requiere
+  if (tipoGasto.obliga_empleado && !gasto.fk_empleado) {
+    throw new Error('El empleado es requerido para este tipo de gasto');
+  }
+  
+  // Crear el gasto
   const { data, error } = await supabase
     .from("gastos_empleados")
     .insert([gasto])
     .select()
     .single();
     
-  if (error) throw error;
+  if (error) {
+    console.error('Error creating gasto empleado:', error);
+    throw new Error(`Error al crear el gasto: ${error.message}`);
+  }
+  
+  // Registrar egreso en detalle_lotes_operaciones si el tipo de gasto afecta la caja
+  if (tipoGasto.afecta_caja && gasto.fk_lote_operaciones && gasto.fk_cuenta_tesoreria) {
+    console.log('Intentando registrar egreso en detalle_lotes_operaciones:', {
+      fk_id_lote: gasto.fk_lote_operaciones,
+      fk_id_cuenta_tesoreria: gasto.fk_cuenta_tesoreria,
+      tipo: "egreso",
+      monto: gasto.monto,
+      afecta_caja: tipoGasto.afecta_caja
+    });
+    
+    const { error: errorDetalle } = await supabase
+      .from("detalle_lotes_operaciones")
+      .insert([{
+        fk_id_lote: gasto.fk_lote_operaciones,
+        fk_id_cuenta_tesoreria: gasto.fk_cuenta_tesoreria,
+        tipo: "egreso",
+        monto: gasto.monto
+      }]);
+      
+    if (errorDetalle) {
+      console.error('Error creating detalle lote operacion:', errorDetalle);
+      // No lanzamos error aquí para no revertir el gasto ya creado
+      // Solo loggeamos el error
+    } else {
+      console.log('Egreso registrado exitosamente en detalle_lotes_operaciones');
+    }
+  } else {
+    console.log('No se registra egreso porque:', {
+      afecta_caja: tipoGasto.afecta_caja,
+      tiene_lote: !!gasto.fk_lote_operaciones,
+      tiene_cuenta: !!gasto.fk_cuenta_tesoreria
+    });
+  }
+  
   return data as GastoEmpleado;
 }
 
 export async function updateGastoEmpleado(id: number, gasto: Partial<CreateGastoEmpleadoData>): Promise<GastoEmpleado> {
-  const usuario = await checkUserPermissions();
-  
-  if (usuario.rol !== 'admin' && usuario.rol !== 'supervisor') {
-    throw new Error('No tienes permisos para actualizar gastos de empleados');
-  }
+  await checkUserPermissions();
   
   const { data, error } = await supabase
     .from("gastos_empleados")
@@ -76,11 +146,7 @@ export async function updateGastoEmpleado(id: number, gasto: Partial<CreateGasto
 }
 
 export async function deleteGastoEmpleado(id: number): Promise<void> {
-  const usuario = await checkUserPermissions();
-  
-  if (usuario.rol !== 'admin') {
-    throw new Error('No tienes permisos para eliminar gastos de empleados');
-  }
+  await checkUserPermissions();
   
   const { error } = await supabase
     .from("gastos_empleados")

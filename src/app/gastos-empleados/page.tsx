@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import { GastosEmpleadosTable } from "@/components/tesoreria/gastos-empleados-table";
-import { useGastosEmpleados } from "@/hooks/use-gastos-empleados";
 import { GastoEmpleadoForm } from "@/components/tesoreria/gasto-empleado-form";
 import {
   Dialog,
@@ -14,10 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { ReceiptText } from "lucide-react";
 import { TiposGastoContent } from "@/components/tesoreria/tipos-gasto-content";
-import { getTiposGasto } from "@/services/tiposGasto";
-import { TipoGasto } from "@/types/tipoGasto";
+import { GastoEmpleado, CreateGastoEmpleadoData } from "@/types/gastoEmpleado";
+import { getGastosEmpleados, createGastoEmpleado } from "@/app/actions/gastos-empleados";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 function Breadcrumb() {
   return (
@@ -32,13 +32,37 @@ function Breadcrumb() {
 export default function GastosEmpleadosPage() {
   const { isSignedIn } = useUser();
   const router = useRouter();
-  const [tiposGasto, setTiposGasto] = useState<TipoGasto[]>([]);
-  useEffect(() => {
-    getTiposGasto().then(setTiposGasto);
-  }, []);
-  const { gastos, addGasto } = useGastosEmpleados(tiposGasto);
+  const [gastos, setGastos] = useState<GastoEmpleado[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    async function fetchGastos() {
+      try {
+        const data = await getGastosEmpleados();
+        setGastos(data);
+      } catch (error) {
+        console.error('Error fetching gastos:', error);
+        toast.error('Error al cargar los gastos');
+      }
+    }
+    fetchGastos();
+  }, []);
+
+  const handleAddGasto = async (data: CreateGastoEmpleadoData) => {
+    try {
+      setIsLoading(true);
+      const newGasto = await createGastoEmpleado(data);
+      setGastos(prev => [newGasto, ...prev]);
+      toast.success('Gasto creado exitosamente');
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error('Error creating gasto:', error);
+      toast.error('Error al crear el gasto');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (!isSignedIn) {
     return (
@@ -77,12 +101,7 @@ export default function GastosEmpleadosPage() {
                 <DialogTitle>Nuevo Gasto de Empleado</DialogTitle>
               </DialogHeader>
               <GastoEmpleadoForm
-                onSubmit={async (data) => {
-                  setIsLoading(true);
-                  await addGasto(data);
-                  setIsLoading(false);
-                  setIsDialogOpen(false);
-                }}
+                onSubmit={handleAddGasto}
                 onCancel={() => setIsDialogOpen(false)}
                 isLoading={isLoading}
               />

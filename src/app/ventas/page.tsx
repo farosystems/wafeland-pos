@@ -56,7 +56,6 @@ export default function VentasPage() {
   const VENTAS_POR_PAGINA = 10;
   const [ventaAAnular, setVentaAAnular] = useState<OrdenVenta | null>(null);
   const [openNotaCredito, setOpenNotaCredito] = useState(false);
-  const [notasCreditoPorVenta, setNotasCreditoPorVenta] = useState<Map<number, number>>(new Map());
   const [filtro, setFiltro] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
@@ -135,16 +134,14 @@ export default function VentasPage() {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      setError(null);
       try {
-        // Cargar datos en paralelo para mejor rendimiento
-        const [ventasData, clientesData, usuariosData, articulosData, cuentasData, tiposData] = await Promise.all([
+        const [ventasData, clientesData, usuariosData, articulosData, cuentasData, tiposComprobantesData] = await Promise.all([
           getOrdenesVenta(),
           getClientes(),
           getUsuarios(),
           getArticles(),
           getCuentasTesoreria(),
-          getTiposComprobantes(),
+          getTiposComprobantes()
         ]);
         
         setVentas(ventasData);
@@ -152,32 +149,10 @@ export default function VentasPage() {
         setUsuarios(usuariosData);
         setArticulos(articulosData);
         setCuentas(cuentasData);
-        setTiposComprobantes(tiposData);
-        
-        // Procesar ventas anuladas
-        const ventasAnuladasSet = new Set<number>();
-        const notasCreditoPorVentaMap = new Map<number, number>();
-        
-        // Buscar el tipo de comprobante "NOTA DE CREDITO"
-        const tipoNotaCredito = tiposData.find(tc => 
-          tc.descripcion.toUpperCase().includes('NOTA DE CREDITO') || 
-          tc.descripcion.toUpperCase().includes('NOTA DE CRÉDITO')
-        );
-        
-        if (tipoNotaCredito) {
-          const notasCredito = ventasData.filter(v => v.fk_id_tipo_comprobante === tipoNotaCredito.id);
-          
-          for (const notaCredito of notasCredito) {
-            if (notaCredito.fk_id_orden_anulada) {
-              ventasAnuladasSet.add(notaCredito.fk_id_orden_anulada);
-              notasCreditoPorVentaMap.set(notaCredito.fk_id_orden_anulada, notaCredito.id);
-            }
-          }
-        }
-        setNotasCreditoPorVenta(notasCreditoPorVentaMap);
+        setTiposComprobantes(tiposComprobantesData);
       } catch (error) {
         console.error("Error al cargar datos:", error);
-        setError("Error al cargar ventas");
+        setError("Error al cargar datos");
       } finally {
         setLoading(false);
       }
@@ -199,28 +174,6 @@ export default function VentasPage() {
     try {
       const data = await getOrdenesVenta();
       setVentas(data);
-      
-      // Reprocesar ventas anuladas
-      const ventasAnuladasSet = new Set<number>();
-      const notasCreditoPorVentaMap = new Map<number, number>();
-      
-      // Buscar el tipo de comprobante "NOTA DE CREDITO"
-      const tipoNotaCredito = tiposComprobantes.find(tc => 
-        tc.descripcion.toUpperCase().includes('NOTA DE CREDITO') || 
-        tc.descripcion.toUpperCase().includes('NOTA DE CRÉDITO')
-      );
-      
-      if (tipoNotaCredito) {
-        const notasCredito = data.filter(v => v.fk_id_tipo_comprobante === tipoNotaCredito.id);
-        
-        for (const notaCredito of notasCredito) {
-          if (notaCredito.fk_id_orden_anulada) {
-            ventasAnuladasSet.add(notaCredito.fk_id_orden_anulada);
-            notasCreditoPorVentaMap.set(notaCredito.fk_id_orden_anulada, notaCredito.id);
-          }
-        }
-      }
-      setNotasCreditoPorVenta(notasCreditoPorVentaMap);
     } catch (error) {
       console.error("Error al refrescar ventas:", error);
       setError("Error al refrescar ventas");
@@ -476,6 +429,13 @@ export default function VentasPage() {
     setOpenNotaCredito(true);
   }
 
+  // Función para buscar la nota de crédito que anuló una venta
+  const getNotaCreditoAnuladora = useCallback((ventaId: number) => {
+    // Buscar la nota de crédito que tiene fk_id_orden_anulada = ventaId
+    const notaCredito = ventas.find(v => v.fk_id_orden_anulada === ventaId);
+    return notaCredito;
+  }, [ventas]);
+
   // AHORA EL CHEQUEO DE isSignedIn
   if (!isSignedIn) {
     return (
@@ -689,13 +649,16 @@ export default function VentasPage() {
                 </div>
                 <div className="text-red-700 text-sm mt-1">
                   Se generó una nota de crédito para anular esta venta.<br />
-                  {notasCreditoPorVenta.has(ventaSeleccionada.id) ? (
-                    <>
-                      <span className="font-bold">Nota de crédito N°:</span> <span>{notasCreditoPorVenta.get(ventaSeleccionada.id)}</span>
-                    </>
-                  ) : (
-                    <span className="font-bold">Nota de crédito no encontrada.</span>
-                  )}
+                  {(() => {
+                    const notaCredito = getNotaCreditoAnuladora(ventaSeleccionada.id);
+                    return notaCredito ? (
+                      <>
+                        <span className="font-bold">Nota de crédito N°:</span> <span>{notaCredito.id}</span>
+                      </>
+                    ) : (
+                      <span className="font-bold">Nota de crédito no encontrada.</span>
+                    );
+                  })()}
                 </div>
               </div>
             )}

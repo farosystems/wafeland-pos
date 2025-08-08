@@ -134,7 +134,7 @@ export function PagoModal({ cuenta, isOpen, onClose, onPagoRealizado, usuarioAct
         cuenta.id,
         montoNumero,
         cuentaId,
-        lote.id_lote // nuevo argumento
+        lote.id_lote
       );
       // Registrar ingreso en caja por el pago de cuenta corriente
       await registrarMovimientoCaja({
