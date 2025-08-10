@@ -543,7 +543,7 @@ BEGIN
     m.id,
     CASE 
       WHEN NEW.rol = 'admin' THEN true
-      WHEN NEW.rol = 'supervisor' THEN true
+      WHEN NEW.rol = 'supervisor' THEN m.nombre IN ('dashboard', 'articulos', 'clientes', 'ventas', 'mis-ventas', 'movimientos-stock', 'importacion-stock', 'stock-faltante', 'talles-colores', 'variantes-productos', 'agrupadores', 'empleados', 'liquidaciones', 'caja', 'gastos-empleados', 'pagos', 'cuentas-corrientes', 'informes')
       WHEN NEW.rol = 'vendedor' THEN m.nombre IN ('dashboard', 'articulos', 'clientes', 'ventas', 'mis-ventas', 'movimientos-stock', 'importacion-stock', 'stock-faltante', 'talles-colores', 'variantes-productos', 'agrupadores')
       WHEN NEW.rol = 'cobrador' THEN m.nombre IN ('dashboard', 'ventas', 'mis-ventas', 'pagos', 'cuentas-corrientes', 'caja')
       ELSE false
@@ -575,7 +575,7 @@ BEGIN
     m.id,
     CASE 
       WHEN NEW.rol = 'admin' THEN true
-      WHEN NEW.rol = 'supervisor' THEN true
+      WHEN NEW.rol = 'supervisor' THEN m.nombre IN ('dashboard', 'articulos', 'clientes', 'ventas', 'mis-ventas', 'movimientos-stock', 'importacion-stock', 'stock-faltante', 'talles-colores', 'variantes-productos', 'agrupadores', 'empleados', 'liquidaciones', 'caja', 'gastos-empleados', 'pagos', 'cuentas-corrientes', 'informes')
       WHEN NEW.rol = 'vendedor' THEN m.nombre IN ('dashboard', 'articulos', 'clientes', 'ventas', 'mis-ventas', 'movimientos-stock', 'importacion-stock', 'stock-faltante', 'talles-colores', 'variantes-productos', 'agrupadores')
       WHEN NEW.rol = 'cobrador' THEN m.nombre IN ('dashboard', 'ventas', 'mis-ventas', 'pagos', 'cuentas-corrientes', 'caja')
       ELSE false

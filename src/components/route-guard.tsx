@@ -82,7 +82,7 @@ export function RouteGuard({ children, requiredModule }: RouteGuardProps) {
         // Verificar si ya tenemos los datos del usuario y no han cambiado
         if (lastCheckedUser === userEmail && usuarioDB && modulosPermitidos.length > 0) {
           // Usar datos en cache
-          const esAdmin = usuarioDB.rol === 'admin' || usuarioDB.rol === 'supervisor';
+          const esAdmin = usuarioDB.rol === 'admin';
           
           if (esAdmin) {
             setHasAccess(true);
@@ -107,7 +107,7 @@ export function RouteGuard({ children, requiredModule }: RouteGuardProps) {
           setModulosPermitidos(modulos);
           
           // Verificar acceso
-          const esAdmin = usuario.rol === 'admin' || usuario.rol === 'supervisor';
+          const esAdmin = usuario.rol === 'admin';
           
           if (esAdmin) {
             setHasAccess(true);

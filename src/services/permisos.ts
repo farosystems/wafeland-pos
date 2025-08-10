@@ -258,8 +258,9 @@ export async function crearPermisosPorDefecto(usuarioId: number, rol: string): P
 function getPuedeVerPorRol(rol: string, nombreModulo: string): boolean {
   switch (rol) {
     case 'admin':
+      return true; // Solo los administradores ven todo por defecto
     case 'supervisor':
-      return true;
+      return ['dashboard', 'articulos', 'clientes', 'ventas', 'mis-ventas', 'movimientos-stock', 'importacion-stock', 'stock-faltante', 'talles-colores', 'variantes-productos', 'agrupadores', 'empleados', 'liquidaciones', 'caja', 'gastos-empleados', 'pagos', 'cuentas-corrientes', 'informes'].includes(nombreModulo);
     case 'vendedor':
       return ['dashboard', 'articulos', 'clientes', 'ventas', 'mis-ventas', 'movimientos-stock', 'importacion-stock', 'stock-faltante', 'talles-colores', 'variantes-productos', 'agrupadores', 'informes'].includes(nombreModulo);
     case 'cobrador':

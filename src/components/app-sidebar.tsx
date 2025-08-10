@@ -83,9 +83,16 @@ export function AppSidebar() {
 
   // Función para verificar si un módulo está permitido
   const isModuloPermitido = (nombreModulo: string): boolean => {
-    if (!usuarioDB || usuarioDB.rol === 'admin' || usuarioDB.rol === 'supervisor') {
-      return true; // Admins y supervisores ven todo
+    if (!usuarioDB) {
+      return false;
     }
+    
+    // Solo los administradores ven todo por defecto
+    if (usuarioDB.rol === 'admin') {
+      return true;
+    }
+    
+    // Para otros roles (incluyendo supervisor), verificar permisos específicos
     return modulosPermitidos.some(modulo => modulo.nombre === nombreModulo);
   };
 

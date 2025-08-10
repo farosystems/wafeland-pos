@@ -18,7 +18,7 @@ export async function getUserPermissions() {
     return {
       usuario,
       modulosPermitidos,
-      esAdmin: usuario.rol === 'admin' || usuario.rol === 'supervisor'
+      esAdmin: usuario.rol === 'admin'
     };
   } catch (error) {
     console.error("Error obteniendo permisos:", error);
@@ -27,7 +27,7 @@ export async function getUserPermissions() {
 }
 
 export function canAccessRoute(pathname: string, modulosPermitidos: any[], esAdmin: boolean): boolean {
-  // Admins y supervisores pueden acceder a todo
+  // Solo los administradores pueden acceder a todo
   if (esAdmin) return true;
 
   // Rutas públicas que no requieren permisos
