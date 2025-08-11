@@ -126,30 +126,30 @@ export function ClientesContentSecure() {
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validar prueba gratis
-    const expired = await checkTrial(() => setShowTrialEnded(true));
-    if (expired) return;
-
-    // Validaciones básicas
-    if (!form.razon_social.trim()) {
-      setFormError("La razón social es requerida");
-      return;
-    }
-
-    if (!form.email.trim()) {
-      setFormError("El email es requerido");
-      return;
-    }
-
-    if (!form.num_doc.trim()) {
-      setFormError("El número de documento es requerido");
-      return;
-    }
-
-    setFormError(null);
-    setLoading(true);
-
     try {
+      // Validar prueba gratis
+      const expired = await checkTrial(() => setShowTrialEnded(true));
+      if (expired) return;
+
+      // Validaciones básicas
+      if (!form.razon_social.trim()) {
+        setFormError("La razón social es requerida");
+        return;
+      }
+
+      if (!form.email.trim()) {
+        setFormError("El email es requerido");
+        return;
+      }
+
+      if (!form.num_doc.trim()) {
+        setFormError("El número de documento es requerido");
+        return;
+      }
+
+      setFormError(null);
+      setLoading(true);
+
       if (editing) {
         await updateCliente(editing.id, form);
         toast.success("Cliente actualizado correctamente");
@@ -162,8 +162,9 @@ export function ClientesContentSecure() {
       fetchAll();
     } catch (error) {
       console.error("Error al guardar cliente:", error);
-      setFormError((error as Error).message);
-      toast.error((error as Error).message);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido al guardar cliente';
+      setFormError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
