@@ -1,7 +1,12 @@
 # Solución para Error de Server Components en Vercel
 
 ## Problema
-Al subir el proyecto a Vercel y intentar crear un nuevo cliente, aparece un error de Server Components render con el mensaje: "An error occurred in the Server Components render. The specific message is omitted in production builds to avoid leaking sensitive details."
+Al subir el proyecto a Vercel y intentar crear un nuevo cliente o artículo, aparece un error de Server Components render con el mensaje: "An error occurred in the Server Components render. The specific message is omitted in production builds to avoid leaking sensitive details."
+
+### Problema Específico de Artículos
+- Los usuarios con rol "supervisor" pueden crear artículos sin problemas
+- Los usuarios con rol "cobrador" reciben un error 500 al intentar crear artículos
+- El error se debe a que los usuarios "cobrador" no tienen permisos para crear artículos
 
 ## Causas Identificadas
 
@@ -14,26 +19,41 @@ Al subir el proyecto a Vercel y intentar crear un nuevo cliente, aparece un erro
 
 ### 1. Mejora del Manejo de Errores en Server Actions
 
-Se ha mejorado el archivo `src/app/actions/clientes.ts` con:
-- Validación de variables de entorno al inicio
-- Manejo de errores con try-catch en todas las funciones
-- Mensajes de error más descriptivos
-- Logging de errores para debugging
+Se han mejorado los archivos de Server Actions con:
+- **`src/app/actions/clientes.ts`**:
+  - Validación de variables de entorno al inicio
+  - Manejo de errores con try-catch en todas las funciones
+  - Mensajes de error más descriptivos
+  - Logging de errores para debugging
+
+- **`src/app/actions/articles.ts`**:
+  - Validación de variables de entorno al inicio
+  - Manejo de errores con try-catch en todas las funciones
+  - Validaciones específicas para artículos (descripción, precio, agrupador)
+  - Mensajes de error más descriptivos para permisos
+  - Logging de errores para debugging
 
 ### 2. Componentes de Manejo de Errores
 
 Se han creado archivos de manejo de errores:
 - `src/app/error.tsx` - Error global de la aplicación
 - `src/app/clientes/error.tsx` - Error específico de la página de clientes
+- `src/app/articles/error.tsx` - Error específico de la página de artículos
 
-### 3. Configuración Mejorada de Next.js
+### 3. Mejoras en la Interfaz de Usuario
+
+- **Toast de éxito**: Se agregó el mensaje "Artículo generado con éxito" al crear un artículo
+- **Manejo de errores de permisos**: Se mejoró el manejo de errores específicos para usuarios sin permisos
+- **Mensajes más descriptivos**: Los errores ahora muestran información más clara sobre qué permisos se necesitan
+
+### 4. Configuración Mejorada de Next.js
 
 Se ha actualizado `next.config.ts` con:
 - Configuración experimental para Server Components
 - Headers de seguridad
 - Configuración optimizada para Vercel
 
-### 4. Configuración de Vercel
+### 5. Configuración de Vercel
 
 Se ha creado `vercel.json` con:
 - Configuración específica para Next.js
@@ -105,11 +125,15 @@ Si el problema persiste:
 ## Archivos Modificados
 
 - `src/app/actions/clientes.ts` - Mejorado manejo de errores
+- `src/app/actions/articles.ts` - Mejorado manejo de errores y permisos
 - `src/app/error.tsx` - Nuevo componente de error global
 - `src/app/clientes/error.tsx` - Nuevo componente de error específico
+- `src/app/articles/error.tsx` - Nuevo componente de error específico para artículos
 - `next.config.ts` - Configuración mejorada
 - `vercel.json` - Nueva configuración de Vercel
 - `src/components/clientes/clientes-content-secure.tsx` - Mejorado manejo de errores
+- `src/components/articles/articles-content-secure.tsx` - Mejorado manejo de errores y toast de éxito
+- `src/hooks/use-articles-secure.ts` - Mejorado manejo de errores
 
 ## Notas Importantes
 

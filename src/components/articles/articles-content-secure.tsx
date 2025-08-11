@@ -33,6 +33,8 @@ export function ArticlesContentSecure() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [showPermErrorModal, setShowPermErrorModal] = React.useState(false);
   const [permErrorMsg, setPermErrorMsg] = React.useState("");
+  const [showSuccessModal, setShowSuccessModal] = React.useState(false);
+  const [successMsg, setSuccessMsg] = React.useState("");
 
   const openCreateDialog = () => {
     setEditingArticle(undefined);
@@ -57,14 +59,18 @@ export function ArticlesContentSecure() {
         toast.success("Artículo actualizado correctamente");
       } else {
         await addArticle(data as CreateArticleData);
-        toast.success("Artículo creado correctamente");
+        setSuccessMsg("Artículo generado correctamente");
+        setShowSuccessModal(true);
       }
       closeDialog();
     } catch (error) {
       console.error("Error al guardar artículo:", error);
       const msg = (error as Error).message || "Error al guardar artículo";
-      if (msg.includes("No tienes permisos para actualizar artículos")) {
-        setPermErrorMsg("No tienes permisos para actualizar artículos. Consulta con un administrador.");
+      
+      // Manejar errores específicos de permisos
+      if (msg.includes("No tienes permisos para crear artículos") || 
+          msg.includes("No tienes permisos para actualizar artículos")) {
+        setPermErrorMsg("No tienes permisos para gestionar artículos. Solo administradores y supervisores pueden crear/editar artículos.");
         setShowPermErrorModal(true);
       } else {
         toast.error(msg);
@@ -161,6 +167,29 @@ export function ArticlesContentSecure() {
           </DialogHeader>
           <div className="flex justify-end mt-4">
             <Button onClick={() => setShowPermErrorModal(false)}>Cerrar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de éxito */}
+      <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <Package className="h-5 w-5" />
+              ¡Artículo Creado!
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              {successMsg}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end mt-4">
+            <Button 
+              onClick={() => setShowSuccessModal(false)}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              Continuar
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

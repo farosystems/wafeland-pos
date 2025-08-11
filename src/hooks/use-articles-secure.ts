@@ -38,7 +38,9 @@ export function useArticlesSecure() {
       setArticles((prev) => [newArticle, ...prev]);
     } catch (error) {
       console.error("Error al crear artículo:", error);
-      setError((error as Error).message);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido al crear artículo';
+      setError(errorMessage);
+      throw error; // Re-lanzar el error para que el componente lo maneje
     } finally {
       setLoading(false);
     }
