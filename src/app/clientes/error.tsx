@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertTriangle, RefreshCw, Users } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface ErrorProps {
   error: Error & { digest?: string };
@@ -21,7 +21,7 @@ export default function ClientesError({ error, reset }: ErrorProps) {
         <CardHeader className="text-center pb-4">
           <div className="flex justify-center mb-4">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-              <Users className="w-8 h-8 text-red-600" />
+              <AlertTriangle className="w-8 h-8 text-red-600" />
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-red-600 mb-2">
