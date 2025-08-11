@@ -128,6 +128,34 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
             />
             <FormField
               control={form.control}
+              name="precio_costo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Precio Costo</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                  </FormControl>
+                  <FormDescription>Precio de costo del artículo</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="mark_up"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mark Up (%)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                  </FormControl>
+                  <FormDescription>Porcentaje de mark up aplicado al costo</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name="precio_unitario"
               render={({ field }) => (
                 <FormItem>
@@ -145,6 +173,8 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
               <Input type="text" value={rentabilidad} readOnly disabled className="bg-gray-100" />
               <div className="text-xs text-muted-foreground mt-1">Rentabilidad calculada según precio de costo y unitario</div>
             </div>
+          </div>
+          <div className="space-y-4">
             <FormField
               control={form.control}
               name="fk_id_agrupador"
@@ -191,36 +221,6 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="precio_costo"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Precio Costo</FormLabel>
-                  <FormControl>
-                    <Input type="number" step="0.01" placeholder="0.00" {...field} />
-                  </FormControl>
-                  <FormDescription>Precio de costo del artículo</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="mark_up"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Mark Up (%)</FormLabel>
-                  <FormControl>
-                    <Input type="number" step="0.01" placeholder="0.00" {...field} />
-                  </FormControl>
-                  <FormDescription>Porcentaje de mark up aplicado al costo</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-          <div className="space-y-4">
             <FormField
               control={form.control}
               name="activo"

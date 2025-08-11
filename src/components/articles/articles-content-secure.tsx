@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Package } from "lucide-react";
+import { Package, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,13 +14,14 @@ import { ArticlesTable } from "@/components/articles/articles-table";
 import { ArticleForm } from "@/components/articles/article-form";
 import { useArticlesSecure } from "@/hooks/use-articles-secure";
 import { useUser } from "@clerk/nextjs";
+import { getUsuarios } from "@/services/usuarios";
 import { AgrupadoresContent } from "@/components/agrupadores/agrupadores-content";
 import { Article, CreateArticleData, UpdateArticleData } from "@/types/article";
 import { MarcasContent } from "@/components/articles/marcas-content";
 import { toast } from "sonner";
 
 export function ArticlesContentSecure() {
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser();
   const {
     articles,
     error,
@@ -35,6 +36,7 @@ export function ArticlesContentSecure() {
   const [permErrorMsg, setPermErrorMsg] = React.useState("");
   const [showSuccessModal, setShowSuccessModal] = React.useState(false);
   const [successMsg, setSuccessMsg] = React.useState("");
+  const [userRole, setUserRole] = React.useState<string | null>(null);
 
   const openCreateDialog = () => {
     setEditingArticle(undefined);
@@ -67,9 +69,14 @@ export function ArticlesContentSecure() {
       console.error("Error al guardar artículo:", error);
       const msg = (error as Error).message || "Error al guardar artículo";
       
-      // Manejar errores específicos de permisos
-      if (msg.includes("No tienes permisos para crear artículos") || 
-          msg.includes("No tienes permisos para actualizar artículos")) {
+      // Detectar errores de permisos de manera más específica
+      const isPermissionError = 
+        msg.includes("No tienes permisos para crear artículos") ||
+        msg.includes("No tienes permisos para actualizar artículos") ||
+        (userRole && userRole !== 'admin' && userRole !== 'supervisor' && 
+         msg.includes("Server Components render"));
+      
+      if (isPermissionError) {
         setPermErrorMsg("No tienes permisos para gestionar artículos. Solo administradores y supervisores pueden crear/editar artículos.");
         setShowPermErrorModal(true);
       } else {
@@ -79,6 +86,25 @@ export function ArticlesContentSecure() {
       setIsLoading(false);
     }
   };
+
+  // Obtener el rol del usuario actual
+  React.useEffect(() => {
+    const getUserRole = async () => {
+      try {
+        const usuarios = await getUsuarios();
+        const currentUser = usuarios.find(u => u.email === user?.emailAddresses[0]?.emailAddress);
+        if (currentUser) {
+          setUserRole(currentUser.rol);
+        }
+      } catch (error) {
+        console.error("Error al obtener rol del usuario:", error);
+      }
+    };
+
+    if (user?.emailAddresses[0]?.emailAddress) {
+      getUserRole();
+    }
+  }, [user]);
 
   // Mostrar error si existe
   React.useEffect(() => {
@@ -138,7 +164,7 @@ export function ArticlesContentSecure() {
 
       {/* Dialog para crear/editar artículo */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingArticle ? "Editar Artículo" : "Nuevo Artículo"}
@@ -160,13 +186,31 @@ export function ArticlesContentSecure() {
       </Dialog>
 
       <Dialog open={showPermErrorModal} onOpenChange={setShowPermErrorModal}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Error de permisos</DialogTitle>
-            <DialogDescription>{permErrorMsg}</DialogDescription>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Error de Permisos
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              {permErrorMsg}
+            </DialogDescription>
           </DialogHeader>
+          <div className="mt-4 p-3 bg-gray-50 rounded-md">
+            <p className="text-sm text-gray-600">
+              <strong>Tu rol actual:</strong> {userRole || 'No determinado'}
+            </p>
+            <p className="text-sm text-gray-600 mt-1">
+              <strong>Roles permitidos:</strong> Administrador, Supervisor
+            </p>
+          </div>
           <div className="flex justify-end mt-4">
-            <Button onClick={() => setShowPermErrorModal(false)}>Cerrar</Button>
+            <Button 
+              onClick={() => setShowPermErrorModal(false)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Entendido
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -56,7 +56,9 @@ export function useArticlesSecure() {
       );
     } catch (error) {
       console.error("Error al editar artículo:", error);
-      setError((error as Error).message);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido al editar artículo';
+      setError(errorMessage);
+      throw error; // Re-lanzar el error para que el componente lo maneje
     } finally {
       setLoading(false);
     }
@@ -70,7 +72,9 @@ export function useArticlesSecure() {
       setArticles((prev) => prev.filter((a) => a.id !== id));
     } catch (error) {
       console.error("Error al eliminar artículo:", error);
-      setError((error as Error).message);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido al eliminar artículo';
+      setError(errorMessage);
+      throw error; // Re-lanzar el error para que el componente lo maneje
     } finally {
       setLoading(false);
     }

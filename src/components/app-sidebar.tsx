@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  IconHome,
   IconPackage,
   IconCalendar,
   IconStack,
@@ -14,6 +13,7 @@ import {
   IconReportAnalytics,
   IconUpload,
   IconShield,
+  IconChartBar,
 } from "@tabler/icons-react";
 import { Shield } from "lucide-react";
 import Link from "next/link";
@@ -264,7 +264,7 @@ export function AppSidebar() {
                 className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/dashboard" ? "bg-gray-200 text-black font-semibold w-[92%] ml-1" : "hover:bg-gray-100 text-black"}`}
                 prefetch={false}
               >
-                <IconHome className="w-5 h-5" />
+                <IconChartBar className="w-5 h-5" />
                 <span>Dashboard</span>
               </Link>
             </li>
