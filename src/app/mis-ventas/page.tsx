@@ -59,13 +59,12 @@ export default function MisVentasPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ordenes.map((orden: any) => getOrdenesVentaMediosPago(orden.id))
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ventasPlanas: any[] = ordenes.flatMap((orden: any, idx: number) => {
-        // Calcular el total de artículos en esta orden para distribuir el descuento
-        const totalCantidadOrden = detalles[idx].reduce((sum: number, det: any) => sum + det.cantidad, 0);
-        const totalSinDescuento = detalles[idx].reduce((sum: number, det: any) => sum + (det.precio_unitario * det.cantidad), 0);
-        const totalConDescuento = orden.total; // Este es el total real con descuentos aplicados
-        const factorDescuento = totalSinDescuento > 0 ? totalConDescuento / totalSinDescuento : 1;
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       const ventasPlanas: any[] = ordenes.flatMap((orden: any, idx: number) => {
+         // Calcular el total sin descuentos para obtener el factor de descuento
+         const totalSinDescuento = detalles[idx].reduce((sum: number, det: any) => sum + (det.precio_unitario * det.cantidad), 0);
+         const totalConDescuento = orden.total; // Este es el total real con descuentos aplicados
+         const factorDescuento = totalSinDescuento > 0 ? totalConDescuento / totalSinDescuento : 1;
         
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return detalles[idx].map((detalle: any) => {
