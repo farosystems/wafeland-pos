@@ -475,7 +475,8 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
         }
       }
       // Calcular total y subtotal de la venta
-      const totalVenta = detalle.reduce((acc, d) => acc + (d.cantidad && d.precio ? d.cantidad * d.precio : 0), 0);
+      // Usar la variable 'total' que ya incluye los descuentos aplicados
+      const totalVenta = total;
       // 1. Crear la orden de venta principal
       const hoy = formatLocalDateTime(new Date());
       const ordenVenta = await createOrdenVenta({

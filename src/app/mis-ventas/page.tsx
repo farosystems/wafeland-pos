@@ -60,16 +60,25 @@ export default function MisVentasPage() {
         ordenes.map((orden: any) => getOrdenesVentaMediosPago(orden.id))
       );
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ventasPlanas: any[] = ordenes.flatMap((orden: any, idx: number) => 
+      const ventasPlanas: any[] = ordenes.flatMap((orden: any, idx: number) => {
+        // Calcular el total de artículos en esta orden para distribuir el descuento
+        const totalCantidadOrden = detalles[idx].reduce((sum: number, det: any) => sum + det.cantidad, 0);
+        const totalSinDescuento = detalles[idx].reduce((sum: number, det: any) => sum + (det.precio_unitario * det.cantidad), 0);
+        const totalConDescuento = orden.total; // Este es el total real con descuentos aplicados
+        const factorDescuento = totalSinDescuento > 0 ? totalConDescuento / totalSinDescuento : 1;
+        
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        detalles[idx].map((detalle: any) => {
+        return detalles[idx].map((detalle: any) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const articulo = articulosDB.find((a: any) => a.id === detalle.fk_id_articulo);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const cliente = clientesDB.find((c: any) => c.id === orden.fk_id_entidades);
           const costo = articulo?.precio_costo ?? 0;
-          const ganancia = (detalle.precio_unitario - costo) * detalle.cantidad;
-          const rentabilidad = costo > 0 ? ((detalle.precio_unitario - costo) / costo) * 100 : null;
+          
+          // Calcular precio final con descuentos aplicados
+          const precioFinalConDescuento = detalle.precio_unitario * factorDescuento;
+          const ganancia = (precioFinalConDescuento - costo) * detalle.cantidad;
+          const rentabilidad = costo > 0 ? ((precioFinalConDescuento - costo) / costo) * 100 : null;
           
           // Debug: Ver qué cantidad se está procesando
           // console.log(`Procesando venta - Orden: ${orden.id}, Artículo: ${articulo?.descripcion}, Cantidad: ${detalle.cantidad}`);
@@ -86,15 +95,15 @@ export default function MisVentasPage() {
             cliente: cliente?.razon_social || "-",
             clienteObj: cliente,
             articulo: articulo?.descripcion || "-",
-            precio_venta: detalle.precio_unitario,
+            precio_venta: precioFinalConDescuento,
             costo,
             cantidad: detalle.cantidad,
             ganancia,
             rentabilidad,
             cuentasTesoreria: cuentas,
           };
-        })
-      );
+        });
+      });
       setVentas(ventasPlanas);
       setClientes(clientesDB);
       setArticulos(articulosDB);

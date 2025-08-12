@@ -174,7 +174,7 @@ export async function getDashboardData(periodo: string = 'mes'): Promise<Dashboa
     const rankingMediosPago = calcularVentasPorTipoPago(mediosPago, cuentasTesoreria, ventas);
 
     // Ranking de productos
-    const rankingProductos = calcularRankingProductos(detallesVenta, articulos, talles, colores);
+    const rankingProductos = calcularRankingProductos(detallesVenta, articulos, talles, colores, ventas);
 
     // Métricas diarias (última semana)
     const metricasDiarias = calcularMetricasDiarias(ventas);
@@ -314,15 +314,45 @@ function calcularVentasPorTipoPago(mediosPago: any[], cuentasTesoreria: any[], v
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function calcularRankingProductos(detallesVenta: any[], articulos: any[], talles: any[], colores: any[]) {
+function calcularRankingProductos(detallesVenta: any[], articulos: any[], talles: any[], colores: any[], ventas: any[]) {
   // Agrupar por fk_id_articulo
   const resumen: Record<number, { producto: string, unidades: number, ingresos: number, costo: number, color: string }> = {};
+  
+  // Crear un mapa de órdenes para acceder rápidamente a los totales
+  const ordenesMap = new Map();
+  ventas.forEach(venta => {
+    ordenesMap.set(venta.id, venta);
+  });
+  
+  // Agrupar detalles por orden para calcular factores de descuento
+  const detallesPorOrden = new Map();
+  detallesVenta.forEach(detalle => {
+    if (!detallesPorOrden.has(detalle.fk_id_orden)) {
+      detallesPorOrden.set(detalle.fk_id_orden, []);
+    }
+    detallesPorOrden.get(detalle.fk_id_orden).push(detalle);
+  });
+  
   detallesVenta.forEach((detalle, idx) => {
     const articulo = articulos.find(a => a.id === detalle.fk_id_articulo);
     if (!articulo) return;
     const talle = talles.find(t => t.id === detalle.fk_id_talle);
     const colorObj = colores.find(c => c.id === detalle.fk_id_color);
     const key = detalle.fk_id_articulo;
+    
+    // Calcular precio con descuentos aplicados
+    const orden = ordenesMap.get(detalle.fk_id_orden);
+    let precioFinal = detalle.precio_unitario || 0;
+    
+    if (orden) {
+      const detallesOrden = detallesPorOrden.get(detalle.fk_id_orden) || [];
+      const totalSinDescuento = detallesOrden.reduce((sum: number, det: any) => 
+        sum + ((det.precio_unitario || 0) * (det.cantidad || 0)), 0);
+      const totalConDescuento = orden.total || 0;
+      const factorDescuento = totalSinDescuento > 0 ? totalConDescuento / totalSinDescuento : 1;
+      precioFinal = (detalle.precio_unitario || 0) * factorDescuento;
+    }
+    
     if (!resumen[key]) {
       resumen[key] = {
         producto: `${articulo.descripcion}${talle ? ' - ' + talle.descripcion : ''}${colorObj ? ' ' + colorObj.descripcion : ''}`.trim(),
@@ -333,7 +363,7 @@ function calcularRankingProductos(detallesVenta: any[], articulos: any[], talles
       };
     }
     resumen[key].unidades += detalle.cantidad || 0;
-    resumen[key].ingresos += (detalle.precio_unitario || 0) * (detalle.cantidad || 0);
+    resumen[key].ingresos += precioFinal * (detalle.cantidad || 0);
     resumen[key].costo += (articulo.precio_costo || 0) * (detalle.cantidad || 0);
   });
   // Convertir a array y ordenar por unidades vendidas
