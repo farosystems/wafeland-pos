@@ -45,7 +45,6 @@ export function TiposComprobantesContent() {
     const descripcion = formData.get("descripcion") as string;
     const descuenta_stock = formData.get("descuenta_stock") === "on";
     const reingresa_stock = formData.get("reingresa_stock") === "on";
-    const admite_impuestos = formData.get("admite_impuestos") === "on";
     const imprime_pdf = formData.get("imprime_pdf") === "on";
     const activo = formData.get("activo") === "on";
 
@@ -55,7 +54,6 @@ export function TiposComprobantesContent() {
         if (typeof descripcion === 'string') updateData.descripcion = descripcion;
         updateData.descuenta_stock = descuenta_stock;
         updateData.reingresa_stock = reingresa_stock;
-        updateData.admite_impuestos = admite_impuestos;
         updateData.imprime_pdf = imprime_pdf;
         updateData.activo = activo;
         await updateTipoComprobante(editing.id, updateData);
@@ -64,7 +62,6 @@ export function TiposComprobantesContent() {
           descripcion: String(descripcion),
           descuenta_stock: descuenta_stock,
           reingresa_stock: reingresa_stock,
-          admite_impuestos: admite_impuestos,
           imprime_pdf: imprime_pdf,
           activo: activo,
         };

@@ -16,7 +16,12 @@ export async function getModulos(): Promise<Modulo[]> {
     .order("orden");
 
   if (error) {
-    console.error("Error obteniendo módulos:", error);
+    console.error("Error obteniendo módulos:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint
+    });
     throw error;
   }
 
@@ -35,7 +40,12 @@ export async function getPermisosUsuario(usuarioId: number): Promise<PermisoUsua
     .eq("fk_id_usuario", usuarioId);
 
   if (error) {
-    console.error("Error obteniendo permisos del usuario:", error);
+    console.error("Error obteniendo permisos del usuario:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint
+    });
     throw error;
   }
 
@@ -58,7 +68,12 @@ export async function getAllPermisosConDetalles(): Promise<PermisoUsuarioConDeta
     `);
 
   if (error) {
-    console.error("Error obteniendo todos los permisos:", error);
+    console.error("Error obteniendo todos los permisos:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint
+    });
     throw error;
   }
 
@@ -84,7 +99,12 @@ export async function createPermiso(permiso: CreatePermisoUsuarioData): Promise<
     .single();
 
   if (error) {
-    console.error("Error creando permiso:", error);
+    console.error("Error creando permiso:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint
+    });
     throw error;
   }
 
@@ -101,7 +121,12 @@ export async function updatePermiso(permisoId: number, updates: UpdatePermisoUsu
     .single();
 
   if (error) {
-    console.error("Error actualizando permiso:", error);
+    console.error("Error actualizando permiso:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint
+    });
     throw error;
   }
 
@@ -110,6 +135,9 @@ export async function updatePermiso(permisoId: number, updates: UpdatePermisoUsu
 
 // Actualizar permisos en lote para un usuario
 export async function updatePermisosUsuarioLote(usuarioId: number, permisos: { [moduloId: number]: UpdatePermisoUsuarioData }): Promise<void> {
+  console.log("Iniciando updatePermisosUsuarioLote para usuario:", usuarioId);
+  console.log("Permisos a procesar:", permisos);
+
   // Primero, obtener los permisos existentes del usuario
   const { data: permisosExistentes, error: errorGet } = await supabase
     .from("permisos_usuarios")
@@ -117,40 +145,89 @@ export async function updatePermisosUsuarioLote(usuarioId: number, permisos: { [
     .eq("fk_id_usuario", usuarioId);
 
   if (errorGet) {
-    console.error("Error obteniendo permisos existentes:", errorGet);
+    console.error("Error obteniendo permisos existentes:", {
+      message: errorGet.message,
+      code: errorGet.code,
+      details: errorGet.details,
+      hint: errorGet.hint
+    });
     throw errorGet;
   }
+
+  console.log("Permisos existentes encontrados:", permisosExistentes);
 
   // Crear un mapa de permisos existentes por módulo
   const permisosExistentesMap = new Map(
     permisosExistentes?.map(p => [p.fk_id_modulo, p]) || []
   );
 
-  // Preparar las operaciones de upsert
-  const updates = Object.entries(permisos).map(([moduloId, permiso]) => {
+  // Procesar cada permiso
+  for (const [moduloId, permiso] of Object.entries(permisos)) {
     const moduloIdNum = parseInt(moduloId);
+    
+    // Validar que el móduloId sea válido y el permiso tenga puede_ver
+    if (isNaN(moduloIdNum) || !permiso || typeof permiso.puede_ver !== 'boolean') {
+      console.warn("Saltando permiso inválido:", { moduloId, permiso });
+      continue;
+    }
+
     const permisoExistente = permisosExistentesMap.get(moduloIdNum);
     
-    return {
-      id: permisoExistente?.id, // Incluir ID si existe para actualizar
-      fk_id_usuario: usuarioId,
-      fk_id_modulo: moduloIdNum,
-      ...permiso,
-      actualizado_el: new Date().toISOString()
-    };
-  });
+    // Filtrar campos undefined/null del permiso
+    const permisoFiltrado = Object.fromEntries(
+      Object.entries(permiso).filter(([, value]) => value !== undefined && value !== null)
+    );
 
-  const { error } = await supabase
-    .from("permisos_usuarios")
-    .upsert(updates, { 
-      onConflict: 'fk_id_usuario,fk_id_modulo',
-      ignoreDuplicates: false 
+    console.log(`Procesando módulo ${moduloIdNum}:`, {
+      permisoExistente: permisoExistente ? `ID: ${permisoExistente.id}, puede_ver: ${permisoExistente.puede_ver}` : "No existe",
+      nuevoPermiso: permisoFiltrado
     });
 
-  if (error) {
-    console.error("Error actualizando permisos en lote:", error);
-    throw error;
+    if (permisoExistente?.id) {
+      // Permiso existente - actualizar usando UPDATE
+      console.log(`Actualizando permiso existente ID: ${permisoExistente.id}`);
+      const { error: updateError } = await supabase
+        .from("permisos_usuarios")
+        .update({
+          ...permisoFiltrado,
+          actualizado_el: new Date().toISOString()
+        })
+        .eq("id", permisoExistente.id);
+
+      if (updateError) {
+        console.error("Error actualizando permiso existente:", {
+          message: updateError.message,
+          code: updateError.code,
+          details: updateError.details,
+          hint: updateError.hint
+        });
+        throw updateError;
+      }
+    } else {
+      // Nuevo permiso - insertar
+      console.log(`Insertando nuevo permiso para módulo ${moduloIdNum}`);
+      const { error: insertError } = await supabase
+        .from("permisos_usuarios")
+        .insert({
+          fk_id_usuario: usuarioId,
+          fk_id_modulo: moduloIdNum,
+          ...permisoFiltrado,
+          actualizado_el: new Date().toISOString()
+        });
+
+      if (insertError) {
+        console.error("Error insertando nuevo permiso:", {
+          message: insertError.message,
+          code: insertError.code,
+          details: insertError.details,
+          hint: insertError.hint
+        });
+        throw insertError;
+      }
+    }
   }
+
+  console.log("updatePermisosUsuarioLote completado exitosamente");
 }
 
 // Eliminar un permiso
@@ -260,9 +337,9 @@ function getPuedeVerPorRol(rol: string, nombreModulo: string): boolean {
     case 'admin':
       return true; // Solo los administradores ven todo por defecto
     case 'supervisor':
-      return ['dashboard', 'articulos', 'clientes', 'ventas', 'mis-ventas', 'movimientos-stock', 'importacion-stock', 'stock-faltante', 'talles-colores', 'variantes-productos', 'agrupadores', 'empleados', 'liquidaciones', 'caja', 'gastos-empleados', 'pagos', 'cuentas-corrientes', 'informes'].includes(nombreModulo);
+      return ['dashboard', 'articulos', 'clientes', 'ventas', 'mis-ventas', 'movimientos-stock', 'importacion-stock', 'stock-faltante', 'agrupadores', 'empleados', 'liquidaciones', 'caja', 'gastos-empleados', 'pagos', 'cuentas-corrientes', 'informes'].includes(nombreModulo);
     case 'vendedor':
-      return ['dashboard', 'articulos', 'clientes', 'ventas', 'mis-ventas', 'movimientos-stock', 'importacion-stock', 'stock-faltante', 'talles-colores', 'variantes-productos', 'agrupadores', 'informes'].includes(nombreModulo);
+      return ['dashboard', 'articulos', 'clientes', 'ventas', 'mis-ventas', 'movimientos-stock', 'importacion-stock', 'stock-faltante', 'agrupadores', 'informes'].includes(nombreModulo);
     case 'cobrador':
       return ['dashboard', 'ventas', 'mis-ventas', 'pagos', 'cuentas-corrientes', 'caja', 'informes'].includes(nombreModulo);
     default:
@@ -327,5 +404,82 @@ export async function deleteModulo(moduloId: number): Promise<void> {
   if (error) {
     console.error("Error eliminando módulo:", error);
     throw error;
+  }
+} 
+
+// Función de diagnóstico para verificar permisos
+export async function diagnosticarPermisos(usuarioId: number): Promise<any> {
+  try {
+    // Verificar si el usuario existe
+    const { data: usuario, error: errorUsuario } = await supabase
+      .from("usuarios")
+      .select("id, nombre, email, rol")
+      .eq("id", usuarioId)
+      .single();
+
+    if (errorUsuario) {
+      return {
+        error: "Usuario no encontrado",
+        details: {
+          message: errorUsuario.message,
+          code: errorUsuario.code,
+          details: errorUsuario.details,
+          hint: errorUsuario.hint
+        }
+      };
+    }
+
+    // Verificar permisos existentes
+    const { data: permisosExistentes, error: errorPermisos } = await supabase
+      .from("permisos_usuarios")
+      .select(`
+        *,
+        modulo:modulos(id, nombre, activo)
+      `)
+      .eq("fk_id_usuario", usuarioId);
+
+    if (errorPermisos) {
+      return {
+        error: "Error obteniendo permisos",
+        details: {
+          message: errorPermisos.message,
+          code: errorPermisos.code,
+          details: errorPermisos.details,
+          hint: errorPermisos.hint
+        }
+      };
+    }
+
+    // Verificar módulos disponibles
+    const { data: modulos, error: errorModulos } = await supabase
+      .from("modulos")
+      .select("id, nombre, activo, orden")
+      .eq("activo", true)
+      .order("orden");
+
+    if (errorModulos) {
+      return {
+        error: "Error obteniendo módulos",
+        details: {
+          message: errorModulos.message,
+          code: errorModulos.code,
+          details: errorModulos.details,
+          hint: errorModulos.hint
+        }
+      };
+    }
+
+    return {
+      usuario,
+      permisosExistentes: permisosExistentes || [],
+      modulosDisponibles: modulos || [],
+      totalPermisos: permisosExistentes?.length || 0,
+      totalModulos: modulos?.length || 0
+    };
+  } catch (error) {
+    return {
+      error: "Error en diagnóstico",
+      details: error instanceof Error ? error.message : 'Error desconocido'
+    };
   }
 } 

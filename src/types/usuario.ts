@@ -9,6 +9,6 @@ export interface Usuario {
   prueba_gratis: boolean;
 }
 
-export interface CreateUsuarioData extends Omit<Usuario, 'id' | 'creado_el'> {
+export interface CreateUsuarioData extends Omit<Usuario, 'id' | 'creado_el' | 'password_hash'> {
   prueba_gratis: boolean;
 } 

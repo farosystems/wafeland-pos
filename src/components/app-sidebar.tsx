@@ -9,7 +9,6 @@ import {
   IconUsers,
   IconReceipt,
   IconCalculator,
-  IconPalette,
   IconReportAnalytics,
   IconUpload,
   IconShield,
@@ -31,27 +30,16 @@ import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, Dialog
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { getConfiguracionEmpresa, updateConfiguracionEmpresa, uploadLogoEmpresa, ConfiguracionEmpresa } from "@/services/configuracion";
-import { useColor } from "@/contexts/ColorContext";
 import { Home } from "lucide-react";
 
-// Paleta de colores para el selector
-const DATABASE_COLORS = [
-  { name: "Verde", value: "#22c55e", class: "bg-green-500" },
-  { name: "Azul", value: "#3b82f6", class: "bg-blue-500" },
-  { name: "Rojo", value: "#ef4444", class: "bg-red-500" },
-  { name: "Púrpura", value: "#8b5cf6", class: "bg-purple-500" },
-  { name: "Naranja", value: "#f97316", class: "bg-orange-500" },
-  { name: "Teal", value: "#14b8a6", class: "bg-teal-500" },
-  { name: "Rosa", value: "#ec4899", class: "bg-pink-500" },
-  { name: "Indigo", value: "#6366f1", class: "bg-indigo-500" },
-];
+
 
 // sidebarItems ya no se usa, menúes son hardcodeados abajo
 
 
 export function AppSidebar() {
   const { user, isSignedIn, isLoaded } = useUser();
-  const { selectedColor, setSelectedColor } = useColor();
+
   const [usuarioDB, setUsuarioDB] = React.useState<Usuario | null>(null);
   const [diasRestantes, setDiasRestantes] = React.useState<number | null>(null);
   const [stockOpen, setStockOpen] = React.useState(false);
@@ -166,8 +154,8 @@ export function AppSidebar() {
         console.log("Logo subido exitosamente:", logoUrl);
       }
       console.log("Actualizando configuración de empresa...");
-      await updateConfiguracionEmpresa(nombreEmpresa, logoUrl, selectedColor);
-      setConfig({ ...config!, nombre: nombreEmpresa, imagen: logoUrl, color_primario: selectedColor });
+      await updateConfiguracionEmpresa(nombreEmpresa, logoUrl, config?.color_primario || '#22c55e');
+      setConfig({ ...config!, nombre: nombreEmpresa, imagen: logoUrl });
       setModalOpen(false);
       console.log("Configuración guardada exitosamente");
     } catch (e: any) {
@@ -194,7 +182,7 @@ export function AppSidebar() {
           <aside className="flex flex-col h-full w-72 bg-white border-r">
       <div 
         className="px-4 py-3"
-        style={{ backgroundColor: selectedColor }}
+        style={{ backgroundColor: config?.color_primario || '#22c55e' }}
       >
         <Dialog open={modalOpen} onOpenChange={setModalOpen}>
           <DialogTrigger asChild>
@@ -219,22 +207,7 @@ export function AppSidebar() {
               {logoPreview && (
                 <img src={logoPreview} alt="Previsualización Logo" className="w-20 h-20 rounded-full object-cover border mt-2" />
               )}
-              <label className="text-sm font-medium mt-2">Color del header</label>
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {DATABASE_COLORS.map((color) => (
-                  <button
-                    key={color.value}
-                    onClick={() => setSelectedColor(color.value)}
-                    className={`w-10 h-10 rounded-full border-2 transition-all ${
-                      selectedColor === color.value 
-                        ? 'border-gray-800 scale-110' 
-                        : 'border-gray-300 hover:scale-105'
-                    }`}
-                    style={{ backgroundColor: color.value }}
-                    title={color.name}
-                  />
-                ))}
-              </div>
+
             </div>
             <DialogFooter>
               <Button onClick={handleSave} disabled={loading}>{loading ? "Guardando..." : "Guardar"}</Button>
@@ -270,7 +243,7 @@ export function AppSidebar() {
             </li>
           )}
           {/* Menú Stock desplegable */}
-          {(isModuloPermitido('articulos') || isModuloPermitido('talles-colores') || isModuloPermitido('variantes-productos') || isModuloPermitido('movimientos-stock') || isModuloPermitido('stock-faltante')) && (
+          {(isModuloPermitido('articulos') || isModuloPermitido('movimientos-stock') || isModuloPermitido('stock-faltante')) && (
             <li>
               <button
                 type="button"
@@ -295,30 +268,8 @@ export function AppSidebar() {
                       </Link>
                     </li>
                   )}
-                  {isModuloPermitido('talles-colores') && (
-                    <li className={`${pathname === "/talles-colores" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                      <Link
-                        href="/talles-colores"
-                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/talles-colores" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                        prefetch={false}
-                      >
-                        <IconPalette className="w-4 h-4" />
-                        <span>Talles y colores</span>
-                      </Link>
-                    </li>
-                  )}
-                  {isModuloPermitido('variantes-productos') && (
-                    <li className={`${pathname === "/variantes-productos" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
-                      <Link
-                        href="/variantes-productos"
-                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/variantes-productos" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
-                        prefetch={false}
-                      >
-                        <IconStack className="w-4 h-4" />
-                        <span>Variantes de productos</span>
-                      </Link>
-                    </li>
-                  )}
+
+
                   {isModuloPermitido('movimientos-stock') && (
                     <li className={`${pathname === "/movimientos-stock" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
                       <Link

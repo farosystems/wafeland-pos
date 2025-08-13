@@ -10,12 +10,7 @@ export async function getOrdenesCompra(): Promise<OrdenCompra[]> {
       empresa:configuracion_empresa!fk_id_empresa(*),
       items:ordenes_compra_items(
         *,
-        variante:variantes(
-          *,
-          articulo:articulos(*),
-          talle:talles(*),
-          color:colores(*)
-        )
+        articulo:articulos(*)
       )
     `)
     .order('creado_el', { ascending: false });
@@ -28,9 +23,7 @@ export async function getOrdenesCompra(): Promise<OrdenCompra[]> {
     empresa_nombre: orden.empresa?.nombre,
     items: orden.items?.map((item: any) => ({
       ...item,
-      articulo_descripcion: item.variante?.articulo?.descripcion,
-      talle_descripcion: item.variante?.talle?.descripcion,
-      color_descripcion: item.variante?.color?.descripcion,
+      articulo_descripcion: item.articulo?.descripcion,
     }))
   }));
 }
@@ -63,7 +56,7 @@ export async function createOrdenCompra(ordenData: CreateOrdenCompraData): Promi
   if (ordenData.items.length > 0) {
     const itemsToInsert = ordenData.items.map(item => ({
       fk_id_orden_compra: orden.id,
-      fk_id_variante: item.fk_id_variante,
+      fk_id_articulo: item.fk_id_articulo,
       cantidad: item.cantidad,
       precio_unitario: item.precio_unitario,
       subtotal: item.subtotal,

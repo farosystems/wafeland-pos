@@ -1,36 +1,22 @@
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabaseClient';
-import { Variante } from '@/types/variante';
+import { Article } from '@/types/article';
 
 interface ExcelRow {
-  Variante: number;
   ID_Articulo: number;
   Descripcion_Articulo: string;
-  ID_Talle: number;
-  Descripcion_Talle: string;
-  ID_Color: number;
-  Descripcion_Color: string;
-  Precio_Venta: number;
-  Stock_Unitario: string | number;
-  Stock_Minimo: string | number;
-  Stock_Maximo: string | number;
+  Precio_Unitario: number;
+  Stock: string | number;
 }
 
-export async function generateStockTemplate(variantes: Variante[]): Promise<void> {
+export async function generateStockTemplate(articulos: Article[]): Promise<void> {
   try {
     // Crear datos para el Excel con las columnas requeridas
-    const excelData = variantes.map(variante => ({
-      'Variante': variante.id,
-      'ID_Articulo': variante.articulo_id || variante.fk_id_articulo,
-      'Descripcion_Articulo': variante.articulo_descripcion,
-      'ID_Talle': variante.talle_id || variante.fk_id_talle,
-      'Descripcion_Talle': variante.talle_descripcion,
-      'ID_Color': variante.color_id || variante.fk_id_color,
-      'Descripcion_Color': variante.color_descripcion,
-      'Precio_Venta': variante.precio_venta || 0,
-      'Stock_Unitario': '', // Vacío para que el usuario complete
-      'Stock_Minimo': '', // Vacío para que el usuario complete
-      'Stock_Maximo': '', // Vacío para que el usuario complete
+    const excelData = articulos.map(articulo => ({
+      'ID_Articulo': articulo.id,
+      'Descripcion_Articulo': articulo.descripcion,
+      'Precio_Unitario': articulo.precio_unitario || 0,
+      'Stock': '', // Vacío para que el usuario complete
     }));
 
     // Crear workbook y worksheet
@@ -39,17 +25,10 @@ export async function generateStockTemplate(variantes: Variante[]): Promise<void
 
     // Configurar estilos para las columnas
     const columnWidths = [
-      { wch: 12 }, // Variante
       { wch: 12 }, // ID_Articulo
-      { wch: 30 }, // Descripcion_Articulo
-      { wch: 12 }, // ID_Talle
-      { wch: 15 }, // Descripcion_Talle
-      { wch: 12 }, // ID_Color
-      { wch: 15 }, // Descripcion_Color
-      { wch: 15 }, // Precio_Venta
-      { wch: 15 }, // Stock_Unitario
-      { wch: 15 }, // Stock_Minimo
-      { wch: 15 }, // Stock_Maximo
+      { wch: 40 }, // Descripcion_Articulo
+      { wch: 15 }, // Precio_Unitario
+      { wch: 15 }, // Stock
     ];
 
     worksheet['!cols'] = columnWidths;
@@ -71,7 +50,7 @@ export async function generateStockTemplate(variantes: Variante[]): Promise<void
   }
 }
 
-export async function validateAndImportStock(excelFile: File, variantes: Variante[]): Promise<void> {
+export async function validateAndImportStock(excelFile: File, articulos: Article[]): Promise<void> {
   try {
     // Leer el archivo Excel
     const arrayBuffer = await excelFile.arrayBuffer();
@@ -90,9 +69,7 @@ export async function validateAndImportStock(excelFile: File, variantes: Variant
 
     // Validar estructura del archivo
     const requiredColumns = [
-      'Variante', 'ID_Articulo', 'Descripcion_Articulo', 'ID_Talle', 
-      'Descripcion_Talle', 'ID_Color', 'Descripcion_Color', 'Precio_Venta',
-      'Stock_Unitario', 'Stock_Minimo', 'Stock_Maximo'
+      'ID_Articulo', 'Descripcion_Articulo', 'Precio_Unitario', 'Stock'
     ];
 
     const firstRow = jsonData[0];
@@ -105,80 +82,64 @@ export async function validateAndImportStock(excelFile: File, variantes: Variant
     // Validar y procesar cada fila
     const updates: Array<{
       id: number;
-      stock_unitario: number;
-      stock_minimo: number | null;
-      stock_maximo: number | null;
+      stock: number;
     }> = [];
 
     for (let i = 0; i < jsonData.length; i++) {
       const row = jsonData[i];
       const rowNumber = i + 2; // +2 porque Excel empieza en 1 y la primera fila es el header
 
-      // Validar que la variante existe
-      const variante = variantes.find(v => v.id === row.Variante);
-      if (!variante) {
-        throw new Error(`Fila ${rowNumber}: La variante con ID ${row.Variante} no existe en la base de datos`);
+      // Validar que el artículo existe
+      const articulo = articulos.find(a => a.id === row.ID_Articulo);
+      if (!articulo) {
+        throw new Error(`Fila ${rowNumber}: El artículo con ID ${row.ID_Articulo} no existe en la base de datos`);
       }
 
       // Validar y convertir valores de stock
-      const stockUnitario = parseStockValue(row.Stock_Unitario, `Stock_Unitario en fila ${rowNumber}`, true);
-      const stockMinimo = parseStockValue(row.Stock_Minimo, `Stock_Minimo en fila ${rowNumber}`, false);
-      const stockMaximo = parseStockValue(row.Stock_Maximo, `Stock_Maximo en fila ${rowNumber}`, false);
+      const stock = parseStockValue(row.Stock, `Stock en fila ${rowNumber}`, true);
 
-      // stockUnitario nunca será null porque es requerido
-      if (stockUnitario === null) {
-        throw new Error(`Stock_Unitario en fila ${rowNumber}: El valor no puede estar vacío`);
-      }
-
-      // Validar que stock_minimo <= stock_unitario <= stock_maximo (solo si ambos valores están presentes)
-      if (stockMinimo !== null && stockMinimo > stockUnitario) {
-        throw new Error(`Fila ${rowNumber}: Stock_Minimo (${stockMinimo}) no puede ser mayor que Stock_Unitario (${stockUnitario})`);
-      }
-      if (stockMaximo !== null && stockMaximo < stockUnitario) {
-        throw new Error(`Fila ${rowNumber}: Stock_Maximo (${stockMaximo}) no puede ser menor que Stock_Unitario (${stockUnitario})`);
+      // stock nunca será null porque es requerido
+      if (stock === null) {
+        throw new Error(`Stock en fila ${rowNumber}: El valor no puede estar vacío`);
       }
 
       updates.push({
-        id: row.Variante,
-        stock_unitario: stockUnitario,
-        stock_minimo: stockMinimo,
-        stock_maximo: stockMaximo,
+        id: row.ID_Articulo,
+        stock: stock,
       });
     }
 
     // Actualizar la base de datos - SUMAR stock en lugar de reemplazar
     for (const update of updates) {
-      // Obtener el stock actual de la variante
-      const { data: currentVariante, error: fetchError } = await supabase
-        .from('variantes_articulos')
-        .select('stock_unitario')
+      // Obtener el stock actual del artículo
+      const { data: currentArticulo, error: fetchError } = await supabase
+        .from('articulos')
+        .select('stock')
         .eq('id', update.id)
         .single();
 
       if (fetchError) {
-        throw new Error(`Error obteniendo stock actual de variante ${update.id}: ${fetchError.message}`);
+        throw new Error(`Error obteniendo stock actual del artículo ${update.id}: ${fetchError.message}`);
       }
 
       // Calcular el nuevo stock sumando el actual con el del Excel
-      const currentStock = currentVariante?.stock_unitario || 0;
-      const newStock = currentStock + update.stock_unitario;
+      const currentStock = currentArticulo?.stock || 0;
+      const newStock = currentStock + update.stock;
 
       // Actualizar con el stock sumado
       const { error } = await supabase
-        .from('variantes_articulos')
+        .from('articulos')
         .update({
-          stock_unitario: newStock,
-          stock_minimo: update.stock_minimo,
-          stock_maximo: update.stock_maximo,
+          stock: newStock,
         })
         .eq('id', update.id);
 
       if (error) {
-        throw new Error(`Error actualizando variante ${update.id}: ${error.message}`);
+        throw new Error(`Error actualizando artículo ${update.id}: ${error.message}`);
       }
     }
 
-    console.log(`Stock importado exitosamente: ${updates.length} variantes actualizadas`);
+    console.log(`Stock importado exitosamente: ${updates.length} artículos actualizados`);
   } catch (error) {
     console.error('Error validando e importando stock:', error);
     throw error;

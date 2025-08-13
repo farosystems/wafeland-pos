@@ -51,130 +51,94 @@ export async function getDashboardData(periodo: string = 'mes'): Promise<Dashboa
     // console.log('Fecha fin filtro:', fechaFin.toISOString());
     
     // Obtener datos básicos sin joins problemáticos
-    const [clientesData, ventasData, variantesData, articulosData, tallesData, coloresData, mediosPagoData, detallesVentaData, cuentasTesoreriaData] = await Promise.all([
+    const [clientesData, ventasData, articulosData, mediosPagoData, detallesVentaData, cuentasTesoreriaData] = await Promise.all([
       supabase.from("entidades").select("*"),
       supabase.from("ordenes_venta")
         .select("*")
         .gte('fecha', fechaInicio.toISOString())
         .lte('fecha', fechaFin.toISOString()),
-      supabase.from("variantes_articulos").select("*"),
       supabase.from("articulos").select("*"),
-      supabase.from("talles").select("*"),
-      supabase.from("color").select("*"),
-             supabase.from("ordenes_venta_medios_pago").select("*"),
+      supabase.from("ordenes_venta_medios_pago").select("*"),
       supabase.from("ordenes_venta_detalle").select("*"),
       supabase.from("cuentas_tesoreria").select("*").eq("activo", true)
     ]);
 
-              // Verificar errores individualmente
-     if (clientesData.error) {
-       console.error('Error obteniendo clientes:', clientesData.error);
-       throw new Error(`Error obteniendo clientes: ${clientesData.error.message}`);
-     }
-     if (ventasData.error) {
-       console.error('Error obteniendo ventas:', ventasData.error);
-       throw new Error(`Error obteniendo ventas: ${ventasData.error.message}`);
-     }
-     if (variantesData.error) {
-       console.error('Error obteniendo variantes_articulos:', variantesData.error);
-       throw new Error(`Error obteniendo variantes_articulos: ${variantesData.error.message}`);
-     }
-     if (articulosData.error) {
-       console.error('Error obteniendo artículos:', articulosData.error);
-       throw new Error(`Error obteniendo artículos: ${articulosData.error.message}`);
-     }
-     if (tallesData.error) {
-       console.error('Error obteniendo talles:', tallesData.error);
-       throw new Error(`Error obteniendo talles: ${tallesData.error.message}`);
-     }
-     if (coloresData.error) {
-       console.error('Error obteniendo colores:', coloresData.error);
-       throw new Error(`Error obteniendo colores: ${coloresData.error.message}`);
-     }
-     if (mediosPagoData.error) {
-       console.error('Error obteniendo medios de pago:', mediosPagoData.error);
-       throw new Error(`Error obteniendo medios de pago: ${mediosPagoData.error.message}`);
-     }
-     if (detallesVentaData.error) {
-       console.error('Error obteniendo detalles de ventas:', detallesVentaData.error);
-       throw new Error(`Error obteniendo detalles de ventas: ${detallesVentaData.error.message}`);
-     }
-     if (cuentasTesoreriaData.error) {
-       console.error('Error obteniendo cuentas de tesorería:', cuentasTesoreriaData.error);
-       throw new Error(`Error obteniendo cuentas de tesorería: ${cuentasTesoreriaData.error.message}`);
-     }
+    // Verificar errores individualmente
+    if (clientesData.error) {
+      console.error('Error obteniendo clientes:', clientesData.error);
+      throw new Error(`Error obteniendo clientes: ${clientesData.error.message}`);
+    }
+    if (ventasData.error) {
+      console.error('Error obteniendo ventas:', ventasData.error);
+      throw new Error(`Error obteniendo ventas: ${ventasData.error.message}`);
+    }
+    if (articulosData.error) {
+      console.error('Error obteniendo artículos:', articulosData.error);
+      throw new Error(`Error obteniendo artículos: ${articulosData.error.message}`);
+    }
+    if (mediosPagoData.error) {
+      console.error('Error obteniendo medios de pago:', mediosPagoData.error);
+      throw new Error(`Error obteniendo medios de pago: ${mediosPagoData.error.message}`);
+    }
+    if (detallesVentaData.error) {
+      console.error('Error obteniendo detalles de ventas:', detallesVentaData.error);
+      throw new Error(`Error obteniendo detalles de ventas: ${detallesVentaData.error.message}`);
+    }
+    if (cuentasTesoreriaData.error) {
+      console.error('Error obteniendo cuentas de tesorería:', cuentasTesoreriaData.error);
+      throw new Error(`Error obteniendo cuentas de tesorería: ${cuentasTesoreriaData.error.message}`);
+    }
 
-     const clientes = clientesData.data || [];
-     const ventas = ventasData.data || [];
-     const variantes = variantesData.data || [];
-     const articulos = articulosData.data || [];
-     const talles = tallesData.data || [];
-     const colores = coloresData.data || [];
-     const mediosPago = mediosPagoData.data || [];
-     const detallesVenta = detallesVentaData.data || [];
-     const cuentasTesoreria = cuentasTesoreriaData.data || [];
+    const clientes = clientesData.data || [];
+    const ventas = ventasData.data || [];
+    const articulos = articulosData.data || [];
+    const mediosPago = mediosPagoData.data || [];
+    const detallesVenta = detallesVentaData.data || [];
+    const cuentasTesoreria = cuentasTesoreriaData.data || [];
 
-     // Combinar datos de productos
-     const productos = variantes.map(variante => {
-       const articulo = articulos.find(a => a.id === variante.fk_id_articulo);
-       const talle = talles.find(t => t.id === variante.fk_id_talle);
-       const color = colores.find(c => c.id === variante.fk_id_color);
-       
-       return {
-         ...variante,
-         articulos: articulo ? { descripcion: articulo.descripcion } : null,
-         talles: talle ? { descripcion: talle.descripcion } : null,
-         colores: color ? { descripcion: color.descripcion } : null
-       };
-     });
+    // Log para debug
+    // console.log('Datos obtenidos:', {
+    //   clientes: clientes.length,
+    //   ventas: ventas.length,
+    //   articulos: articulos.length,
+    //   mediosPago: mediosPago.length,
+    //   detallesVenta: detallesVenta.length,
+    //   cuentasTesoreria: cuentasTesoreria.length
+    // });
 
-     // Log para debug
-     // console.log('Datos obtenidos:', {
-     //   clientes: clientes.length,
-     //   ventas: ventas.length,
-     //   variantes: variantes.length,
-     //   articulos: articulos.length,
-     //   talles: talles.length,
-     //   colores: colores.length,
-     //   productos: productos.length,
-     //   mediosPago: mediosPago.length,
-     //   detallesVenta: detallesVenta.length,
-     //   cuentasTesoreria: cuentasTesoreria.length
-     // });
+    // Debug específico para medios de pago
+    // console.log('Medios de pago obtenidos:', mediosPago);
+    // console.log('Cuentas de tesorería obtenidas:', cuentasTesoreria);
 
-     // Debug específico para medios de pago
-     // console.log('Medios de pago obtenidos:', mediosPago);
-     // console.log('Cuentas de tesorería obtenidas:', cuentasTesoreria);
+    // Calcular totales
+    const totalVentas = ventas.reduce((sum, venta) => sum + (venta.total || 0), 0);
+    const totalClientes = clientes.length;
+    const totalProductos = articulos.length;
 
-         // Calcular totales
-     const totalVentas = ventas.reduce((sum, venta) => sum + (venta.total || 0), 0);
-     const totalClientes = clientes.length;
-     const totalProductos = productos.length;
+    // Si no hay datos, retornar valores por defecto
+    if (ventas.length === 0 && clientes.length === 0 && articulos.length === 0) {
+      // console.log('No hay datos en la base de datos, retornando valores por defecto');
+      return {
+        totalVentas: 0,
+        totalClientes: 0,
+        totalProductos: 0,
+        ventasPorPeriodo: [],
+        rankingMediosPago: [],
+        rankingProductos: [],
+        metricasDiarias: [],
+        rendimientoVendedores: [],
+        alertas: []
+      };
+    }
 
-     // Si no hay datos, retornar valores por defecto
-     if (ventas.length === 0 && clientes.length === 0 && productos.length === 0) {
-       // console.log('No hay datos en la base de datos, retornando valores por defecto');
-       return {
-         totalVentas: 0,
-         totalClientes: 0,
-         totalProductos: 0,
-         ventasPorPeriodo: [],
-         rankingMediosPago: [],
-         rankingProductos: [],
-         metricasDiarias: [],
-         rendimientoVendedores: [],
-         alertas: []
-       };
-     }
-
-         // Ventas por período (dinámico según período seleccionado)
-     const ventasPorPeriodo = calcularVentasPorPeriodo(ventas, periodo);
+    // Ventas por período (dinámico según período seleccionado)
+    const ventasPorPeriodo = calcularVentasPorPeriodo(ventas, periodo);
 
     // Ventas por tipo de pago
     const rankingMediosPago = calcularVentasPorTipoPago(mediosPago, cuentasTesoreria, ventas);
 
     // Ranking de productos
-    const rankingProductos = calcularRankingProductos(detallesVenta, articulos, talles, colores, ventas);
+    const rankingProductos = calcularRankingProductos(detallesVenta, articulos, ventas);
 
     // Métricas diarias (última semana)
     const metricasDiarias = calcularMetricasDiarias(ventas);
@@ -183,7 +147,7 @@ export async function getDashboardData(periodo: string = 'mes'): Promise<Dashboa
     const rendimientoVendedores = calcularRendimientoVendedores();
 
     // Alertas del sistema
-    const alertas = generarAlertas(productos, ventas, clientes);
+    const alertas = generarAlertas(articulos, ventas, clientes);
 
     return {
       totalVentas,
@@ -247,9 +211,9 @@ function calcularVentasPorTipoPago(mediosPago: any[], cuentasTesoreria: any[], v
   // Crear un Set con los IDs de las ventas que están dentro del período filtrado
   const ventasEnPeriodo = new Set(ventas.map(v => v.id));
   
-       // console.log('Total de ventas obtenidas:', ventas.length);
-     // console.log('IDs de ventas en período:', Array.from(ventasEnPeriodo));
-     // console.log('Fechas de ventas:', ventas.map(v => ({ id: v.id, fecha: v.fecha })));
+  // console.log('Total de ventas obtenidas:', ventas.length);
+  // console.log('IDs de ventas en período:', Array.from(ventasEnPeriodo));
+  // console.log('Fechas de ventas:', ventas.map(v => ({ id: v.id, fecha: v.fecha })));
   
   // Debug: Ver la estructura de los medios de pago
   // console.log('Estructura de medios de pago:', mediosPago.slice(0, 3).map(mp => ({
@@ -314,7 +278,7 @@ function calcularVentasPorTipoPago(mediosPago: any[], cuentasTesoreria: any[], v
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function calcularRankingProductos(detallesVenta: any[], articulos: any[], talles: any[], colores: any[], ventas: any[]) {
+function calcularRankingProductos(detallesVenta: any[], articulos: any[], ventas: any[]) {
   // Agrupar por fk_id_articulo
   const resumen: Record<number, { producto: string, unidades: number, ingresos: number, costo: number, color: string }> = {};
   
@@ -336,8 +300,7 @@ function calcularRankingProductos(detallesVenta: any[], articulos: any[], talles
   detallesVenta.forEach((detalle, idx) => {
     const articulo = articulos.find(a => a.id === detalle.fk_id_articulo);
     if (!articulo) return;
-    const talle = talles.find(t => t.id === detalle.fk_id_talle);
-    const colorObj = colores.find(c => c.id === detalle.fk_id_color);
+    
     const key = detalle.fk_id_articulo;
     
     // Calcular precio con descuentos aplicados
@@ -355,7 +318,7 @@ function calcularRankingProductos(detallesVenta: any[], articulos: any[], talles
     
     if (!resumen[key]) {
       resumen[key] = {
-        producto: `${articulo.descripcion}${talle ? ' - ' + talle.descripcion : ''}${colorObj ? ' ' + colorObj.descripcion : ''}`.trim(),
+        producto: articulo.descripcion,
         unidades: 0,
         ingresos: 0,
         costo: 0,
@@ -366,6 +329,7 @@ function calcularRankingProductos(detallesVenta: any[], articulos: any[], talles
     resumen[key].ingresos += precioFinal * (detalle.cantidad || 0);
     resumen[key].costo += (articulo.precio_costo || 0) * (detalle.cantidad || 0);
   });
+  
   // Convertir a array y ordenar por unidades vendidas
   return Object.values(resumen)
     .sort((a, b) => b.unidades - a.unidades)
@@ -436,16 +400,16 @@ function calcularRendimientoVendedores(): Array<{vendedor: string, ventas: numbe
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function generarAlertas(productos: any[], ventas: any[], clientes: any[]): Array<{tipo: 'warning' | 'success' | 'info', titulo: string, mensaje: string}> {
+function generarAlertas(articulos: any[], ventas: any[], clientes: any[]): Array<{tipo: 'warning' | 'success' | 'info', titulo: string, mensaje: string}> {
   const alertas = [];
 
   // Alerta de stock bajo
-  const productosStockBajo = productos.filter(p => (p.stock_unitario || 0) < 10);
-  if (productosStockBajo.length > 0) {
+  const articulosStockBajo = articulos.filter(a => (a.stock || 0) < (a.stock_minimo || 0));
+  if (articulosStockBajo.length > 0) {
     alertas.push({
       tipo: 'warning' as const,
       titulo: 'Stock Bajo',
-      mensaje: `${productosStockBajo.length} productos con stock crítico`
+      mensaje: `${articulosStockBajo.length} artículos con stock por debajo del mínimo`
     });
   }
 
@@ -486,164 +450,164 @@ function generarAlertas(productos: any[], ventas: any[], clientes: any[]): Array
     });
   }
 
-       return alertas;
-   }
+  return alertas;
+}
 
-   // Función para calcular fechas según el período seleccionado
-   function calcularFechasPeriodo(periodo: string): { fechaInicio: Date, fechaFin: Date } {
-     const ahora = new Date();
-     const fechaFin = new Date(ahora);
-     const fechaInicio = new Date(ahora);
-   
-     switch (periodo) {
-       case 'semana':
-         fechaInicio.setDate(ahora.getDate() - 7);
-         break;
-       case 'mes':
-         fechaInicio.setMonth(ahora.getMonth() - 1);
-         break;
-       case 'trimestre':
-         fechaInicio.setMonth(ahora.getMonth() - 3);
-         break;
-       case 'año':
-         fechaInicio.setFullYear(ahora.getFullYear() - 1);
-         break;
-       default:
-         fechaInicio.setMonth(ahora.getMonth() - 1);
-     }
-   
-     return { fechaInicio, fechaFin };
-   }
+// Función para calcular fechas según el período seleccionado
+function calcularFechasPeriodo(periodo: string): { fechaInicio: Date, fechaFin: Date } {
+  const ahora = new Date();
+  const fechaFin = new Date(ahora);
+  const fechaInicio = new Date(ahora);
 
-   // Funciones auxiliares para calcular ventas por diferentes períodos
-   function generarPeriodosVacios(periodo: string): Array<{mes: string, ventas: number, meta: number}> {
-     switch (periodo) {
-       case 'semana':
-         return ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(dia => ({
-           mes: dia,
-           ventas: 0,
-           meta: 10000
-         }));
-       case 'mes':
-         return ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'].map(semana => ({
-           mes: semana,
-           ventas: 0,
-           meta: 12500
-         }));
-       case 'trimestre':
-         return ['Mes 1', 'Mes 2', 'Mes 3'].map(mes => ({
-           mes,
-           ventas: 0,
-           meta: 50000
-         }));
-       case 'año':
-         return ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'].map(mes => ({
-           mes,
-           ventas: 0,
-           meta: 50000
-         }));
-       default:
-         return ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'].map(semana => ({
-           mes: semana,
-           ventas: 0,
-           meta: 12500
-         }));
-     }
-   }
+  switch (periodo) {
+    case 'semana':
+      fechaInicio.setDate(ahora.getDate() - 7);
+      break;
+    case 'mes':
+      fechaInicio.setMonth(ahora.getMonth() - 1);
+      break;
+    case 'trimestre':
+      fechaInicio.setMonth(ahora.getMonth() - 3);
+      break;
+    case 'año':
+      fechaInicio.setFullYear(ahora.getFullYear() - 1);
+      break;
+    default:
+      fechaInicio.setMonth(ahora.getMonth() - 1);
+  }
 
-   function calcularVentasPorSemana(ventas: any[]): Array<{mes: string, ventas: number, meta: number}> {
-     const dias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-     const ventasPorDia = new Array(7).fill(0);
-   
-     ventas.forEach(venta => {
-       if (venta.fecha) {
-         try {
-           const fecha = new Date(venta.fecha);
-           const dia = fecha.getDay(); // 0 = Domingo, 1 = Lunes, etc.
-           const indice = dia === 0 ? 6 : dia - 1; // Convertir a índice 0-6 (Lun-Dom)
-           ventasPorDia[indice] += venta.total || 0;
-         } catch (error) {
-           console.warn('Error procesando fecha de venta:', venta.fecha, error);
-         }
-       }
-     });
-   
-     return dias.map((dia, index) => ({
-       mes: dia,
-       ventas: Math.round(ventasPorDia[index]),
-       meta: 10000
-     }));
-   }
+  return { fechaInicio, fechaFin };
+}
 
-   function calcularVentasPorMes(ventas: any[]): Array<{mes: string, ventas: number, meta: number}> {
-     const semanas = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'];
-     const ventasPorSemana = new Array(4).fill(0);
-   
-     ventas.forEach(venta => {
-       if (venta.fecha) {
-         try {
-           const fecha = new Date(venta.fecha);
-           const dia = fecha.getDate();
-           const semana = Math.floor((dia - 1) / 7);
-           if (semana >= 0 && semana < 4) {
-             ventasPorSemana[semana] += venta.total || 0;
-           }
-         } catch (error) {
-           console.warn('Error procesando fecha de venta:', venta.fecha, error);
-         }
-       }
-     });
-   
-     return semanas.map((semana, index) => ({
-       mes: semana,
-       ventas: Math.round(ventasPorSemana[index]),
-       meta: 12500
-     }));
-   }
+// Funciones auxiliares para calcular ventas por diferentes períodos
+function generarPeriodosVacios(periodo: string): Array<{mes: string, ventas: number, meta: number}> {
+  switch (periodo) {
+    case 'semana':
+      return ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(dia => ({
+        mes: dia,
+        ventas: 0,
+        meta: 10000
+      }));
+    case 'mes':
+      return ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'].map(semana => ({
+        mes: semana,
+        ventas: 0,
+        meta: 12500
+      }));
+    case 'trimestre':
+      return ['Mes 1', 'Mes 2', 'Mes 3'].map(mes => ({
+        mes,
+        ventas: 0,
+        meta: 50000
+      }));
+    case 'año':
+      return ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'].map(mes => ({
+        mes,
+        ventas: 0,
+        meta: 50000
+      }));
+    default:
+      return ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'].map(semana => ({
+        mes: semana,
+        ventas: 0,
+        meta: 12500
+      }));
+  }
+}
 
-   function calcularVentasPorTrimestre(ventas: any[]): Array<{mes: string, ventas: number, meta: number}> {
-     const meses = ['Mes 1', 'Mes 2', 'Mes 3'];
-     const ventasPorMes = new Array(3).fill(0);
-   
-     ventas.forEach(venta => {
-       if (venta.fecha) {
-         try {
-           const fecha = new Date(venta.fecha);
-           const mes = fecha.getMonth();
-           const mesRelativo = mes % 3;
-           ventasPorMes[mesRelativo] += venta.total || 0;
-         } catch (error) {
-           console.warn('Error procesando fecha de venta:', venta.fecha, error);
-         }
-       }
-     });
-   
-     return meses.map((mes, index) => ({
-       mes,
-       ventas: Math.round(ventasPorMes[index]),
-       meta: 50000
-     }));
-   }
+function calcularVentasPorSemana(ventas: any[]): Array<{mes: string, ventas: number, meta: number}> {
+  const dias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+  const ventasPorDia = new Array(7).fill(0);
 
-   function calcularVentasPorAño(ventas: any[]): Array<{mes: string, ventas: number, meta: number}> {
-     const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-     const ventasPorMes = new Array(12).fill(0);
-   
-     ventas.forEach(venta => {
-       if (venta.fecha) {
-         try {
-           const fecha = new Date(venta.fecha);
-           const mes = fecha.getMonth();
-           ventasPorMes[mes] += venta.total || 0;
-         } catch (error) {
-           console.warn('Error procesando fecha de venta:', venta.fecha, error);
-         }
-       }
-     });
-   
-     return meses.map((mes, index) => ({
-       mes,
-       ventas: Math.round(ventasPorMes[index]),
-       meta: 50000
-     }));
-   } 
+  ventas.forEach(venta => {
+    if (venta.fecha) {
+      try {
+        const fecha = new Date(venta.fecha);
+        const dia = fecha.getDay(); // 0 = Domingo, 1 = Lunes, etc.
+        const indice = dia === 0 ? 6 : dia - 1; // Convertir a índice 0-6 (Lun-Dom)
+        ventasPorDia[indice] += venta.total || 0;
+      } catch (error) {
+        console.warn('Error procesando fecha de venta:', venta.fecha, error);
+      }
+    }
+  });
+
+  return dias.map((dia, index) => ({
+    mes: dia,
+    ventas: Math.round(ventasPorDia[index]),
+    meta: 10000
+  }));
+}
+
+function calcularVentasPorMes(ventas: any[]): Array<{mes: string, ventas: number, meta: number}> {
+  const semanas = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'];
+  const ventasPorSemana = new Array(4).fill(0);
+
+  ventas.forEach(venta => {
+    if (venta.fecha) {
+      try {
+        const fecha = new Date(venta.fecha);
+        const dia = fecha.getDate();
+        const semana = Math.floor((dia - 1) / 7);
+        if (semana >= 0 && semana < 4) {
+          ventasPorSemana[semana] += venta.total || 0;
+        }
+      } catch (error) {
+        console.warn('Error procesando fecha de venta:', venta.fecha, error);
+      }
+    }
+  });
+
+  return semanas.map((semana, index) => ({
+    mes: semana,
+    ventas: Math.round(ventasPorSemana[index]),
+    meta: 12500
+  }));
+}
+
+function calcularVentasPorTrimestre(ventas: any[]): Array<{mes: string, ventas: number, meta: number}> {
+  const meses = ['Mes 1', 'Mes 2', 'Mes 3'];
+  const ventasPorMes = new Array(3).fill(0);
+
+  ventas.forEach(venta => {
+    if (venta.fecha) {
+      try {
+        const fecha = new Date(venta.fecha);
+        const mes = fecha.getMonth();
+        const mesRelativo = mes % 3;
+        ventasPorMes[mesRelativo] += venta.total || 0;
+      } catch (error) {
+        console.warn('Error procesando fecha de venta:', venta.fecha, error);
+      }
+    }
+  });
+
+  return meses.map((mes, index) => ({
+    mes,
+    ventas: Math.round(ventasPorMes[index]),
+    meta: 50000
+  }));
+}
+
+function calcularVentasPorAño(ventas: any[]): Array<{mes: string, ventas: number, meta: number}> {
+  const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  const ventasPorMes = new Array(12).fill(0);
+
+  ventas.forEach(venta => {
+    if (venta.fecha) {
+      try {
+        const fecha = new Date(venta.fecha);
+        const mes = fecha.getMonth();
+        ventasPorMes[mes] += venta.total || 0;
+      } catch (error) {
+        console.warn('Error procesando fecha de venta:', venta.fecha, error);
+      }
+    }
+  });
+
+  return meses.map((mes, index) => ({
+    mes,
+    ventas: Math.round(ventasPorMes[index]),
+    meta: 50000
+  }));
+} 

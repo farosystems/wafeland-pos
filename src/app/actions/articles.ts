@@ -140,9 +140,40 @@ export async function updateArticle(id: number, article: UpdateArticleData): Pro
       throw new Error('No tienes permisos para actualizar artículos. Solo administradores y supervisores pueden actualizar artículos.');
     }
     
+    // Obtener el artículo actual para calcular el nuevo stock
+    const { data: articuloActual, error: errorActual } = await supabase
+      .from("articulos")
+      .select("stock")
+      .eq("id", id)
+      .single();
+      
+    if (errorActual) {
+      console.error('Error al obtener artículo actual:', errorActual);
+      throw new Error('Error al obtener el artículo actual');
+    }
+    
+    // Calcular el nuevo stock si se proporcionan ajustes
+    let nuevoStock = articuloActual.stock;
+    if (article.stock !== undefined) {
+      nuevoStock = article.stock;
+    }
+    
+    // Preparar los datos para actualizar (sin los campos de ajuste)
+    const datosActualizacion = {
+      descripcion: article.descripcion,
+      precio_unitario: article.precio_unitario,
+      fk_id_agrupador: article.fk_id_agrupador,
+      fk_id_marca: article.fk_id_marca,
+      activo: article.activo,
+      stock: nuevoStock,
+      stock_minimo: article.stock_minimo,
+      mark_up: article.mark_up,
+      precio_costo: article.precio_costo,
+    };
+    
     const { data, error } = await supabase
       .from("articulos")
-      .update(article)
+      .update(datosActualizacion)
       .eq("id", id)
       .select()
       .single();

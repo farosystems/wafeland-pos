@@ -1,14 +1,12 @@
 export interface OrdenCompraItem {
   id?: number;
   fk_id_orden_compra?: number;
-  fk_id_variante: number;
+  fk_id_articulo: number;
   cantidad: number;
   precio_unitario: number;
   subtotal: number;
   // Campos adicionales para mostrar en la UI
   articulo_descripcion?: string;
-  talle_descripcion?: string;
-  color_descripcion?: string;
 }
 
 export interface OrdenCompra {

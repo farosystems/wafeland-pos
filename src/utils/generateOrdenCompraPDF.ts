@@ -95,7 +95,7 @@ export async function generateOrdenCompraPDF(orden: OrdenCompra): Promise<void> 
         doc.text('UN', productX + 2, currentProductY);
         productX += productWidths[1];
         
-        const descripcion = `${item.articulo_descripcion || 'Artículo'} - ${item.talle_descripcion || ''} - ${item.color_descripcion || ''}`;
+        const descripcion = item.articulo_descripcion || 'Artículo';
         doc.text(descripcion.substring(0, 30), productX + 2, currentProductY);
         productX += productWidths[2];
         

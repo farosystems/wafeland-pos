@@ -102,6 +102,11 @@ export function ArticlesTable({ data, onEdit, onNewArticle }: ArticlesTableProps
       cell: ({ row }) => <div>{row.getValue("stock")}</div>,
     },
     {
+      accessorKey: "stock_minimo",
+      header: "Stock Mínimo",
+      cell: ({ row }) => <div>{row.getValue("stock_minimo")}</div>,
+    },
+    {
       accessorKey: "marca_nombre",
       header: "Marca",
       cell: ({ row }) => <div>{row.getValue("marca_nombre") || "-"}</div>,

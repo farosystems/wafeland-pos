@@ -170,8 +170,6 @@ export default function MovimientosStockPage() {
   const columns = [
     { key: "id", label: "ID" },
     { key: "articulo", label: "Artículo" },
-    { key: "talle_descripcion", label: "Talle" },
-    { key: "color_descripcion", label: "Color" },
     { key: "origen", label: "Origen" },
     { key: "fk_id_orden", label: "Orden" },
     { key: "tipo", label: "Tipo" },
@@ -262,8 +260,7 @@ export default function MovimientosStockPage() {
                   <TableRow key={mov.id} className="border-b hover:bg-gray-50 transition-colors">
                     {(columnVisibility["id"] ?? true) && <TableCell>{mov.id}</TableCell>}
                     {(columnVisibility["articulo"] ?? true) && <TableCell>{getArticuloNombre(mov.fk_id_articulos)}</TableCell>}
-                    {(columnVisibility["talle_descripcion"] ?? true) && <TableCell>{mov.talle_descripcion}</TableCell>}
-                    {(columnVisibility["color_descripcion"] ?? true) && <TableCell>{mov.color_descripcion}</TableCell>}
+
                     {(columnVisibility["origen"] ?? true) && <TableCell>{mov.origen}</TableCell>}
                     {(columnVisibility["fk_id_orden"] ?? true) && <TableCell>
                       {mov.fk_id_orden ? (

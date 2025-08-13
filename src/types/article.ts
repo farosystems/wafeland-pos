@@ -6,6 +6,7 @@ export interface Article {
   fk_id_marca: number | null;
   activo: boolean;
   stock: number;
+  stock_minimo: number;
   agrupador_nombre?: string;
   marca_nombre?: string;
   mark_up?: number;
@@ -19,6 +20,7 @@ export interface CreateArticleData {
   fk_id_marca: number | null;
   activo: boolean;
   stock: number;
+  stock_minimo: number;
   mark_up?: number;
   precio_costo?: number;
 }
@@ -30,6 +32,7 @@ export interface UpdateArticleData {
   fk_id_marca?: number | null;
   activo?: boolean;
   stock?: number;
+  stock_minimo?: number;
   mark_up?: number;
   precio_costo?: number;
 } 

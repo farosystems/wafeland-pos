@@ -50,7 +50,6 @@ async function setupNotaCredito() {
         descripcion: 'NOTA DE CREDITO',
         descuenta_stock: false,
         reingresa_stock: true,
-        admite_impuestos: true,
         imprime_pdf: true,
         activo: true
       }])
@@ -79,7 +78,6 @@ async function setupNotaCredito() {
     console.log(`  - Descripción: "${tipoVerificado.descripcion}"`);
     console.log(`  - Descuenta stock: ${tipoVerificado.descuenta_stock ? 'Sí' : 'No'}`);
     console.log(`  - Reingresa stock: ${tipoVerificado.reingresa_stock ? 'Sí' : 'No'}`);
-    console.log(`  - Admite impuestos: ${tipoVerificado.admite_impuestos ? 'Sí' : 'No'}`);
     console.log(`  - Imprime PDF: ${tipoVerificado.imprime_pdf ? 'Sí' : 'No'}`);
     console.log(`  - Activo: ${tipoVerificado.activo ? 'Sí' : 'No'}`);
     

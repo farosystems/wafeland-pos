@@ -49,28 +49,12 @@ export async function getMovimientosStock() {
   
   const { data, error } = await supabase
     .from("movimientos_stock")
-    .select(`*, talle:fk_id_talle(descripcion), color:fk_id_color(descripcion)`)
+    .select(`*`)
     .order("id", { ascending: false });
     
   if (error) throw error;
   
-  return (data as Array<{
-    id: number;
-    fk_id_orden: number | null;
-    fk_id_articulos: number;
-    origen: string;
-    tipo: string;
-    cantidad: number;
-    fk_id_talle: number | null;
-    fk_id_color: number | null;
-    creado_el: string;
-    talle?: { descripcion: string };
-    color?: { descripcion: string };
-  }>).map(m => ({
-    ...m,
-    talle_descripcion: m.talle?.descripcion || '-',
-    color_descripcion: m.color?.descripcion || '-',
-  }));
+  return data;
 }
 
 export async function createMovimientoStock(mov: {
@@ -79,8 +63,6 @@ export async function createMovimientoStock(mov: {
   origen: string;
   tipo: string;
   cantidad: number;
-  fk_id_talle?: number | null;
-  fk_id_color?: number | null;
   stock_actual?: number | null;
 }) {
   const usuario = await checkUserPermissions();
@@ -99,8 +81,7 @@ export async function createMovimientoStock(mov: {
         origen: mov.origen,
         tipo: mov.tipo,
         cantidad: mov.cantidad,
-        fk_id_talle: mov.fk_id_talle,
-        fk_id_color: mov.fk_id_color,
+
         stock_actual: mov.stock_actual,
         creado_el: new Date().toISOString(),
       }
@@ -117,29 +98,13 @@ export async function getMovimientosStockByArticulo(articuloId: number) {
   
   const { data, error } = await supabase
     .from("movimientos_stock")
-    .select(`*, talle:fk_id_talle(descripcion), color:fk_id_color(descripcion)`)
+    .select(`*`)
     .eq("fk_id_articulos", articuloId)
     .order("creado_el", { ascending: false });
     
   if (error) throw error;
   
-  return (data as Array<{
-    id: number;
-    fk_id_orden: number | null;
-    fk_id_articulos: number;
-    origen: string;
-    tipo: string;
-    cantidad: number;
-    fk_id_talle: number | null;
-    fk_id_color: number | null;
-    creado_el: string;
-    talle?: { descripcion: string };
-    color?: { descripcion: string };
-  }>).map(m => ({
-    ...m,
-    talle_descripcion: m.talle?.descripcion || '-',
-    color_descripcion: m.color?.descripcion || '-',
-  }));
+  return data;
 }
 
 export async function getMovimientosStockByDateRange(fechaInicio: string, fechaFin: string) {
@@ -152,28 +117,12 @@ export async function getMovimientosStockByDateRange(fechaInicio: string, fechaF
   
   const { data, error } = await supabase
     .from("movimientos_stock")
-    .select(`*, talle:fk_id_talle(descripcion), color:fk_id_color(descripcion)`)
+    .select(`*`)
     .gte("creado_el", fechaInicio)
     .lte("creado_el", fechaFin)
     .order("creado_el", { ascending: false });
     
   if (error) throw error;
   
-  return (data as Array<{
-    id: number;
-    fk_id_orden: number | null;
-    fk_id_articulos: number;
-    origen: string;
-    tipo: string;
-    cantidad: number;
-    fk_id_talle: number | null;
-    fk_id_color: number | null;
-    creado_el: string;
-    talle?: { descripcion: string };
-    color?: { descripcion: string };
-  }>).map(m => ({
-    ...m,
-    talle_descripcion: m.talle?.descripcion || '-',
-    color_descripcion: m.color?.descripcion || '-',
-  }));
+  return data;
 } 

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { useVariantes } from '@/hooks/use-variantes';
+
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -12,13 +12,16 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { IconUpload, IconFileSpreadsheet, IconDownload, IconCheck, IconAlertTriangle, IconArrowRight } from '@tabler/icons-react';
 import { BreadcrumbBar } from '@/components/BreadcrumbBar';
 import { generateStockTemplate, validateAndImportStock } from '@/utils/generateStockTemplate';
-
+import { getArticles } from '@/services/articles';
+import { Article } from '@/types/article';
 
 export default function ImportacionStockPage() {
   const { isSignedIn, isLoaded } = useUser();
-  const { variantes, loading, error, fetchVariantes } = useVariantes();
+  const [articulos, setArticulos] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedVariantes, setSelectedVariantes] = useState<Set<number>>(new Set());
+  const [selectedArticulos, setSelectedArticulos] = useState<Set<number>>(new Set());
   const [generatingTemplate, setGeneratingTemplate] = useState(false);
   const [templateGenerated, setTemplateGenerated] = useState(false);
   const [importingStock, setImportingStock] = useState(false);
@@ -30,59 +33,77 @@ export default function ImportacionStockPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
-  // Filtrar variantes basado en el término de búsqueda
-  const filteredVariantes = variantes.filter(variante =>
-    (variante.articulo_descripcion || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (variante.talle_descripcion || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (variante.color_descripcion || '').toLowerCase().includes(searchTerm.toLowerCase())
+  // Cargar artículos al montar el componente
+  useEffect(() => {
+    if (isSignedIn) {
+      fetchArticulos();
+    }
+  }, [isSignedIn]);
+
+  // Función para cargar artículos
+  const fetchArticulos = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getArticles();
+      setArticulos(data);
+    } catch (err: any) {
+      setError(err.message || "Error al cargar artículos");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filtrar artículos basado en el término de búsqueda
+  const filteredArticulos = articulos.filter(articulo =>
+    (articulo.descripcion || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Calcular paginación
-  const totalPages = Math.ceil(filteredVariantes.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredArticulos.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentVariantes = filteredVariantes.slice(startIndex, endIndex);
+  const currentArticulos = filteredArticulos.slice(startIndex, endIndex);
 
   // Resetear página cuando cambia el filtro
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  // Seleccionar/deseleccionar todas las variantes
+  // Seleccionar/deseleccionar todos los artículos
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedVariantes(new Set(currentVariantes.map(v => v.id)));
+      setSelectedArticulos(new Set(currentArticulos.map(a => a.id)));
     } else {
-      setSelectedVariantes(new Set());
+      setSelectedArticulos(new Set());
     }
   };
 
-  // Seleccionar/deseleccionar una variante específica
-  const handleSelectVariante = (varianteId: number, checked: boolean) => {
-    const newSelected = new Set(selectedVariantes);
+  // Seleccionar/deseleccionar un artículo específico
+  const handleSelectArticulo = (articuloId: number, checked: boolean) => {
+    const newSelected = new Set(selectedArticulos);
     if (checked) {
-      newSelected.add(varianteId);
+      newSelected.add(articuloId);
     } else {
-      newSelected.delete(varianteId);
+      newSelected.delete(articuloId);
     }
-    setSelectedVariantes(newSelected);
+    setSelectedArticulos(newSelected);
   };
 
   // Generar plantilla Excel
   const handleGenerateTemplate = async () => {
-    if (selectedVariantes.size === 0) {
-      alert('Por favor selecciona al menos una variante para generar la plantilla.');
+    if (selectedArticulos.size === 0) {
+      alert('Por favor selecciona al menos un artículo para generar la plantilla.');
       return;
     }
 
     setGeneratingTemplate(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const selectedVariantesData = variantes.filter(v => selectedVariantes.has(v.id)) as any[];
-      await generateStockTemplate(selectedVariantesData);
+      const selectedArticulosData = articulos.filter(a => selectedArticulos.has(a.id));
+      await generateStockTemplate(selectedArticulosData);
       setTemplateGenerated(true);
-      // Deseleccionar todas las variantes después de generar la plantilla
-      setSelectedVariantes(new Set());
+      // Deseleccionar todos los artículos después de generar la plantilla
+      setSelectedArticulos(new Set());
     } catch (error) {
       console.error('Error generando plantilla:', error);
       alert('Error al generar la plantilla. Por favor intenta nuevamente.');
@@ -119,11 +140,11 @@ export default function ImportacionStockPage() {
     setImportingStock(true);
 
     try {
-      await validateAndImportStock(excelFile, variantes);
+      await validateAndImportStock(excelFile, articulos);
       setImportSuccess(true);
       setExcelFile(null);
-      // Recargar variantes para mostrar los cambios
-      await fetchVariantes();
+      // Recargar artículos para mostrar los cambios
+      await fetchArticulos();
     } catch (error: unknown) {
       console.error('Error importando stock:', error);
       const errorMessage = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' 
@@ -238,7 +259,7 @@ export default function ImportacionStockPage() {
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1">
               <Input
-                placeholder="Buscar artículos por nombre, talle o color..."
+                placeholder="Buscar artículos por nombre..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="max-w-md"
@@ -247,79 +268,61 @@ export default function ImportacionStockPage() {
             <div className="flex items-center gap-2">
               <Checkbox
                 id="select-all"
-                checked={selectedVariantes.size === currentVariantes.length && currentVariantes.length > 0}
+                checked={selectedArticulos.size === currentArticulos.length && currentArticulos.length > 0}
                 onCheckedChange={handleSelectAll}
               />
               <label htmlFor="select-all" className="text-sm font-medium">
-                Seleccionar todos ({selectedVariantes.size} de {currentVariantes.length})
+                Seleccionar todos ({selectedArticulos.size} de {currentArticulos.length})
               </label>
             </div>
           </div>
 
-          {/* Tabla de variantes */}
+          {/* Tabla de artículos */}
           <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">Seleccionar</TableHead>
-                  <TableHead>ID Variante</TableHead>
                   <TableHead>ID Artículo</TableHead>
                   <TableHead>Artículo</TableHead>
-                  <TableHead>Talle</TableHead>
-                  <TableHead>Color</TableHead>
                   <TableHead>Stock Actual</TableHead>
-                  <TableHead>Stock Mínimo</TableHead>
-                  <TableHead>Stock Máximo</TableHead>
                   <TableHead>Precio</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8">
+                    <TableCell colSpan={5} className="text-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                     </TableCell>
                   </TableRow>
                 ) : error ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-red-600">
+                    <TableCell colSpan={5} className="text-center py-8 text-red-600">
                       Error al cargar los datos: {error}
                     </TableCell>
                   </TableRow>
-                ) : currentVariantes.length === 0 ? (
+                ) : currentArticulos.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-gray-500">
-                      No se encontraron variantes
+                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                      No se encontraron artículos
                     </TableCell>
                   </TableRow>
                 ) : (
-                  currentVariantes.map((variante) => (
-                    <TableRow key={variante.id}>
+                  currentArticulos.map((articulo) => (
+                    <TableRow key={articulo.id}>
                       <TableCell>
                         <Checkbox
-                          checked={selectedVariantes.has(variante.id)}
+                          checked={selectedArticulos.has(articulo.id)}
                           onCheckedChange={(checked) => 
-                            handleSelectVariante(variante.id, checked as boolean)
+                            handleSelectArticulo(articulo.id, checked as boolean)
                           }
                         />
                       </TableCell>
-                      <TableCell className="font-mono text-sm">{variante.id}</TableCell>
-                      <TableCell className="font-mono text-sm">{variante.articulo_id || variante.fk_id_articulo}</TableCell>
-                      <TableCell className="font-medium">{variante.articulo_descripcion || ''}</TableCell>
-                      <TableCell>{variante.talle_descripcion || ''}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-4 h-4 rounded border"
-                            style={{ backgroundColor: getColorHex(variante.color_descripcion || '') }}
-                          />
-                          {variante.color_descripcion || ''}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono">{variante.stock_unitario}</TableCell>
-                      <TableCell className="font-mono">{variante.stock_minimo}</TableCell>
-                      <TableCell className="font-mono">{variante.stock_maximo}</TableCell>
-                      <TableCell className="font-mono">${variante.precio_venta || 0}</TableCell>
+                      <TableCell className="font-mono text-sm">{articulo.id}</TableCell>
+                      <TableCell className="font-medium">{articulo.descripcion}</TableCell>
+                      <TableCell className="font-mono">{articulo.stock}</TableCell>
+                      <TableCell className="font-mono">${articulo.precio_unitario}</TableCell>
                     </TableRow>
                   ))
                 )}
@@ -331,7 +334,7 @@ export default function ImportacionStockPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">
-                Mostrando {startIndex + 1} a {Math.min(endIndex, filteredVariantes.length)} de {filteredVariantes.length} variantes
+                Mostrando {startIndex + 1} a {Math.min(endIndex, filteredArticulos.length)} de {filteredArticulos.length} artículos
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -371,7 +374,7 @@ export default function ImportacionStockPage() {
           <div className="flex justify-end">
             <Button
               onClick={handleGenerateTemplate}
-              disabled={selectedVariantes.size === 0 || generatingTemplate}
+              disabled={selectedArticulos.size === 0 || generatingTemplate}
               className="flex items-center gap-2"
             >
               {generatingTemplate ? (
@@ -407,7 +410,7 @@ export default function ImportacionStockPage() {
               <h4 className="font-medium text-green-800 mb-2">Próximos pasos:</h4>
               <ol className="text-sm text-green-700 space-y-1">
                 <li>1. Abre el archivo Excel descargado</li>
-                <li>2. Completa las columnas: stock_unitario (se sumará al actual), stock_minimo, stock_maximo</li>
+                <li>2. Completa la columna: stock (se sumará al actual)</li>
                 <li>3. Guarda el archivo</li>
                 <li>4. Regresa aquí para la etapa 2 de importación</li>
               </ol>
@@ -439,8 +442,7 @@ export default function ImportacionStockPage() {
               <ul className="text-sm text-green-700 space-y-1">
                 <li>• Validación del formato del archivo Excel</li>
                 <li>• Verificación de campos requeridos</li>
-                <li>• Suma del stock_unitario al stock existente</li>
-                <li>• Actualización de stock_minimo y stock_maximo</li>
+                <li>• Suma del stock al stock existente</li>
                 <li>• Recarga automática de datos</li>
               </ul>
             </div>
@@ -494,23 +496,4 @@ export default function ImportacionStockPage() {
       </Dialog>
     </div>
   );
-}
-
-// Función helper para obtener el color hexadecimal
-function getColorHex(colorName: string): string {
-  const colorMap: { [key: string]: string } = {
-    'Rojo': '#ef4444',
-    'Azul': '#3b82f6',
-    'Verde': '#22c55e',
-    'Amarillo': '#eab308',
-    'Negro': '#000000',
-    'Blanco': '#ffffff',
-    'Gris': '#6b7280',
-    'Marrón': '#a16207',
-    'Rosa': '#ec4899',
-    'Púrpura': '#8b5cf6',
-    'Naranja': '#f97316',
-    'Cyan': '#06b6d4',
-  };
-  return colorMap[colorName] || '#6b7280';
 } 

@@ -12,10 +12,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { BreadcrumbBar } from "@/components/BreadcrumbBar";
 import { getUsuarios } from "@/services/usuarios";
-import { getModulos, getAllPermisosConDetalles, updatePermisosUsuarioLote, crearPermisosPorDefecto } from "@/services/permisos";
+import { getModulos, getAllPermisosConDetalles, updatePermisosUsuarioLote, crearPermisosPorDefecto, diagnosticarPermisos } from "@/services/permisos";
 import { Usuario } from "@/types/usuario";
 import { Modulo, PermisoUsuarioConDetalles } from "@/types/permisos";
 import { toast } from "sonner";
+import { CreateUsuarioDialog } from "@/components/usuarios/create-usuario-dialog";
+import { UsuarioDetailsDialog } from "@/components/usuarios/usuario-details-dialog";
 
 interface PermisosUsuario {
   [moduloId: number]: {
@@ -24,7 +26,7 @@ interface PermisosUsuario {
 }
 
 export default function SeguridadPage() {
-  const { } = useUser();
+  const { user } = useUser();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [modulos, setModulos] = useState<Modulo[]>([]);
   const [permisos, setPermisos] = useState<PermisoUsuarioConDetalles[]>([]);
@@ -36,31 +38,49 @@ export default function SeguridadPage() {
   const [filterRol, setFilterRol] = useState<string>("");
   const [hasChanges, setHasChanges] = useState(false);
   const [creatingPermissions, setCreatingPermissions] = useState(false);
+  const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
+
+  // Función para obtener el usuario actual
+  const obtenerUsuarioActual = async () => {
+    if (user?.emailAddresses?.[0]?.emailAddress) {
+      try {
+        const usuariosData = await getUsuarios();
+        const usuario = usuariosData.find(u => 
+          u.email.toLowerCase() === user.emailAddresses[0].emailAddress.toLowerCase()
+        );
+        setUsuarioActual(usuario || null);
+      } catch (error) {
+        console.error("Error obteniendo usuario actual:", error);
+      }
+    }
+  };
+
+  // Función para recargar datos
+  const recargarDatos = async () => {
+    try {
+      setLoading(true);
+      const [usuariosData, modulosData, permisosData] = await Promise.all([
+        getUsuarios(),
+        getModulos(),
+        getAllPermisosConDetalles()
+      ]);
+
+      setUsuarios(usuariosData);
+      setModulos(modulosData);
+      setPermisos(permisosData);
+    } catch (error) {
+      console.error("Error cargando datos:", error);
+      toast.error("Error cargando datos");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Cargar datos iniciales
   useEffect(() => {
-    const cargarDatos = async () => {
-      try {
-        setLoading(true);
-        const [usuariosData, modulosData, permisosData] = await Promise.all([
-          getUsuarios(),
-          getModulos(),
-          getAllPermisosConDetalles()
-        ]);
-
-        setUsuarios(usuariosData);
-        setModulos(modulosData);
-        setPermisos(permisosData);
-      } catch (error) {
-        console.error("Error cargando datos:", error);
-        toast.error("Error cargando datos");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    cargarDatos();
-  }, []);
+    recargarDatos();
+    obtenerUsuarioActual();
+  }, [user]);
 
   // Filtrar usuarios
   const filteredUsuarios = usuarios.filter(usuario => {
@@ -112,10 +132,19 @@ export default function SeguridadPage() {
       const permisosParaActualizar: { [moduloId: number]: { puede_ver: boolean } } = {};
       
       Object.entries(permisosUsuario).forEach(([moduloId, permiso]) => {
-        permisosParaActualizar[parseInt(moduloId)] = {
-          puede_ver: permiso.puede_ver
-        };
+        const moduloIdNum = parseInt(moduloId);
+        if (!isNaN(moduloIdNum) && permiso && typeof permiso.puede_ver === 'boolean') {
+          permisosParaActualizar[moduloIdNum] = {
+            puede_ver: permiso.puede_ver
+          };
+        }
       });
+
+      // Validar que hay datos para actualizar
+      if (Object.keys(permisosParaActualizar).length === 0) {
+        toast.warning("No hay cambios para guardar");
+        return;
+      }
 
       await updatePermisosUsuarioLote(selectedUsuario.id, permisosParaActualizar);
       
@@ -126,7 +155,11 @@ export default function SeguridadPage() {
       const permisosActualizados = await getAllPermisosConDetalles();
       setPermisos(permisosActualizados);
     } catch (error: unknown) {
-      console.error("Error guardando permisos:", error);
+      console.error("Error guardando permisos:", {
+        error: error,
+        message: error instanceof Error ? error.message : 'Error desconocido',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       
       // Mostrar mensaje de error más específico
       let errorMessage = "Error guardando permisos";
@@ -134,11 +167,35 @@ export default function SeguridadPage() {
         errorMessage = "Error: Ya existe un permiso para este usuario y módulo. Intenta recargar la página.";
       } else if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
         errorMessage = `Error: ${error.message}`;
+      } else if (error instanceof Error) {
+        errorMessage = `Error: ${error.message}`;
       }
       
       toast.error(errorMessage);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Función de diagnóstico
+  const handleDiagnostico = async () => {
+    if (!selectedUsuario) {
+      toast.warning("Selecciona un usuario primero");
+      return;
+    }
+
+    try {
+      const resultado = await diagnosticarPermisos(selectedUsuario.id);
+      console.log("Diagnóstico de permisos:", resultado);
+      
+      if (resultado.error) {
+        toast.error(`Error en diagnóstico: ${resultado.error}`);
+      } else {
+        toast.success(`Diagnóstico completado. Usuario: ${resultado.usuario.nombre}, Permisos: ${resultado.totalPermisos}, Módulos: ${resultado.totalModulos}`);
+      }
+    } catch (error) {
+      console.error("Error en diagnóstico:", error);
+      toast.error("Error ejecutando diagnóstico");
     }
   };
 
@@ -169,13 +226,19 @@ export default function SeguridadPage() {
       const permisosActualizados = await getAllPermisosConDetalles();
       setPermisos(permisosActualizados);
     } catch (error: unknown) {
-      console.error("Error creando permisos:", error);
+      console.error("Error creando permisos:", {
+        error: error,
+        message: error instanceof Error ? error.message : 'Error desconocido',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       
       // Mostrar mensaje de error más específico
       let errorMessage = "Error creando permisos para usuarios existentes";
       if (error && typeof error === 'object' && 'code' in error && error.code === "23505") {
         errorMessage = "Error: Algunos permisos ya existen. Los permisos duplicados fueron ignorados.";
       } else if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+        errorMessage = `Error: ${error.message}`;
+      } else if (error instanceof Error) {
         errorMessage = `Error: ${error.message}`;
       }
       
@@ -241,17 +304,24 @@ export default function SeguridadPage() {
       
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-100 rounded-lg">
-            <Shield className="w-6 h-6 text-blue-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Seguridad por Usuario</h1>
-            <p className="text-gray-600">Gestiona los permisos de visualización de módulos para cada usuario</p>
-          </div>
-        </div>
-        
-                 <div className="flex items-center gap-2">
+                 <div className="flex items-center gap-3">
+           <div className="p-2 bg-blue-100 rounded-lg">
+             <Shield className="w-6 h-6 text-blue-600" />
+           </div>
+           <div>
+             <h1 className="text-2xl font-bold text-gray-900">Seguridad por Usuario</h1>
+             <p className="text-gray-600">Gestiona los permisos de visualización de módulos para cada usuario</p>
+           </div>
+         </div>
+         
+         <div className="flex items-center gap-2">
+           {/* Mostrar botón para administradores */}
+           {(usuarioActual?.rol === 'admin' || user?.emailAddresses?.[0]?.emailAddress === 'admindemokiosco@gmail.com') && (
+             <CreateUsuarioDialog onUsuarioCreated={recargarDatos} />
+           )}
+           
+
+           
            <Button
              onClick={handleCreatePermissionsForExistingUsers}
              disabled={creatingPermissions}
@@ -354,15 +424,21 @@ export default function SeguridadPage() {
                       : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">{usuario.nombre}</div>
-                      <div className="text-sm text-gray-600">{usuario.email}</div>
-                    </div>
-                    <Badge className={getRolColor(usuario.rol)}>
-                      {usuario.rol}
-                    </Badge>
-                  </div>
+                                     <div className="flex items-center justify-between">
+                     <div className="flex-1">
+                       <div className="font-medium text-gray-900">{usuario.nombre}</div>
+                       <div className="text-sm text-gray-600">{usuario.email}</div>
+                     </div>
+                     <div className="flex items-center gap-2">
+                       <Badge className={getRolColor(usuario.rol)}>
+                         {usuario.rol}
+                       </Badge>
+                       <UsuarioDetailsDialog 
+                         usuario={usuario} 
+                         onUsuarioDeleted={recargarDatos} 
+                       />
+                     </div>
+                   </div>
                 </div>
               ))}
             </div>
@@ -450,6 +526,14 @@ export default function SeguridadPage() {
                       <p className="text-xs text-blue-700">
                         Los cambios se aplicarán inmediatamente al guardar
                       </p>
+                      <Button
+                        onClick={handleDiagnostico}
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 border-purple-600 text-purple-600 hover:bg-purple-50"
+                      >
+                        🔍 Diagnóstico
+                      </Button>
                     </div>
                     {hasChanges && (
                       <div className="flex items-center gap-2 text-orange-600">

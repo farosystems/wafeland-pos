@@ -3,8 +3,9 @@ import * as React from "react";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { useVariantes } from "@/hooks/use-variantes";
 import { useClientesSecure } from "@/hooks/use-clientes-secure";
+import { getArticles } from "@/services/articles";
+import { Article } from "@/types/article";
 
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,142 +15,12 @@ import { AlertTriangle, FileText, Loader2 } from "lucide-react";
 import { BreadcrumbBar } from "@/components/BreadcrumbBar";
 import { generateOrdenCompraPDF } from "@/utils/generateOrdenCompraPDF";
 
-// Función helper para obtener el color hexadecimal basado en el nombre del color
-const getColorHex = (colorName: string): string => {
-  if (!colorName) return '#ccc';
-  
-  const colorNameLower = colorName.toLowerCase().trim();
-  
-  // Si ya es un código hexadecimal válido, devolverlo tal como está
-  if (/^#[0-9A-F]{6}$/i.test(colorName)) {
-    return colorName;
-  }
-  
-  // Si es un código hexadecimal de 3 caracteres, expandirlo
-  if (/^#[0-9A-F]{3}$/i.test(colorName)) {
-    return colorName.split('').map(char => char === '#' ? '#' : char + char).join('');
-  }
-  
-  // Mapeo de colores comunes en español
-  const colorMap: { [key: string]: string } = {
-    // Colores básicos
-    'rojo': '#ef4444',
-    'azul': '#3b82f6',
-    'verde': '#10b981',
-    'amarillo': '#f59e0b',
-    'negro': '#000000',
-    'blanco': '#ffffff',
-    'gris': '#6b7280',
-    'rosa': '#ec4899',
-    'morado': '#8b5cf6',
-    'naranja': '#f97316',
-    'marron': '#a16207',
-    'celeste': '#0ea5e9',
-    'violeta': '#7c3aed',
-    'turquesa': '#14b8a6',
-    'beige': '#f5f5dc',
-    'coral': '#ff7f50',
-    'lila': '#c084fc',
-    'dorado': '#fbbf24',
-    'plateado': '#c0c0c0',
-    'bordo': '#dc2626',
-    'navy': '#1e3a8a',
-    'oliva': '#84cc16',
-    'salmon': '#fb7185',
-    'lavanda': '#a78bfa',
-    'menta': '#34d399',
-    'crema': '#fef3c7',
-    'chocolate': '#92400e',
-    'cobre': '#b45309',
-    'esmeralda': '#059669',
-    
-    // Variaciones
-    'rojo claro': '#fca5a5',
-    'rojo oscuro': '#dc2626',
-    'azul claro': '#93c5fd',
-    'azul oscuro': '#1e40af',
-    'verde claro': '#86efac',
-    'verde oscuro': '#047857',
-    'amarillo claro': '#fde047',
-    'amarillo oscuro': '#d97706',
-    'rosa claro': '#f9a8d4',
-    'rosa oscuro': '#be185d',
-    'morado claro': '#c4b5fd',
-    'morado oscuro': '#5b21b6',
-    'naranja claro': '#fdba74',
-    'naranja oscuro': '#ea580c',
-    'marron claro': '#d97706',
-    'marron oscuro': '#78350f',
-    'gris claro': '#d1d5db',
-    'gris oscuro': '#374151',
-    
-    // Colores de moda
-    'fucsia': '#e91e63',
-    'magenta': '#ec4899',
-    'cian': '#06b6d4',
-    'indigo': '#6366f1',
-    'púrpura': '#9333ea',
-    'carmesí': '#dc2626',
-    'bermellón': '#ef4444',
-    'ocre': '#d97706',
-    'sepia': '#92400e',
-    'caqui': '#84cc16',
-    'mostaza': '#f59e0b',
-    'aqua': '#14b8a6',
-    'teal': '#0f766e',
-    'slate': '#475569',
-    'zinc': '#71717a',
-    'neutral': '#737373',
-    'stone': '#78716c',
-    
-    // Colores en inglés (por si acaso)
-    'red': '#ef4444',
-    'orange': '#f97316',
-    'amber': '#f59e0b',
-    'yellow': '#eab308',
-    'lime': '#84cc16',
-    'green': '#22c55e',
-    'emerald': '#10b981',
-    'cyan': '#06b6d4',
-    'sky': '#0ea5e9',
-    'blue': '#3b82f6',
-    'violet': '#8b5cf6',
-    'purple': '#a855f7',
-    'fuchsia': '#d946ef',
-    'pink': '#ec4899',
-    'rose': '#f43f5e',
-  };
-  
-  // Buscar coincidencia exacta
-  if (colorMap[colorNameLower]) {
-    return colorMap[colorNameLower];
-  }
-  
-  // Buscar coincidencia parcial (por ejemplo, "rojo" en "rojo claro")
-  for (const [key, value] of Object.entries(colorMap)) {
-    if (colorNameLower.includes(key) || key.includes(colorNameLower)) {
-      return value;
-    }
-  }
-  
-  // Si no encuentra coincidencia, generar un color único basado en el hash del nombre
-  let hash = 0;
-  for (let i = 0; i < colorNameLower.length; i++) {
-    hash = colorNameLower.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  
-  // Generar un color pastel único basado en el hash
-  const hue = Math.abs(hash) % 360;
-  const saturation = 60 + (Math.abs(hash) % 30); // 60-90%
-  const lightness = 65 + (Math.abs(hash) % 20); // 65-85%
-  
-  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-};
-
 export default function StockFaltantePage() {
   const { isSignedIn } = useUser();
   const router = useRouter();
-  const { variantes, error, fetchVariantes } = useVariantes();
+  const [articulos, setArticulos] = React.useState<Article[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   const { clientes } = useClientesSecure();
   const [filter, setFilter] = React.useState("");
   const [page, setPage] = React.useState(0);
@@ -157,7 +28,7 @@ export default function StockFaltantePage() {
   
   // Estados para la modal de orden de compra
   const [showOrdenModal, setShowOrdenModal] = React.useState(false);
-  const [selectedVariantes, setSelectedVariantes] = React.useState<Set<number>>(new Set());
+  const [selectedArticulos, setSelectedArticulos] = React.useState<Set<number>>(new Set());
   const [selectedProveedor, setSelectedProveedor] = React.useState<number>(0);
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [preciosUnitarios, setPreciosUnitarios] = React.useState<{[key: number]: number}>({});
@@ -178,10 +49,24 @@ export default function StockFaltantePage() {
     ciudad: "Ciudad, Estado, CP"
   });
 
-  // useEffect debe ir ANTES de cualquier lógica condicional
+  // Cargar artículos al montar el componente
   React.useEffect(() => {
-    fetchVariantes();
-  }, [fetchVariantes]);
+    const fetchArticulos = async () => {
+      try {
+        setLoading(true);
+        const data = await getArticles();
+        setArticulos(data);
+      } catch (err: any) {
+        setError(err.message || "Error al cargar artículos");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (isSignedIn) {
+      fetchArticulos();
+    }
+  }, [isSignedIn]);
 
   if (!isSignedIn) {
     return (
@@ -192,35 +77,41 @@ export default function StockFaltantePage() {
     );
   }
 
-  // Filtrar variantes con stock faltante (stock_unitario <= stock_minimo)
-  const variantesConStockFaltante = variantes.filter(v => 
-    v.stock_unitario <= (v.stock_minimo ?? 0)
+  if (loading) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-muted-foreground gap-4">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span>Cargando artículos...</span>
+      </div>
+    );
+  }
+
+  // Filtrar artículos con stock faltante (stock <= stock_minimo)
+  const articulosConStockFaltante = articulos.filter(art => 
+    art.stock <= (art.stock_minimo ?? 0)
   );
 
   // Aplicar filtro de búsqueda
-  const variantesFiltradas = variantesConStockFaltante.filter(v =>
+  const articulosFiltrados = articulosConStockFaltante.filter(art =>
     (!filter ||
-      v.articulo_descripcion?.toLowerCase().includes(filter.toLowerCase()) ||
-      v.talle_descripcion?.toLowerCase().includes(filter.toLowerCase()) ||
-      v.color_descripcion?.toLowerCase().includes(filter.toLowerCase())
+      art.descripcion?.toLowerCase().includes(filter.toLowerCase())
     )
   );
 
-  const variantesPaginadas = variantesFiltradas.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
-  const totalPages = Math.ceil(variantesFiltradas.length / rowsPerPage);
+  const articulosPaginados = articulosFiltrados.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+  const totalPages = Math.ceil(articulosFiltrados.length / rowsPerPage);
 
   // Calcular estadísticas
-  const totalVariantesFaltantes = variantesConStockFaltante.length;
-  const totalArticulosAfectados = new Set(variantesConStockFaltante.map(v => v.fk_id_articulo)).size;
-  const stockFaltanteTotal = variantesConStockFaltante.reduce((acc, v) => {
-    const faltante = (v.stock_minimo ?? 0) - v.stock_unitario;
+  const totalArticulosFaltantes = articulosConStockFaltante.length;
+  const stockFaltanteTotal = articulosConStockFaltante.reduce((acc, art) => {
+    const faltante = (art.stock_minimo ?? 0) - art.stock;
     return acc + Math.max(0, faltante);
   }, 0);
 
   // Funciones para manejar la orden de compra
   const handleOpenOrdenModal = () => {
     setShowOrdenModal(true);
-    setSelectedVariantes(new Set());
+    setSelectedArticulos(new Set());
     setSelectedProveedor(0);
     setPreciosUnitarios({});
     setDescuento(0);
@@ -231,7 +122,7 @@ export default function StockFaltantePage() {
 
   const handleCloseOrdenModal = () => {
     setShowOrdenModal(false);
-    setSelectedVariantes(new Set());
+    setSelectedArticulos(new Set());
     setSelectedProveedor(0);
     setIsGenerating(false);
   };
@@ -241,30 +132,30 @@ export default function StockFaltantePage() {
     setOrdenGenerada(null);
   };
 
-  const handleVarianteSelection = (varianteId: number, checked: boolean) => {
-    const newSelected = new Set(selectedVariantes);
+  const handleArticuloSelection = (articuloId: number, checked: boolean) => {
+    const newSelected = new Set(selectedArticulos);
     if (checked) {
-      newSelected.add(varianteId);
+      newSelected.add(articuloId);
     } else {
-      newSelected.delete(varianteId);
+      newSelected.delete(articuloId);
     }
-    setSelectedVariantes(newSelected);
+    setSelectedArticulos(newSelected);
   };
 
-  const handlePrecioChange = (varianteId: number, precio: number) => {
+  const handlePrecioChange = (articuloId: number, precio: number) => {
     setPreciosUnitarios(prev => ({
       ...prev,
-      [varianteId]: precio
+      [articuloId]: precio
     }));
   };
 
   const calcularTotales = () => {
     let subtotal = 0;
     
-    variantesConStockFaltante.forEach(variante => {
-      if (selectedVariantes.has(variante.id)) {
-        const precio = preciosUnitarios[variante.id] || 0;
-        const stockFaltante = (variante.stock_minimo ?? 0) - variante.stock_unitario;
+    articulosConStockFaltante.forEach(articulo => {
+      if (selectedArticulos.has(articulo.id)) {
+        const precio = preciosUnitarios[articulo.id] || 0;
+        const stockFaltante = (articulo.stock_minimo ?? 0) - articulo.stock;
         subtotal += precio * Math.max(0, stockFaltante);
       }
     });
@@ -282,8 +173,8 @@ export default function StockFaltantePage() {
   };
 
   const handleGenerarOrden = async () => {
-    if (selectedVariantes.size === 0) {
-      alert("Debes seleccionar al menos una variante");
+    if (selectedArticulos.size === 0) {
+      alert("Debes seleccionar al menos un artículo");
       return;
     }
 
@@ -299,29 +190,25 @@ export default function StockFaltantePage() {
       
       // Crear items de la orden
       const items: {
-        fk_id_variante: number;
+        fk_id_articulo: number;
         cantidad: number;
         precio_unitario: number;
         subtotal: number;
         articulo_descripcion: string;
-        talle_descripcion: string;
-        color_descripcion: string;
       }[] = [];
       
-      variantesConStockFaltante.forEach(variante => {
-        if (selectedVariantes.has(variante.id)) {
-          const precio = preciosUnitarios[variante.id] || 0;
-          const stockFaltante = (variante.stock_minimo ?? 0) - variante.stock_unitario;
+      articulosConStockFaltante.forEach(articulo => {
+        if (selectedArticulos.has(articulo.id)) {
+          const precio = preciosUnitarios[articulo.id] || 0;
+          const stockFaltante = (articulo.stock_minimo ?? 0) - articulo.stock;
           const cantidad = Math.max(0, stockFaltante);
           
           items.push({
-            fk_id_variante: variante.id,
+            fk_id_articulo: articulo.id,
             cantidad,
             precio_unitario: precio,
             subtotal: precio * cantidad,
-            articulo_descripcion: variante.articulo_descripcion ?? '',
-            talle_descripcion: variante.talle_descripcion ?? '',
-            color_descripcion: variante.color_descripcion ?? '',
+            articulo_descripcion: articulo.descripcion ?? '',
           });
         }
       });
@@ -385,8 +272,8 @@ export default function StockFaltantePage() {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-red-600">Variantes con stock bajo</p>
-              <p className="text-2xl font-bold text-red-700">{totalVariantesFaltantes}</p>
+              <p className="text-sm font-medium text-red-600">Artículos con stock bajo</p>
+              <p className="text-2xl font-bold text-red-700">{totalArticulosFaltantes}</p>
             </div>
             <AlertTriangle className="h-8 w-8 text-red-500" />
           </div>
@@ -394,21 +281,10 @@ export default function StockFaltantePage() {
         <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-orange-600">Artículos afectados</p>
-              <p className="text-2xl font-bold text-orange-700">{totalArticulosAfectados}</p>
+              <p className="text-sm font-medium text-orange-600">Unidades faltantes</p>
+              <p className="text-2xl font-bold text-orange-700">{stockFaltanteTotal}</p>
             </div>
             <div className="h-8 w-8 bg-orange-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-sm font-bold">A</span>
-            </div>
-          </div>
-        </div>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-yellow-600">Unidades faltantes</p>
-              <p className="text-2xl font-bold text-yellow-700">{stockFaltanteTotal}</p>
-            </div>
-            <div className="h-8 w-8 bg-yellow-500 rounded-full flex items-center justify-center">
               <span className="text-white text-sm font-bold">U</span>
             </div>
           </div>
@@ -418,7 +294,7 @@ export default function StockFaltantePage() {
       <div className="mb-6 flex items-center justify-between">
         <div className="flex gap-2 items-center">
           <Input 
-            placeholder="Filtrar por artículo, talle o color..." 
+                          placeholder="Filtrar por artículo..." 
             value={filter} 
             onChange={e => setFilter(e.target.value)} 
             className="max-w-xs" 
@@ -426,9 +302,9 @@ export default function StockFaltantePage() {
         </div>
         <div className="flex items-center gap-4">
           <div className="text-sm text-muted-foreground">
-            Mostrando {variantesFiltradas.length} de {totalVariantesFaltantes} variantes con stock bajo
+            Mostrando {articulosFiltrados.length} de {totalArticulosFaltantes} artículos con stock bajo
           </div>
-          {totalVariantesFaltantes > 0 && (
+          {totalArticulosFaltantes > 0 && (
             <Button 
               onClick={handleOpenOrdenModal}
               className="bg-blue-600 hover:bg-blue-700 text-white"
@@ -447,8 +323,7 @@ export default function StockFaltantePage() {
             <TableRow>
               <TableHead>ID</TableHead>
               <TableHead>Artículo</TableHead>
-              <TableHead>Talle</TableHead>
-              <TableHead>Color</TableHead>
+
               <TableHead>Stock actual</TableHead>
               <TableHead>Stock mínimo</TableHead>
               <TableHead>Stock faltante</TableHead>
@@ -456,14 +331,14 @@ export default function StockFaltantePage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {variantesPaginadas.length === 0 ? (
+            {articulosPaginados.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
-                  {variantesConStockFaltante.length === 0 ? (
+                <TableCell colSpan={6} className="text-center py-8">
+                  {articulosConStockFaltante.length === 0 ? (
                     <div className="flex flex-col items-center gap-2">
                       <AlertTriangle className="h-12 w-12 text-green-500" />
                       <p className="text-lg font-medium text-green-700">¡Excelente!</p>
-                      <p className="text-muted-foreground">No hay productos con stock bajo</p>
+                      <p className="text-muted-foreground">No hay artículos con stock bajo</p>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-2">
@@ -474,38 +349,23 @@ export default function StockFaltantePage() {
                   )}
                 </TableCell>
               </TableRow>
-            ) : variantesPaginadas.map(v => {
-              const stockFaltante = (v.stock_minimo ?? 0) - v.stock_unitario;
-              const porcentajeStock = v.stock_minimo ? Math.round((v.stock_unitario / v.stock_minimo) * 100) : 0;
+            ) : articulosPaginados.map(art => {
+              const stockFaltante = (art.stock_minimo ?? 0) - art.stock;
+              const porcentajeStock = art.stock_minimo ? Math.round((art.stock / art.stock_minimo) * 100) : 0;
               
               return (
-                <TableRow key={v.id} className="hover:bg-gray-50">
-                  <TableCell className="font-medium">{v.id}</TableCell>
-                  <TableCell className="font-medium">{v.articulo_descripcion}</TableCell>
-                  <TableCell>{v.talle_descripcion}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="w-8 h-8 rounded-lg border-2 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-                        style={{ 
-                          backgroundColor: getColorHex(v.color_descripcion ?? ''),
-                          borderColor: ['blanco', 'beige', 'crema', 'amarillo claro', 'rosa claro', 'celeste'].includes(v.color_descripcion?.toLowerCase() ?? '') 
-                            ? '#d1d5db' 
-                            : '#e5e7eb'
-                        }}
-                        title={`Color: ${v.color_descripcion ?? ''}`}
-                      />
-                      <span className="text-sm font-medium">{v.color_descripcion ?? ''}</span>
-                    </div>
-                  </TableCell>
+                <TableRow key={art.id} className="hover:bg-gray-50">
+                  <TableCell className="font-medium">{art.id}</TableCell>
+                  <TableCell className="font-medium">{art.descripcion}</TableCell>
+
                   <TableCell>
                     <span className="px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800">
-                      {v.stock_unitario}
+                      {art.stock}
                     </span>
                   </TableCell>
                   <TableCell>
                     <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                      {v.stock_minimo ?? 0}
+                      {art.stock_minimo ?? 0}
                     </span>
                   </TableCell>
                   <TableCell>
@@ -583,7 +443,7 @@ export default function StockFaltantePage() {
               </select>
             </div>
 
-            {/* Lista de Variantes con Stock Faltante */}
+            {/* Lista de Artículos con Stock Faltante */}
             <div>
               <h3 className="text-lg font-medium mb-3">Productos a Reponer</h3>
               <div className="border rounded-lg overflow-hidden">
@@ -592,48 +452,33 @@ export default function StockFaltantePage() {
                     <TableRow>
                       <TableHead className="w-12">Seleccionar</TableHead>
                       <TableHead>Artículo</TableHead>
-                      <TableHead>Talle</TableHead>
-                      <TableHead>Color</TableHead>
+
                       <TableHead>Stock Faltante</TableHead>
                       <TableHead>Precio Unitario</TableHead>
                       <TableHead>Subtotal</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {variantesConStockFaltante.map(variante => {
-                      const stockFaltante = (variante.stock_minimo ?? 0) - variante.stock_unitario;
-                      const precio = preciosUnitarios[variante.id] || 0;
+                    {articulosConStockFaltante.map(art => {
+                      const stockFaltante = (art.stock_minimo ?? 0) - art.stock;
+                      const precio = preciosUnitarios[art.id] || 0;
                       const subtotal = precio * Math.max(0, stockFaltante);
-                      const isSelected = selectedVariantes.has(variante.id);
+                      const isSelected = selectedArticulos.has(art.id);
                       
                       return (
-                        <TableRow key={variante.id}>
+                        <TableRow key={art.id}>
                           <TableCell>
                             <Checkbox
                               checked={isSelected}
                               onCheckedChange={(checked) => 
-                                handleVarianteSelection(variante.id, checked as boolean)
+                                handleArticuloSelection(art.id, checked as boolean)
                               }
                             />
                           </TableCell>
                           <TableCell className="font-medium">
-                            {variante.articulo_descripcion}
+                            {art.descripcion}
                           </TableCell>
-                          <TableCell>{variante.talle_descripcion}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div 
-                                className="w-6 h-6 rounded border shadow-sm"
-                                style={{ 
-                                  backgroundColor: getColorHex(variante.color_descripcion ?? ''),
-                                  borderColor: ['blanco', 'beige', 'crema', 'amarillo claro', 'rosa claro', 'celeste'].includes(variante.color_descripcion?.toLowerCase() ?? '') 
-                                    ? '#d1d5db' 
-                                    : '#e5e7eb'
-                                }}
-                              />
-                              <span className="text-sm">{variante.color_descripcion ?? ''}</span>
-                            </div>
-                          </TableCell>
+
                           <TableCell>
                             <span className="px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800">
                               {Math.max(0, stockFaltante)}
@@ -645,7 +490,7 @@ export default function StockFaltantePage() {
                               min="0"
                               step="0.01"
                               value={precio}
-                              onChange={(e) => handlePrecioChange(variante.id, Number(e.target.value))}
+                              onChange={(e) => handlePrecioChange(art.id, Number(e.target.value))}
                               className="w-20 h-8 text-sm"
                               placeholder="0.00"
                             />
@@ -758,7 +603,7 @@ export default function StockFaltantePage() {
             </Button>
             <Button 
               onClick={handleGenerarOrden}
-              disabled={isGenerating || selectedVariantes.size === 0 || selectedProveedor === 0}
+              disabled={isGenerating || selectedArticulos.size === 0 || selectedProveedor === 0}
               className="bg-blue-600 hover:bg-blue-700"
             >
               {isGenerating ? (

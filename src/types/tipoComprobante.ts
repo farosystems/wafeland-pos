@@ -3,7 +3,6 @@ export interface TipoComprobante {
   descripcion: string;
   descuenta_stock: boolean;
   reingresa_stock: boolean;
-  admite_impuestos: boolean;
   imprime_pdf: boolean;
   activo: boolean;
   creado_el: string;

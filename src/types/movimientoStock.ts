@@ -7,6 +7,4 @@ export interface MovimientoStock {
   cantidad: number | null;
   stock_actual?: number;
   creado_el: string;
-  talle_descripcion?: string;
-  color_descripcion?: string;
 } 

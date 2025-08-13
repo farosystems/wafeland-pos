@@ -1,7 +1,7 @@
 import { AppSidebar } from "@/components/app-sidebar";
 import { ClerkProvider } from "@clerk/nextjs";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { ColorProvider } from "@/contexts/ColorContext";
+
 import { RouteGuard } from "@/components/route-guard";
 import "./globals.css";
 
@@ -13,7 +13,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <link rel="icon" type="image/png" href="/favicon.png" />
         </head>
         <body className="flex h-screen">
-          <ColorProvider>
             <SidebarProvider>
               <RouteGuard>
                 <AppSidebar />
@@ -25,7 +24,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </div>
               </RouteGuard>
             </SidebarProvider>
-          </ColorProvider>
         </body>
       </html>
     </ClerkProvider>

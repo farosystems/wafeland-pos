@@ -30,11 +30,8 @@ import { createMovimientoStock } from "@/services/movimientosStock";
 import { createCuentaCorriente } from "@/services/cuentasCorrientes";
 import { registrarMovimientoCaja } from "@/services/detalleLotesOperaciones";
 import { useUser } from "@clerk/nextjs";
-import { useTalles } from "@/hooks/use-talles";
-import { useColores } from "@/hooks/use-colores";
-import { useVariantes } from "@/hooks/use-variantes";
-import { editVariante } from "@/services/variantes";
-import { Scan, X } from "lucide-react";
+
+
 
 interface VentaFormDialogProps {
   open: boolean;
@@ -50,9 +47,7 @@ interface DetalleLinea {
   precio: number;
   subtotal: number;
   input: string;
-  talle: number | null; // Nuevo campo para el talle
-  color: number | null; // Nuevo campo para el color
-  variante: number | null; // Nuevo campo para la variante
+
   descuentoPorcentaje: number; // Nuevo campo para descuento por porcentaje
   descuentoFijo: number; // Nuevo campo para descuento por importe fijo
 }
@@ -92,17 +87,9 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   const [articulos, setArticulos] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(null);
-  const { talles } = useTalles();
-  const { colores } = useColores();
-  const { variantes } = useVariantes();
+
   
-  // Log para verificar si el hook se está ejecutando
-  console.log('🔧 VentaFormDialog - Hook useVariantes ejecutado, variantes:', variantes.length);
-  
-  // Estados para el picking
-  const [modoPicking, setModoPicking] = useState(false);
-  const [codigoBarrasInput, setCodigoBarrasInput] = useState("");
-  const [pickingInputRef] = useState(useRef<HTMLInputElement>(null));
+
 
   useEffect(() => {
     if (open) {
@@ -138,7 +125,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
 
   // Estado para el detalle de la venta
   const [detalle, setDetalle] = useState<DetalleLinea[]>([
-    { articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null, descuentoPorcentaje: 0, descuentoFijo: 0 },
+    { articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", descuentoPorcentaje: 0, descuentoFijo: 0 },
   ]);
   const [showSugerencias, setShowSugerencias] = useState<number | null>(null); // idx de línea con sugerencias abiertas
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -147,7 +134,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   useEffect(() => {
     if (!open) {
       // Al cerrar el modal, siempre resetear a una línea vacía (modo manual)
-      setDetalle([{ articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null, descuentoPorcentaje: 0, descuentoFijo: 0 }]);
+      setDetalle([{ articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", descuentoPorcentaje: 0, descuentoFijo: 0 }]);
       setShowSugerencias(null);
       // Resetear a valores por defecto
       setClienteSeleccionado(1); // Consumidor final
@@ -157,24 +144,11 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
       // Limpiar búsqueda de cliente
       setBusquedaCliente("");
       setMostrarSugerenciasCliente(false);
-      // Limpiar modo picking
-      setModoPicking(false);
-      setCodigoBarrasInput("");
+
     }
   }, [open]);
 
-  // Log para verificar datos cargados
-  useEffect(() => {
-    if (open && variantes.length > 0) {
-      console.log('📊 Datos cargados en el modal de venta:');
-      console.log('📦 Variantes totales:', variantes.length);
-      console.log('🏷️ Variantes con códigos de barras:', variantes.filter(v => v.codigo_barras).length);
-      console.log('📋 Primeras 5 variantes con códigos:', variantes.filter(v => v.codigo_barras).slice(0, 5).map(v => ({ id: v.id, codigo: v.codigo_barras, articulo: v.articulo_descripcion })));
-      console.log('🛍️ Artículos totales:', articulos.length);
-      console.log('🔍 Verificando si hay variantes con stock > 0:', variantes.filter(v => v.codigo_barras && v.stock_unitario > 0).length);
-      console.log('📋 Variantes con stock y códigos:', variantes.filter(v => v.codigo_barras && v.stock_unitario > 0).map(v => ({ id: v.id, codigo: v.codigo_barras, stock: v.stock_unitario, articulo: v.articulo_descripcion })));
-    }
-  }, [open, variantes, articulos]);
+
 
   // Cerrar sugerencias de cliente cuando se hace clic fuera
   useEffect(() => {
@@ -285,7 +259,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
 
   // Agregar línea
   function agregarLinea() {
-    setDetalle(detalle => [...detalle, { articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null, descuentoPorcentaje: 0, descuentoFijo: 0 }]);
+    setDetalle(detalle => [...detalle, { articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", descuentoPorcentaje: 0, descuentoFijo: 0 }]);
     setTimeout(() => {
       const idx = detalle.length;
       if (inputRefs.current[idx]) inputRefs.current[idx]?.focus();
@@ -295,14 +269,9 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   function quitarLinea(idx: number) {
     setDetalle(detalle => {
       const nuevoDetalle = detalle.filter((_, i) => i !== idx);
-      // Si estamos en modo picking y no quedan artículos, mantener el array vacío
-      // Si no estamos en modo picking y no quedan artículos, agregar una línea vacía
+      // Si no quedan artículos, agregar una línea vacía
       if (nuevoDetalle.length === 0) {
-        if (modoPicking) {
-          return []; // En modo picking, mantener vacío
-        } else {
-          return [{ articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null, descuentoPorcentaje: 0, descuentoFijo: 0 }];
-        }
+        return [{ articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", descuentoPorcentaje: 0, descuentoFijo: 0 }];
       }
       return nuevoDetalle;
     });
@@ -496,8 +465,6 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
             fk_id_articulo: d.articulo.id,
             cantidad: d.cantidad,
             precio_unitario: d.precio,
-            fk_id_talle: d.talle ?? null,
-            fk_id_color: d.color ?? null,
           });
           // Registrar movimiento de stock (FACTURA)
           await createMovimientoStock({
@@ -506,17 +473,8 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
             origen: "FACTURA",
             tipo: "salida",
             cantidad: -Math.abs(d.cantidad),
-            fk_id_talle: d.talle ?? null,
-            fk_id_color: d.color ?? null,
             stock_actual: 0, // Se calculará después del descuento
           });
-          // Descontar stock_unitario de la variante si corresponde
-          if (d.talle && d.color && d.articulo) {
-            const variante = variantes.find(v => v.fk_id_articulo === d.articulo!.id && v.fk_id_talle === d.talle && v.fk_id_color === d.color);
-            if (variante) {
-              await editVariante(variante.id, { stock_unitario: (variante.stock_unitario ?? 0) - d.cantidad });
-            }
-          }
         }
       }
       // 3. Crear los medios de pago
@@ -602,127 +560,11 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
 
 
 
-  // Función para obtener variantes disponibles para un artículo
-  function getVariantesDisponibles(articuloId: number | null) {
-    return variantes.filter(v => v.fk_id_articulo === articuloId && v.stock_unitario > 0);
-  }
 
-  // Función para buscar variante por código de barras
-  function buscarVariantePorCodigoBarras(codigo: string) {
-    console.log('🔍 Buscando código de barras:', codigo);
-    console.log('📦 Variantes disponibles:', variantes.length);
-    console.log('📋 Variantes con códigos:', variantes.filter(v => v.codigo_barras).map(v => ({ id: v.id, codigo: v.codigo_barras, stock: v.stock_unitario })));
-    
-    // Buscar por código exacto (sin verificar stock inicialmente)
-    const variante = variantes.find(v => v.codigo_barras === codigo);
-    console.log('✅ Variante encontrada:', variante);
-    
-    return variante;
-  }
 
-  // Función para agregar artículo desde picking
-  function agregarArticuloDesdePicking(codigoBarras: string) {
-    console.log('🚀 Iniciando agregarArticuloDesdePicking con código:', codigoBarras);
-    
-    const variante = buscarVariantePorCodigoBarras(codigoBarras);
-    if (!variante) {
-      console.log('❌ Variante no encontrada');
-      showToast("Código de barras no encontrado");
-      return;
-    }
 
-    // Verificar stock pero ser más permisivo
-    if (variante.stock_unitario <= 0) {
-      console.log('⚠️ Variante encontrada pero sin stock:', variante.stock_unitario);
-      showToast(`Artículo encontrado pero sin stock disponible (Stock: ${variante.stock_unitario})`);
-      // Continuar de todas formas para permitir agregar el artículo
-    }
 
-    console.log('📦 Variante encontrada:', variante);
-    const articulo = articulos.find(a => a.id === variante.fk_id_articulo);
-    console.log('🛍️ Artículos disponibles:', articulos.length);
-    console.log('🎯 Artículo encontrado:', articulo);
-    
-    if (!articulo) {
-      console.log('❌ Artículo no encontrado');
-      showToast("Artículo no encontrado");
-      return;
-    }
 
-    // Verificar si ya existe en el detalle
-    const existeEnDetalle = detalle.find(d => 
-      d.articulo?.id === articulo.id && 
-      d.talle === variante.fk_id_talle && 
-      d.color === variante.fk_id_color
-    );
-
-    if (existeEnDetalle) {
-      // Incrementar cantidad si ya existe
-      setDetalle(detalle => detalle.map(d => 
-        d.articulo?.id === articulo.id && 
-        d.talle === variante.fk_id_talle && 
-        d.color === variante.fk_id_color
-          ? { ...d, cantidad: d.cantidad + 1 }
-          : d
-      ));
-    } else {
-      // Agregar nueva línea
-      setDetalle(detalle => [...detalle, {
-        articulo: articulo,
-        cantidad: 1,
-        precio: articulo.precio_unitario,
-        subtotal: articulo.precio_unitario,
-        input: articulo.descripcion,
-        talle: variante.fk_id_talle,
-        color: variante.fk_id_color,
-        variante: variante.id,
-        descuentoPorcentaje: 0,
-        descuentoFijo: 0,
-      }]);
-    }
-
-    showToast(`Agregado: ${articulo.descripcion} (${talles.find(t => t.id === variante.fk_id_talle)?.descripcion || 'Sin talle'} - ${colores.find(c => c.id === variante.fk_id_color)?.descripcion || 'Sin color'})`);
-  }
-
-  // Función para manejar el cambio en el input de código de barras
-  function handleCodigoBarrasChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const valor = e.target.value;
-    setCodigoBarrasInput(valor);
-  }
-
-  // Función para agregar artículo desde el botón
-  function handleAgregarCodigoBarras() {
-    if (codigoBarrasInput.trim()) {
-      console.log('🎯 Botón Agregar presionado con valor:', codigoBarrasInput.trim());
-      console.log('🔍 Llamando a agregarArticuloDesdePicking...');
-      agregarArticuloDesdePicking(codigoBarrasInput.trim());
-      setCodigoBarrasInput("");
-      // Mantener el foco en el input para continuar escaneando
-      setTimeout(() => pickingInputRef.current?.focus(), 100);
-    }
-  }
-
-  // Función para activar/desactivar modo picking
-  function toggleModoPicking() {
-    setModoPicking(!modoPicking);
-    if (!modoPicking) {
-      // Activar modo picking - limpiar el detalle para que no queden líneas vacías
-      console.log('🔍 Activando modo picking...');
-      console.log('📦 Variantes disponibles:', variantes.length);
-      console.log('🏷️ Variantes con códigos:', variantes.filter(v => v.codigo_barras).length);
-      console.log('📋 Códigos disponibles:', variantes.filter(v => v.codigo_barras).map(v => v.codigo_barras));
-      // Limpiar el detalle para que solo se agreguen artículos por picking
-      setDetalle([]);
-      setTimeout(() => pickingInputRef.current?.focus(), 100);
-    } else {
-      // Desactivar modo picking
-      setCodigoBarrasInput("");
-      // Si no hay artículos en el detalle, agregar una línea vacía para el modo manual
-      if (detalle.length === 0) {
-        setDetalle([{ articulo: null, cantidad: 1, precio: 0, subtotal: 0, input: "", talle: null, color: null, variante: null, descuentoPorcentaje: 0, descuentoFijo: 0 }]);
-      }
-    }
-  }
 
   return (
     <>
@@ -786,69 +628,14 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                 <div className="mb-4">
                   <div className="flex justify-between items-center mb-2">
                     <span>Agrega artículos, cantidad y precio:</span>
-                    <Button
-                      type="button"
-                      variant={modoPicking ? "destructive" : "outline"}
-                      size="sm"
-                      onClick={toggleModoPicking}
-                      className="flex items-center gap-2"
-                    >
-                      {modoPicking ? (
-                        <>
-                          <X className="w-4 h-4" />
-                          Desactivar Picking
-                        </>
-                      ) : (
-                        <>
-                          <Scan className="w-4 h-4" />
-                          Activar Picking
-                        </>
-                      )}
-                    </Button>
                   </div>
-                  
-                  {modoPicking && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Scan className="w-4 h-4 text-blue-600" />
-                        <span className="text-sm font-medium text-blue-800">Modo Picking Activo</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          ref={pickingInputRef}
-                          type="text"
-                          className="flex-1 border border-blue-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="Escanee el código de barras..."
-                          value={codigoBarrasInput}
-                          onChange={handleCodigoBarrasChange}
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleAgregarCodigoBarras();
-                            }
-                          }}
-                          autoFocus
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={handleAgregarCodigoBarras}
-                          disabled={!codigoBarrasInput.trim()}
-                          className="bg-blue-600 hover:bg-blue-700 text-white"
-                        >
-                          Agregar
-                        </Button>
-                      </div>
-                    </div>
-                  )}
                 </div>
                 <div className="overflow-visible">
                   <table className="w-full text-sm border mb-2">
                   <thead>
                     <tr className="bg-gray-100">
                       <th className="px-3 py-2 w-1/4">Artículo</th>
-                      <th className="px-3 py-2 w-20">Talle</th>
-                      <th className="px-3 py-2 w-20">Color</th>
+                      
                       <th className="px-3 py-2 w-20">Cantidad</th>
                       <th className="px-3 py-2 w-24">Precio</th>
                       <th className="px-3 py-2 w-20">Desc. %</th>
@@ -888,40 +675,6 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                               </div>
                             )}
                           </div>
-                        </td>
-                        <td className="px-3 py-2">
-                          <select
-                            className="w-full border rounded px-2 py-1"
-                            value={d.talle ?? ""}
-                            onChange={e => {
-                              const talle = e.target.value ? Number(e.target.value) : null;
-                              setDetalle(detalle => detalle.map((linea, i) => i === idx ? { ...linea, talle, color: null, variante: null } : linea));
-                            }}
-                            disabled={!d.articulo}
-                          >
-                            <option value="">Talle</option>
-                            {getVariantesDisponibles(d.articulo?.id ?? null).filter(v => !d.color || v.fk_id_color === d.color).map(v => v.fk_id_talle).filter((v, i, arr) => arr.indexOf(v) === i).map(talleId => {
-                              const talle = talles.find(t => t.id === talleId);
-                              return talle ? <option key={talle.id} value={talle.id}>{talle.descripcion}</option> : null;
-                            })}
-                          </select>
-                        </td>
-                        <td className="px-3 py-2">
-                          <select
-                            className="w-full border rounded px-2 py-1"
-                            value={d.color ?? ""}
-                            onChange={e => {
-                              const color = e.target.value ? Number(e.target.value) : null;
-                              setDetalle(detalle => detalle.map((linea, i) => i === idx ? { ...linea, color, variante: null } : linea));
-                            }}
-                            disabled={!d.articulo}
-                          >
-                            <option value="">Color</option>
-                            {getVariantesDisponibles(d.articulo?.id ?? null).filter(v => !d.talle || v.fk_id_talle === d.talle).map(v => v.fk_id_color).filter((v, i, arr) => arr.indexOf(v) === i).map(colorId => {
-                              const color = colores.find(c => c.id === colorId);
-                              return color ? <option key={color.id} value={color.id}>{color.descripcion}</option> : null;
-                            })}
-                          </select>
                         </td>
                         <td className="px-3 py-2">
                           <input
@@ -1410,7 +1163,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
           <DialogHeader>
             <DialogTitle>Stock insuficiente</DialogTitle>
             <DialogDescription>
-              No hay stock disponible para la combinación seleccionada de artículo, talle y color. Por favor, revisa el stock antes de continuar.
+              No hay stock disponible para el artículo seleccionado. Por favor, revisa el stock antes de continuar.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end mt-4">

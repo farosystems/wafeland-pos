@@ -15,8 +15,6 @@ import { getUsuarios } from "@/services/usuarios";
 import { getTiposComprobantes } from "@/services/tiposComprobantes";
 import { getCuentasTesoreria } from "@/services/cuentasTesoreria";
 import { getArticles } from "@/services/articles";
-import { getTalles } from "@/services/talles";
-import { getColores } from "@/services/colores";
 import { createOrdenVenta, updateOrdenVentaAnulada } from "@/services/ordenesVenta";
 import { createOrdenVentaDetalle } from "@/services/ordenesVentaDetalle";
 import { createOrdenVentaMediosPago } from "@/services/ordenesVentaMediosPago";
@@ -28,8 +26,8 @@ import { Usuario } from "@/types/usuario";
 import { TipoComprobante } from "@/types/tipoComprobante";
 import { CuentaTesoreria } from "@/types/cuentaTesoreria";
 import { Article } from "@/types/article";
-import { Talle } from "@/types/talle";
-import { Color } from "@/types/color";
+
+
 import { OrdenVenta, OrdenVentaDetalle } from "@/types/ordenVenta";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -50,8 +48,6 @@ interface DetalleLinea {
   precio: number;
   subtotal: number;
   input: string;
-  talle: number | null;
-  color: number | null;
 }
 
 export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, ventaAAnular }: NotaCreditoDialogProps) {
@@ -60,8 +56,6 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
   const [tiposComprobantes, setTiposComprobantes] = useState<TipoComprobante[]>([]);
   const [cuentasTesoreria, setCuentasTesoreria] = useState<CuentaTesoreria[]>([]);
   const [articulos, setArticulos] = useState<Article[]>([]);
-  const [talles, setTalles] = useState<Talle[]>([]);
-  const [colores, setColores] = useState<Color[]>([]);
   const [loading, setLoading] = useState(true);
   const [detalleOriginal, setDetalleOriginal] = useState<OrdenVentaDetalle[]>([]);
   const { checkTrial } = useTrialCheck();
@@ -76,17 +70,13 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
         getTiposComprobantes(),
         getCuentasTesoreria(),
         getArticles(),
-        getTalles(),
-        getColores(),
         getOrdenesVentaDetalle(ventaAAnular.id),
-      ]).then(([c, u, tc, ct, a, t, col, detalle]) => {
+      ]).then(([c, u, tc, ct, a, detalle]) => {
         setClientes(c);
         setUsuarios(u);
         setTiposComprobantes(tc);
         setCuentasTesoreria(ct);
         setArticulos(a);
-        setTalles(t);
-        setColores(col);
         setDetalleOriginal(detalle);
         setLoading(false);
       });
@@ -109,8 +99,6 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
           precio: d.precio_unitario,
           subtotal: d.cantidad * d.precio_unitario,
           input: articulo?.descripcion || "",
-          talle: d.fk_id_talle || null,
-          color: d.fk_id_color || null,
         };
       });
       setDetalle(detalleCargado);
@@ -147,10 +135,6 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
       } else if (field === "input") {
         nuevo[idx].input = String(value);
         setShowSugerencias(idx);
-      } else if (field === "talle") {
-        nuevo[idx].talle = Number(value) || null;
-      } else if (field === "color") {
-        nuevo[idx].color = Number(value) || null;
       }
       nuevo[idx].subtotal = nuevo[idx].cantidad * nuevo[idx].precio;
       return nuevo;
@@ -315,8 +299,6 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
             fk_id_articulo: d.articulo.id,
             cantidad: d.cantidad,
             precio_unitario: d.precio,
-            fk_id_talle: d.talle,
-            fk_id_color: d.color,
           });
 
           // Registrar movimiento de stock (NOTA DE CREDITO)
@@ -326,8 +308,6 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
             origen: "NOTA DE CREDITO",
             tipo: "entrada",
             cantidad: Math.abs(d.cantidad),
-            fk_id_talle: d.talle,
-            fk_id_color: d.color,
             stock_actual: 0, // Se calculará después del reingreso
           });
         }
@@ -440,8 +420,6 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
                   <thead>
                     <tr className="bg-gray-100">
                       <th className="px-2 py-1">Artículo</th>
-                      <th className="px-2 py-1">Talle</th>
-                      <th className="px-2 py-1">Color</th>
                       <th className="px-2 py-1">Cantidad</th>
                       <th className="px-2 py-1">Precio</th>
                       <th className="px-2 py-1">Subtotal</th>
@@ -480,30 +458,7 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
                             )}
                           </div>
                         </td>
-                        <td className="px-2 py-1">
-                          <select
-                            className="w-full border rounded px-2 py-1 text-sm"
-                            value={d.talle || ""}
-                            onChange={e => handleDetalleChange(idx, "talle", e.target.value)}
-                          >
-                            <option value="">Seleccionar talle</option>
-                            {talles.map(t => (
-                              <option key={t.id} value={t.id}>{t.descripcion}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-2 py-1">
-                          <select
-                            className="w-full border rounded px-2 py-1 text-sm"
-                            value={d.color || ""}
-                            onChange={e => handleDetalleChange(idx, "color", e.target.value)}
-                          >
-                            <option value="">Seleccionar color</option>
-                            {colores.map(c => (
-                              <option key={c.id} value={c.id}>{c.descripcion}</option>
-                            ))}
-                          </select>
-                        </td>
+
                         <td className="px-2 py-1">
                           <input
                             type="number"
@@ -638,19 +593,14 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
                 <div className="mb-4">
                   <div className="font-semibold text-sm mb-2">Artículos a reingresar ({detalle.filter(d => d.articulo && d.cantidad > 0).length}):</div>
                   <div className="border rounded p-2 bg-gray-50 max-h-32 overflow-y-auto">
-                    {detalle.filter(d => d.articulo && d.cantidad > 0).map((d, idx) => {
-                      const talleDesc = talles.find(t => t.id === d.talle)?.descripcion || "Sin talle";
-                      const colorDesc = colores.find(c => c.id === d.color)?.descripcion || "Sin color";
-                      return (
-                        <div key={idx} className="flex justify-between text-sm py-1">
-                          <div>
-                            <span className="font-medium">{d.articulo?.descripcion}</span>
-                            <span className="text-gray-600 ml-2">({talleDesc} - {colorDesc})</span>
-                          </div>
-                          <span>{d.cantidad} x {formatCurrency(d.precio, DEFAULT_CURRENCY, DEFAULT_LOCALE)} = {formatCurrency(d.subtotal, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
+                    {detalle.filter(d => d.articulo && d.cantidad > 0).map((d, idx) => (
+                      <div key={idx} className="flex justify-between text-sm py-1">
+                        <div>
+                          <span className="font-medium">{d.articulo?.descripcion}</span>
                         </div>
-                      );
-                    })}
+                        <span>{d.cantidad} x {formatCurrency(d.precio, DEFAULT_CURRENCY, DEFAULT_LOCALE)} = {formatCurrency(d.subtotal, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</span>
+                      </div>
+                    ))}
                     {detalle.filter(d => d.articulo && d.cantidad > 0).length === 0 && (
                       <div className="text-gray-500 text-sm">No hay artículos para reingresar</div>
                     )}
