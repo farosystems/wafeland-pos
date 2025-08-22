@@ -72,10 +72,13 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
     const expired = await checkTrial(() => setShowTrialEnded(true));
     if (expired) return;
 
+    // Preparar los datos base del formulario (sin campos de ajuste de stock)
     const formData = {
-      ...values,
+      descripcion: values.descripcion as string,
       precio_unitario: Number(values.precio_unitario),
       fk_id_agrupador: Number(values.fk_id_agrupador),
+      fk_id_marca: values.fk_id_marca ? Number(values.fk_id_marca) : null,
+      activo: values.activo as boolean,
       stock: Number(values.stock),
       stock_minimo: Number(values.stock_minimo),
       mark_up: Number(values.mark_up),

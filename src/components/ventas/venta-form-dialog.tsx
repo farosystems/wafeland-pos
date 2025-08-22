@@ -512,9 +512,9 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
       // for (const imp of impuestos) {
       //   await createOrdenVentaImpuestos({
       //     id_orden: ordenVenta.id,
-      //     porcentaje_iva: imp.porcentaje_iva,
-      //     base_gravada: imp.base_gravada,
-      //     monto_iva: imp.monto_iva,
+      //     porcentaje: imp.porcentaje,
+      //     tipo_impuesto: imp.tipo_impuesto,
+      //     monto: imp.monto,
       //   });
       // }
       // 5. Refrescar la tabla de ventas (si hay callback o prop para hacerlo)
@@ -532,11 +532,11 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
 
   // Elimina el estado y handlers de impuestos si no se usan en otro lado
   // const [impuestos, setImpuestos] = useState([
-  //   { porcentaje_iva: 21, base_gravada: 0, monto_iva: 0 },
+  //   { porcentaje: 21, tipo_impuesto: "IVA", monto: 0 },
   // ]);
 
   // Handler para cambio de impuesto
-  // function handleImpuestoChange(idx: number, field: 'porcentaje_iva' | 'base_gravada' | 'monto_iva', value: number) {
+  // function handleImpuestoChange(idx: number, field: 'porcentaje' | 'tipo_impuesto' | 'monto', value: number) {
   //   setImpuestos(impuestos => {
   //     const nuevo = [...impuestos];
   //     nuevo[idx][field] = value;
@@ -545,7 +545,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   // }
   // Handler para agregar/quitar impuesto
   // function agregarImpuesto() {
-  //   setImpuestos(impuestos => [...impuestos, { porcentaje_iva: 21, base_gravada: 0, monto_iva: 0 }]);
+  //   setImpuestos(impuestos => [...impuestos, { porcentaje: 21, tipo_impuesto: "IVA", monto: 0 }]);
   // }
   // function quitarImpuesto(idx: number) {
   //   setImpuestos(impuestos => impuestos.length > 1 ? impuestos.filter((_, i) => i !== idx) : impuestos);
@@ -921,7 +921,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                     {impuestos.map((imp, idx) => (
                       <tr key={idx}>
                         <td className="px-2 py-1">
-                          <select className="w-24 border rounded px-2 py-1" value={imp.porcentaje_iva} onChange={e => handleImpuestoChange(idx, 'porcentaje_iva', Number(e.target.value))}>
+                          <select className="w-24 border rounded px-2 py-1" value={imp.porcentaje} onChange={e => handleImpuestoChange(idx, 'porcentaje', Number(e.target.value))}>
                             <option value={0}>0%</option>
                             <option value={10.5}>10.5%</option>
                             <option value={21}>21%</option>
@@ -929,10 +929,10 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                           </select>
                         </td>
                         <td className="px-2 py-1">
-                          <input type="number" className="w-24 border rounded px-2 py-1" value={imp.base_gravada} onChange={e => handleImpuestoChange(idx, 'base_gravada', Number(e.target.value))} />
+                          <input type="number" className="w-24 border rounded px-2 py-1" value={imp.tipo_impuesto} onChange={e => handleImpuestoChange(idx, 'tipo_impuesto', Number(e.target.value))} />
                         </td>
                         <td className="px-2 py-1">
-                          <input type="number" className="w-24 border rounded px-2 py-1" value={imp.monto_iva} onChange={e => handleImpuestoChange(idx, 'monto_iva', Number(e.target.value))} />
+                          <input type="number" className="w-24 border rounded px-2 py-1" value={imp.monto} onChange={e => handleImpuestoChange(idx, 'monto', Number(e.target.value))} />
                         </td>
                         <td className="px-2 py-1">
                           <button className="text-red-600 hover:underline" onClick={() => quitarImpuesto(idx)}>Quitar</button>
@@ -1042,8 +1042,8 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                   <div className="border rounded p-2 bg-gray-50">
                     {/* {impuestos.map((imp, idx) => (
                       <div key={idx} className="flex justify-between text-sm py-1">
-                        <span>IVA {imp.porcentaje_iva}%</span>
-                        <span>Base: ${imp.base_gravada.toFixed(2)} | IVA: ${imp.monto_iva.toFixed(2)}</span>
+                        <span>IVA {imp.porcentaje}%</span>
+                        <span>Base: ${imp.tipo_impuesto} | IVA: ${imp.monto.toFixed(2)}</span>
                       </div>
                     ))} */}
                   </div>

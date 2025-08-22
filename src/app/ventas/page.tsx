@@ -249,11 +249,11 @@ export default function VentasPage() {
     if (impuestos.length > 0) {
       autoTable(doc, {
         startY: afterPagoY,
-        head: [["% IVA", "Base gravada", "Monto IVA"]],
+        head: [["% IVA", "Tipo impuesto", "Monto IVA"]],
         body: impuestos.map(imp => [
-          imp.porcentaje_iva,
-          `${formatCurrency(imp.base_gravada, DEFAULT_CURRENCY, DEFAULT_LOCALE)}`,
-          `${formatCurrency(imp.monto_iva, DEFAULT_CURRENCY, DEFAULT_LOCALE)}`
+          imp.porcentaje,
+          imp.tipo_impuesto,
+          `${formatCurrency(imp.monto, DEFAULT_CURRENCY, DEFAULT_LOCALE)}`
         ]),
         theme: "grid",
         headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: "bold" },
@@ -378,11 +378,11 @@ export default function VentasPage() {
     if (impuestos.length > 0) {
       autoTable(doc, {
         startY: afterPagoY,
-        head: [["% IVA", "Base gravada", "Monto IVA"]],
+        head: [["% IVA", "Tipo impuesto", "Monto IVA"]],
         body: impuestos.map(imp => [
-          imp.porcentaje_iva,
-          `${formatCurrency(imp.base_gravada, DEFAULT_CURRENCY, DEFAULT_LOCALE)}`,
-          `${formatCurrency(imp.monto_iva, DEFAULT_CURRENCY, DEFAULT_LOCALE)}`
+          imp.porcentaje,
+          imp.tipo_impuesto,
+          `${formatCurrency(imp.monto, DEFAULT_CURRENCY, DEFAULT_LOCALE)}`
         ]),
         theme: "grid",
         headStyles: { 
@@ -706,16 +706,16 @@ export default function VentasPage() {
             <thead>
               <tr className="bg-gray-100">
                 <th className="px-2 py-1 text-right">% IVA</th>
-                <th className="px-2 py-1 text-right">Base gravada</th>
+                <th className="px-2 py-1 text-right">Tipo impuesto</th>
                 <th className="px-2 py-1 text-right">Monto IVA</th>
               </tr>
             </thead>
             <tbody>
               {impuestosVenta.map((imp, idx) => (
                 <tr key={idx}>
-                  <td className="px-2 py-1 text-right">{imp.porcentaje_iva}</td>
-                  <td className="px-2 py-1 text-right">{formatCurrency(imp.base_gravada, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
-                  <td className="px-2 py-1 text-right">{formatCurrency(imp.monto_iva, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
+                  <td className="px-2 py-1 text-right">{imp.porcentaje}</td>
+                  <td className="px-2 py-1 text-right">{imp.tipo_impuesto}</td>
+                  <td className="px-2 py-1 text-right">{formatCurrency(imp.monto, DEFAULT_CURRENCY, DEFAULT_LOCALE)}</td>
                 </tr>
               ))}
             </tbody>

@@ -113,9 +113,22 @@ export async function createArticle(article: CreateArticleData): Promise<Article
       throw new Error('El agrupador es requerido');
     }
     
+    // Preparar los datos para insertar (solo campos válidos de la tabla)
+    const datosInsercion = {
+      descripcion: article.descripcion,
+      precio_unitario: article.precio_unitario,
+      fk_id_agrupador: article.fk_id_agrupador,
+      fk_id_marca: article.fk_id_marca,
+      activo: article.activo,
+      stock: article.stock || 0,
+      stock_minimo: article.stock_minimo || 0,
+      mark_up: article.mark_up,
+      precio_costo: article.precio_costo,
+    };
+
     const { data, error } = await supabase
       .from("articulos")
-      .insert([article])
+      .insert([datosInsercion])
       .select()
       .single();
       

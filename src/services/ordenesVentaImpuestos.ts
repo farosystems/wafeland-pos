@@ -5,8 +5,8 @@ export async function getOrdenesVentaImpuestos(id_orden: number) {
   const { data, error } = await supabase
     .from("ordenes_venta_impuestos")
     .select("*")
-    .eq("id_orden", id_orden)
-    .order("idd", { ascending: true });
+    .eq("fk_id_orden", id_orden)
+    .order("id", { ascending: true });
   if (error) throw error;
   return data as OrdenVentaImpuestos[];
 }
@@ -21,18 +21,18 @@ export async function createOrdenVentaImpuestos(impuesto: CreateOrdenVentaImpues
   return data as OrdenVentaImpuestos;
 }
 
-export async function updateOrdenVentaImpuestos(idd: number, impuesto: Partial<CreateOrdenVentaImpuestosData>) {
+export async function updateOrdenVentaImpuestos(id: number, impuesto: Partial<CreateOrdenVentaImpuestosData>) {
   const { data, error } = await supabase
     .from("ordenes_venta_impuestos")
     .update(impuesto)
-    .eq("idd", idd)
+    .eq("id", id)
     .select()
     .single();
   if (error) throw error;
   return data as OrdenVentaImpuestos;
 }
 
-export async function deleteOrdenVentaImpuestos(idd: number) {
-  const { error } = await supabase.from("ordenes_venta_impuestos").delete().eq("idd", idd);
+export async function deleteOrdenVentaImpuestos(id: number) {
+  const { error } = await supabase.from("ordenes_venta_impuestos").delete().eq("id", id);
   if (error) throw error;
 } 

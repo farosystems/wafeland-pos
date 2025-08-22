@@ -25,13 +25,13 @@ export interface OrdenVentaDetalle {
 export type CreateOrdenVentaDetalleData = Omit<OrdenVentaDetalle, 'idd' | 'subtotal'>
 
 export interface OrdenVentaImpuestos {
-  idd: number;
-  id_orden: number;
-  porcentaje_iva: number;
-  base_gravada: number;
-  monto_iva: number;
+  id: number;
+  fk_id_orden: number;
+  tipo_impuesto: string;
+  porcentaje: number;
+  monto: number;
 }
-export type CreateOrdenVentaImpuestosData = Omit<OrdenVentaImpuestos, 'idd'>
+export type CreateOrdenVentaImpuestosData = Omit<OrdenVentaImpuestos, 'id'>
 
 export interface OrdenVentaMediosPago {
   idd: number;
