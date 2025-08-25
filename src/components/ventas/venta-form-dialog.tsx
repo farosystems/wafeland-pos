@@ -30,6 +30,7 @@ import { createMovimientoStock } from "@/services/movimientosStock";
 import { createCuentaCorriente } from "@/services/cuentasCorrientes";
 import { registrarMovimientoCaja } from "@/services/detalleLotesOperaciones";
 import { useUser } from "@clerk/nextjs";
+import { toast } from "sonner";
 
 
 
@@ -373,11 +374,16 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
   const [showTrialEnded, setShowTrialEnded] = useState(false);
   const [showClienteConsumidorFinalError, setShowClienteConsumidorFinalError] = useState(false);
   const [showMaxCuentaCorrienteError, setShowMaxCuentaCorrienteError] = useState(false);
-  const [toast, setToast] = useState<{ show: boolean, message: string }>({ show: false, message: "" });
-  function showToast(message: string) {
-    console.log('🍞 Toast:', message);
-    setToast({ show: true, message });
-    setTimeout(() => setToast({ show: false, message: "" }), 2500);
+  
+  // Función mejorada para mostrar toast de éxito con detalles
+  function showSuccessToast(ordenVenta: any, totalVenta: number) {
+    const cliente = clientesFiltrados.find(c => c.id === clienteSeleccionado);
+    const tipoComprobante = tiposComprobantes.find(t => t.id === tipoComprobanteSeleccionado);
+    
+    toast.success(`¡Venta #${ordenVenta.id} registrada exitosamente!`, {
+      description: `${cliente?.razon_social || 'Cliente'} - ${tipoComprobante?.descripcion || 'Comprobante'} - ${formatCurrency(totalVenta)}`,
+      duration: 4000,
+    });
   }
   const [showStockError, setShowStockError] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
@@ -521,11 +527,19 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
       if (onVentaGuardada) onVentaGuardada();
       // 6. Cerrar el popup y mostrar feedback
       onOpenChange(false);
-      showToast("Venta registrada con éxito");
-      // Opcional: mostrar toast de éxito
+      
+      // Mostrar toast de éxito con detalles
+      showSuccessToast(ordenVenta, totalVenta);
     } catch (e: unknown) {
       console.error("Error al guardar la venta:", e);
-      setError(e instanceof Error ? e.message : "Error al guardar la venta");
+      const errorMessage = e instanceof Error ? e.message : "Error al guardar la venta";
+      setError(errorMessage);
+      
+      // Mostrar toast de error
+      toast.error("Error al registrar la venta", {
+        description: errorMessage,
+        duration: 5000,
+      });
     }
     setLoading(false);
   }
@@ -1098,11 +1112,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
           </div>
         </DialogContent>
       </Dialog>
-      {toast.show && (
-        <div className="fixed top-6 right-6 z-50 bg-green-600 text-white px-6 py-3 rounded shadow-lg animate-fade-in">
-          {toast.message}
-        </div>
-      )}
+
       {/* Modal de error de medios de pago */}
       <Dialog open={showMediosPagoError} onOpenChange={setShowMediosPagoError}>
         <DialogContent>

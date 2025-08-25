@@ -18,6 +18,9 @@ import { getGastosEmpleados, createGastoEmpleado } from "@/app/actions/gastos-em
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { formatCurrency } from "@/lib/utils";
+import { getTiposGasto } from "@/services/tiposGasto";
+import { getEmpleados } from "@/services/empleados";
 
 function Breadcrumb() {
   return (
@@ -35,18 +38,26 @@ export default function GastosEmpleadosPage() {
   const [gastos, setGastos] = useState<GastoEmpleado[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [tiposGasto, setTiposGasto] = useState<any[]>([]);
+  const [empleados, setEmpleados] = useState<any[]>([]);
 
   useEffect(() => {
-    async function fetchGastos() {
+    async function fetchData() {
       try {
-        const data = await getGastosEmpleados();
-        setGastos(data);
+        const [gastosData, tiposData, empleadosData] = await Promise.all([
+          getGastosEmpleados(),
+          getTiposGasto(),
+          getEmpleados(),
+        ]);
+        setGastos(gastosData);
+        setTiposGasto(tiposData);
+        setEmpleados(empleadosData);
       } catch (error) {
-        console.error('Error fetching gastos:', error);
-        toast.error('Error al cargar los gastos');
+        console.error('Error fetching data:', error);
+        toast.error('Error al cargar los datos');
       }
     }
-    fetchGastos();
+    fetchData();
   }, []);
 
   const handleAddGasto = async (data: CreateGastoEmpleadoData) => {
@@ -54,11 +65,25 @@ export default function GastosEmpleadosPage() {
       setIsLoading(true);
       const newGasto = await createGastoEmpleado(data);
       setGastos(prev => [newGasto, ...prev]);
-      toast.success('Gasto creado exitosamente');
+      
+      // Obtener información para el toast
+      const tipoGasto = tiposGasto.find(t => t.id === data.fk_tipo_gasto);
+      const empleado = data.fk_empleado ? empleados.find(e => e.id === data.fk_empleado) : null;
+      
+      // Mostrar toast de éxito con detalles
+      toast.success(`¡Gasto de ${formatCurrency(data.monto)} registrado exitosamente!`, {
+        description: `${tipoGasto?.descripcion || 'Tipo de gasto'}${empleado ? ` - ${empleado.nombre}` : ''}${data.descripcion ? ` - ${data.descripcion}` : ''}`,
+        duration: 4000,
+      });
+      
       setIsDialogOpen(false);
     } catch (error) {
       console.error('Error creating gasto:', error);
-      toast.error('Error al crear el gasto');
+      const errorMessage = error instanceof Error ? error.message : 'Error al crear el gasto';
+      toast.error('Error al crear el gasto', {
+        description: errorMessage,
+        duration: 5000,
+      });
     } finally {
       setIsLoading(false);
     }

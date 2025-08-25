@@ -34,6 +34,7 @@ import { format } from "date-fns";
 import { formatCurrency, DEFAULT_CURRENCY, DEFAULT_LOCALE } from "@/lib/utils";
 import { useTrialCheck } from "@/hooks/use-trial-check";
 import { createMovimientoStock } from "@/services/movimientosStock";
+import { toast } from "sonner";
 
 interface NotaCreditoDialogProps {
   open: boolean;
@@ -235,12 +236,17 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
 
   const [error, setError] = useState<string | null>(null);
   const [showLoteError, setShowLoteError] = useState(false);
-  const [toast, setToast] = useState<{ show: boolean, message: string }>({ show: false, message: "" });
   const [showMediosPagoError, setShowMediosPagoError] = useState(false);
-
-  function showToast(message: string) {
-    setToast({ show: true, message });
-    setTimeout(() => setToast({ show: false, message: "" }), 2500);
+  
+  // Función mejorada para mostrar toast de éxito con detalles
+  function showSuccessToast(notaCredito: any, total: number, ventaOriginal: OrdenVenta) {
+    const cliente = clientes.find(c => c.id === ventaOriginal.fk_id_entidades);
+    const tipoComprobante = tiposComprobantes.find(t => t.id === notaCredito.fk_id_tipo_comprobante);
+    
+    toast.success(`¡Nota de crédito #${notaCredito.id} registrada exitosamente!`, {
+      description: `${cliente?.razon_social || 'Cliente'} - ${tipoComprobante?.descripcion || 'Nota de crédito'} - ${formatCurrency(Math.abs(total))}`,
+      duration: 4000,
+    });
   }
 
   async function handleGuardarNotaCredito() {
@@ -334,7 +340,9 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
 
       if (onNotaCreditoGuardada) onNotaCreditoGuardada();
       onOpenChange(false);
-      showToast("Nota de crédito registrada con éxito");
+      
+      // Mostrar toast de éxito con detalles
+      showSuccessToast(notaCredito, total, ventaAAnular);
     } catch (e: unknown) {
       console.error("Error al guardar la nota de crédito:", e);
       const errorMessage = e instanceof Error ? e.message : 
@@ -342,6 +350,12 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
         String((e as { error_description: unknown }).error_description) : 
         "Error al guardar la nota de crédito";
       setError(errorMessage);
+      
+      // Mostrar toast de error
+      toast.error("Error al registrar la nota de crédito", {
+        description: errorMessage,
+        duration: 5000,
+      });
     }
     setLoading(false);
   }
@@ -671,11 +685,7 @@ export function NotaCreditoDialog({ open, onOpenChange, onNotaCreditoGuardada, v
           </div>
         </DialogContent>
       </Dialog>
-      {toast.show && (
-        <div className="fixed top-6 right-6 z-50 bg-green-600 text-white px-6 py-3 rounded shadow-lg animate-fade-in">
-          {toast.message}
-        </div>
-      )}
+
       {/* Modal de error de medios de pago */}
       <Dialog open={showMediosPagoError} onOpenChange={setShowMediosPagoError}>
         <DialogContent>

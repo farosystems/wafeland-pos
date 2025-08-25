@@ -1,6 +1,7 @@
 import { AppSidebar } from "@/components/app-sidebar";
 import { ClerkProvider } from "@clerk/nextjs";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { Toaster } from "sonner";
 
 import { RouteGuard } from "@/components/route-guard";
 import "./globals.css";
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </SidebarProvider>
         </body>
       </html>
+      <Toaster position="top-right" richColors />
     </ClerkProvider>
   );
 }
