@@ -11,7 +11,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <ClerkProvider>
       <html lang="es">
         <head>
-          <link rel="icon" type="image/png" href="/favicon.png" />
+          <link rel="icon" type="image/png" href="/2-removebg-preview.png" />
         </head>
         <body className="flex h-screen">
             <SidebarProvider>
