@@ -13,6 +13,7 @@ import {
   IconUpload,
   IconShield,
   IconChartBar,
+  IconTable,
 } from "@tabler/icons-react";
 import { Shield } from "lucide-react";
 import Link from "next/link";
@@ -229,6 +230,20 @@ export function AppSidebar() {
               <span>Inicio</span>
             </Link>
           </li>
+          
+          {/* Módulo de Mesas - Abrir Local */}
+          {isModuloPermitido('mesas') && (
+            <li>
+              <Link
+                href="/mesas"
+                className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/mesas" ? "bg-gray-200 text-black font-semibold w-[92%] ml-1" : "hover:bg-gray-100 text-black"}`}
+                prefetch={false}
+              >
+                <IconTable className="w-5 h-5" />
+                <span>Mesas</span>
+              </Link>
+            </li>
+          )}
           
           {isModuloPermitido('dashboard') && (
             <li>
