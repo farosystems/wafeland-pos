@@ -4,7 +4,7 @@ import { Article, CreateArticleData, UpdateArticleData } from "@/types/article";
 export async function getArticles() {
   const { data, error } = await supabase
     .from("articulos")
-    .select(`*, fk_id_marca, fk_id_agrupador`)
+    .select(`*, fk_id_marca, fk_id_agrupador, equivalencia`)
     .order("id", { ascending: false });
   if (error) throw error;
 

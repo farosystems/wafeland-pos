@@ -41,18 +41,61 @@ export async function getOrdenesVentaDetalle() {
 
 export async function createOrdenVentaDetalle(detalle: any) {
   const usuario = await checkUserPermissions();
-  
+
   if (usuario.rol !== 'admin' && usuario.rol !== 'supervisor') {
     throw new Error('No tienes permisos para crear detalles de órdenes de venta');
   }
-  
+
+  // Insertar el detalle de venta
   const { data, error } = await supabase
     .from("ordenes_venta_detalle")
     .insert([detalle])
     .select()
     .single();
-    
+
   if (error) throw error;
+
+  // Procesar consumo de leche si el artículo tiene equivalencia > 0
+  try {
+    console.log('🥛 INICIO: Verificando consumo de leche para artículo:', detalle.fk_id_articulo);
+
+    // Obtener la equivalencia del artículo vendido
+    const { data: articulo, error: articuloError } = await supabase
+      .from("articulos")
+      .select("equivalencia, descripcion")
+      .eq("id", detalle.fk_id_articulo)
+      .single();
+
+    console.log('🥛 ARTICULO:', articulo, 'ERROR:', articuloError);
+
+    if (!articuloError && articulo && articulo.equivalencia && articulo.equivalencia > 0) {
+      console.log('🥛 PROCESANDO CONSUMO:', {
+        orden: detalle.fk_id_orden,
+        articulo: detalle.fk_id_articulo,
+        cantidad: detalle.cantidad,
+        equivalencia: articulo.equivalencia
+      });
+
+      // Llamar a la función SQL para procesar el consumo de leche
+      const { error: consumoError } = await supabase.rpc('procesar_consumo_leche', {
+        p_orden_id: detalle.fk_id_orden,
+        p_articulo_id: detalle.fk_id_articulo,
+        p_cantidad: detalle.cantidad,
+        p_equivalencia_ml: articulo.equivalencia
+      });
+
+      if (consumoError) {
+        console.error('🥛 ERROR al procesar consumo de leche:', consumoError);
+      } else {
+        console.log('🥛 ÉXITO: Consumo de leche procesado correctamente');
+      }
+    } else {
+      console.log('🥛 SKIP: Artículo sin equivalencia o equivalencia = 0');
+    }
+  } catch (error) {
+    console.error('🥛 ERROR GENERAL al verificar equivalencia:', error);
+  }
+
   return data;
 }
 

@@ -7,6 +7,7 @@ export interface Article {
   activo: boolean;
   stock: number;
   stock_minimo: number;
+  equivalencia?: number;
   agrupador_nombre?: string;
   marca_nombre?: string;
   mark_up?: number;
@@ -21,6 +22,7 @@ export interface CreateArticleData {
   activo: boolean;
   stock: number;
   stock_minimo: number;
+  equivalencia: number;
   mark_up?: number;
   precio_costo?: number;
 }
@@ -33,6 +35,7 @@ export interface UpdateArticleData {
   activo?: boolean;
   stock?: number;
   stock_minimo?: number;
+  equivalencia: number;
   mark_up?: number;
   precio_costo?: number;
 } 

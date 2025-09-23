@@ -61,7 +61,7 @@ export async function getArticles(): Promise<Article[]> {
     
     const { data, error } = await supabase
       .from("articulos")
-      .select(`*, fk_id_marca, fk_id_agrupador`)
+      .select(`*, fk_id_marca, fk_id_agrupador, equivalencia`)
       .order("id", { ascending: false });
       
     if (error) {
@@ -122,6 +122,7 @@ export async function createArticle(article: CreateArticleData): Promise<Article
       activo: article.activo,
       stock: article.stock || 0,
       stock_minimo: article.stock_minimo || 0,
+      equivalencia: article.equivalencia,
       mark_up: article.mark_up,
       precio_costo: article.precio_costo,
     };
@@ -180,6 +181,7 @@ export async function updateArticle(id: number, article: UpdateArticleData): Pro
       activo: article.activo,
       stock: nuevoStock,
       stock_minimo: article.stock_minimo,
+      equivalencia: article.equivalencia,
       mark_up: article.mark_up,
       precio_costo: article.precio_costo,
     };
@@ -233,7 +235,7 @@ export async function getArticleById(id: number): Promise<Article | null> {
     
     const { data, error } = await supabase
       .from("articulos")
-      .select(`*, fk_id_marca, fk_id_agrupador`)
+      .select(`*, fk_id_marca, fk_id_agrupador, equivalencia`)
       .eq("id", id)
       .single();
       

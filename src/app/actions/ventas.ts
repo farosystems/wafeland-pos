@@ -137,19 +137,49 @@ export async function createOrdenVentaDetalle(detalle: {
   fk_id_color?: number | null;
 }) {
   const usuario = await checkUserPermissions();
-  
+
   // Verificar permisos específicos para crear detalles de venta
   if (usuario.rol !== 'admin' && usuario.rol !== 'supervisor' && usuario.rol !== 'cobrador') {
     throw new Error('No tienes permisos para crear detalles de venta');
   }
-  
+
+  // Insertar el detalle de venta
   const { data, error } = await supabase
     .from("ordenes_venta_detalle")
     .insert([detalle])
     .select()
     .single();
-    
+
   if (error) throw error;
+
+  // Procesar consumo de leche si el artículo tiene equivalencia > 0
+  try {
+    // Obtener la equivalencia del artículo vendido
+    const { data: articulo, error: articuloError } = await supabase
+      .from("articulos")
+      .select("equivalencia")
+      .eq("id", detalle.fk_id_articulo)
+      .single();
+
+    if (!articuloError && articulo && articulo.equivalencia && articulo.equivalencia > 0) {
+      // Llamar a la función SQL para procesar el consumo de leche
+      const { error: consumoError } = await supabase.rpc('procesar_consumo_leche', {
+        p_orden_id: detalle.fk_id_orden,
+        p_articulo_id: detalle.fk_id_articulo,
+        p_cantidad: detalle.cantidad,
+        p_equivalencia_ml: articulo.equivalencia
+      });
+
+      if (consumoError) {
+        console.error('Error al procesar consumo de leche:', consumoError);
+        // No lanzamos error para que no falle la venta, solo logeamos
+      }
+    }
+  } catch (error) {
+    console.error('Error al verificar equivalencia para consumo de leche:', error);
+    // No lanzamos error para que no falle la venta
+  }
+
   return data;
 }
 

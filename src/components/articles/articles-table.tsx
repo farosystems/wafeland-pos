@@ -107,6 +107,14 @@ export function ArticlesTable({ data, onEdit, onNewArticle }: ArticlesTableProps
       cell: ({ row }) => <div>{row.getValue("stock_minimo")}</div>,
     },
     {
+      accessorKey: "equivalencia",
+      header: "Equivalencia",
+      cell: ({ row }) => {
+        const equivalencia = row.getValue("equivalencia") as number | null | undefined;
+        return <div>{equivalencia !== null && equivalencia !== undefined ? equivalencia : "1.0"}</div>;
+      },
+    },
+    {
       accessorKey: "marca_nombre",
       header: "Marca",
       cell: ({ row }) => <div>{row.getValue("marca_nombre") || "-"}</div>,

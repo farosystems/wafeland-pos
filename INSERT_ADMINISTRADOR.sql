@@ -11,7 +11,7 @@
 -- IMPORTANTE: Reemplaza los valores con los datos reales del administrador
 INSERT INTO usuarios (nombre, email, rol, clerk_user_id) 
 VALUES (
-  'Administrador',           -- nombre
+  'administrador',           -- nombre
   'admin@empresa.com',       -- email (reemplazar con email real)
   'admin',                   -- rol
   'user_admin_clerk_id'      -- clerk_user_id (reemplazar con ID real de Clerk)

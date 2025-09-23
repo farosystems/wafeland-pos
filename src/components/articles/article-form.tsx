@@ -30,11 +30,14 @@ const articleSchema = z.object({
   activo: z.boolean(),
   stock: z.union([z.string(), z.number()]).transform(Number).refine(val => !isNaN(val) && val >= 0, { message: "El stock debe ser mayor o igual a 0" }),
   stock_minimo: z.union([z.string(), z.number()]).transform(Number).refine(val => !isNaN(val) && val >= 0, { message: "El stock mínimo debe ser mayor o igual a 0" }),
+  equivalencia: z.union([z.string(), z.number()]).transform(val => val === '' ? 0 : Number(val)).refine(val => !isNaN(val) && val >= 0, { message: "La equivalencia debe ser mayor o igual a 0" }),
   mark_up: z.union([z.string(), z.number()]).transform(val => val === '' ? 0 : Number(val)).refine(val => !isNaN(val) && val >= 0, { message: "El mark up debe ser mayor o igual a 0" }).optional(),
   precio_costo: z.union([z.string(), z.number()]).transform(val => val === '' ? 0 : Number(val)).refine(val => !isNaN(val) && val >= 0, { message: "El precio de costo debe ser mayor o igual a 0" }).optional(),
   // Campos para ajuste de stock (solo en edición)
   stock_a_descontar: z.union([z.string(), z.number()]).transform(val => val === '' ? 0 : Number(val)).refine(val => !isNaN(val) && val >= 0, { message: "El stock a descontar debe ser mayor o igual a 0" }).optional(),
   stock_nuevo: z.union([z.string(), z.number()]).transform(val => val === '' ? 0 : Number(val)).refine(val => !isNaN(val) && val >= 0, { message: "El stock nuevo debe ser mayor o igual a 0" }).optional(),
+  // Campo local para auto-calcular equivalencia (no se envía al servidor)
+  es_articulo_leche: z.boolean().optional(),
 });
 
 interface ArticleFormProps {
@@ -58,10 +61,12 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
       activo: article?.activo ?? true,
       stock: article?.stock ?? 0,
       stock_minimo: article?.stock_minimo ?? 0,
+      equivalencia: article?.equivalencia ?? 0,
       mark_up: article?.mark_up ?? 0,
       precio_costo: article?.precio_costo ?? 0,
       stock_a_descontar: 0,
       stock_nuevo: 0,
+      es_articulo_leche: false,
     },
   });
 
@@ -81,6 +86,7 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
       activo: values.activo as boolean,
       stock: Number(values.stock),
       stock_minimo: Number(values.stock_minimo),
+      equivalencia: Number(values.equivalencia),
       mark_up: Number(values.mark_up),
       precio_costo: Number(values.precio_costo),
     };
@@ -153,13 +159,35 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
         form.setValue('precio_unitario', nuevoPrecio);
       }
     }
-  }, [precioCosto, markUp]);
+  }, [precioCosto, markUp, precioUnitarioManual, form]);
 
   // Si el usuario edita el precio unitario manualmente, no recalcular automáticamente
   const handlePrecioUnitarioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPrecioUnitarioManual(true);
     form.setValue('precio_unitario', e.target.value);
   };
+
+  // Observar cambios en el checkbox de artículo leche y stock para auto-calcular equivalencia
+  const esArticuloLeche = form.watch('es_articulo_leche');
+  const stock = form.watch('stock');
+
+  React.useEffect(() => {
+    if (esArticuloLeche && stock && !isNaN(Number(stock))) {
+      const stockNumerico = Number(stock);
+      form.setValue('equivalencia', stockNumerico * 1000);
+    }
+  }, [esArticuloLeche, stock, form]);
+
+  // También observar cambios en stock cuando es artículo leche para actualizar equivalencia
+  const currentStock = form.watch('stock');
+  React.useEffect(() => {
+    if (esArticuloLeche) {
+      if (currentStock && !isNaN(Number(currentStock))) {
+        const stockNumerico = Number(currentStock);
+        form.setValue('equivalencia', stockNumerico * 1000);
+      }
+    }
+  }, [currentStock, esArticuloLeche, form]);
 
   return (
     <Form {...form}>
@@ -285,7 +313,7 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
           </div>
 
           {/* Tercera fila */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <FormField
               control={form.control}
               name="activo"
@@ -324,6 +352,63 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
                     <Input type="number" step="1" placeholder="0" {...field} />
                   </FormControl>
                   <FormDescription>Cantidad mínima de artículos en stock para alertar</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="equivalencia"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Equivalencia (ml)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.0"
+                      lang="en-US"
+                      {...field}
+                      disabled={form.watch('es_articulo_leche')}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {form.watch('es_articulo_leche')
+                      ? 'Se calcula automáticamente: stock × 1000ml'
+                      : 'ML de leche que consume este artículo'
+                    }
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Campo para auto-calcular equivalencia de leche */}
+          <div className="border rounded-lg p-4 bg-blue-50">
+            <FormField
+              control={form.control}
+              name="es_articulo_leche"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormControl>
+                    <input
+                      type="checkbox"
+                      checked={field.value}
+                      onChange={e => field.onChange(e.target.checked)}
+                      className="mt-1"
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel className="text-sm font-medium">
+                      Es artículo de Leche
+                    </FormLabel>
+                    <FormDescription className="text-xs">
+                      Si marcas esta opción, la equivalencia se calculará automáticamente como: stock × 1000ml
+                      <br />
+                      <strong>Solo para el artículo &quot;Leche&quot; que representa paquetes de 1 litro</strong>
+                    </FormDescription>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}

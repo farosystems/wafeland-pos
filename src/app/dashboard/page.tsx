@@ -12,6 +12,7 @@ import {
   Activity, Loader2
 } from "lucide-react";
 import { getDashboardData, DashboardData } from "@/services/dashboard";
+import { MilkConsumptionAnalytics } from "@/components/dashboard/milk-consumption-analytics";
 
 
 export default function DashboardPage() {
@@ -324,7 +325,19 @@ export default function DashboardPage() {
           </div>
         </div>
 
-         
+        {/* Sección de Análisis de Consumo de Leche */}
+        <div className="mb-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Control de Consumo de Leche</h3>
+                <p className="text-sm text-gray-600">Monitoreo de materia prima y consumo por productos</p>
+              </div>
+            </div>
+            <MilkConsumptionAnalytics />
+          </div>
+        </div>
+
       </div>
     </div>
   );

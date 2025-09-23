@@ -128,6 +128,36 @@ export async function procesarCobroMesa({
       throw new Error('Error al crear los detalles de la orden de venta');
     }
 
+    // Procesar consumo de leche para cada detalle
+    for (const detalle of detallesOrden) {
+      try {
+        // Obtener la equivalencia del artículo vendido
+        const { data: articulo, error: articuloError } = await supabase
+          .from("articulos")
+          .select("equivalencia")
+          .eq("id", detalle.fk_id_articulo)
+          .single();
+
+        if (!articuloError && articulo && articulo.equivalencia && articulo.equivalencia > 0) {
+          // Llamar a la función SQL para procesar el consumo de leche
+          const { error: consumoError } = await supabase.rpc('procesar_consumo_leche', {
+            p_orden_id: detalle.fk_id_orden,
+            p_articulo_id: detalle.fk_id_articulo,
+            p_cantidad: detalle.cantidad,
+            p_equivalencia_ml: articulo.equivalencia
+          });
+
+          if (consumoError) {
+            console.error('Error al procesar consumo de leche:', consumoError);
+            // No lanzamos error para que no falle la venta, solo logeamos
+          }
+        }
+      } catch (error) {
+        console.error('Error al verificar equivalencia para consumo de leche:', error);
+        // No lanzamos error para que no falle la venta
+      }
+    }
+
     // 4. Crear medio de pago con el seleccionado
     // Verificar que existe la cuenta de tesorería seleccionada
     const { data: cuentaSeleccionada, error: cuentaError } = await supabase
