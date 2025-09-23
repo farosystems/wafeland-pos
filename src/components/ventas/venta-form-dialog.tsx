@@ -677,7 +677,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                               autoComplete="off"
                               ref={el => { inputRefs.current[idx] = el; }}
                               onFocus={() => d.input && setShowSugerencias(idx)}
-                              onBlur={() => setTimeout(() => setShowSugerencias(s => (s === idx ? null : s)), 120)}
+                              onBlur={() => setTimeout(() => setShowSugerencias(s => (s === idx ? null : s)), 200)}
                             />
                             {d.input && showSugerencias === idx && getSugerencias(d.input).length > 0 && (
                               <div className="absolute z-50 bg-white border rounded shadow-lg w-full mt-1" style={{ maxHeight: 'none', overflow: 'visible' }}>
@@ -685,6 +685,10 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                                   <div
                                     key={a.id}
                                     className="px-3 py-2 hover:bg-gray-100 cursor-pointer flex justify-between border-b last:border-b-0"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      handleDetalleChange(idx, "articulo", a.id);
+                                    }}
                                     onClick={() => handleDetalleChange(idx, "articulo", a.id)}
                                   >
                                     <span className="font-medium">{a.descripcion}</span>
@@ -873,6 +877,12 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
                             <div
                               key={c.id}
                               className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setClienteSeleccionado(c.id);
+                                setBusquedaCliente(c.razon_social);
+                                setMostrarSugerenciasCliente(false);
+                              }}
                               onClick={() => {
                                 setClienteSeleccionado(c.id);
                                 setBusquedaCliente(c.razon_social);
