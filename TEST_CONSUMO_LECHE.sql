@@ -84,3 +84,4 @@ WHERE descripcion = 'Leche';
 -- DELETE FROM control_ml_leche;
 -- DELETE FROM articulos WHERE descripcion IN ('Café de Prueba');
 -- UPDATE articulos SET stock = 5 WHERE descripcion = 'Leche';
+

@@ -111,8 +111,8 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
         if (user?.emailAddresses?.[0]?.emailAddress) {
           const actual = u.find(us => us.email === user.emailAddresses[0].emailAddress);
           setUsuarioActual(actual || null);
-          // Si es cobrador, setearlo automáticamente
-          if (actual && actual.rol !== "supervisor") {
+          // Siempre setear el usuario logueado por defecto
+          if (actual) {
             setUsuarioSeleccionado(actual.id);
           }
         }
@@ -139,7 +139,12 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
       setShowSugerencias(null);
       // Resetear a valores por defecto
       setClienteSeleccionado(1); // Consumidor final
-      setUsuarioSeleccionado(1); // Jony
+      // Mantener siempre el usuario actual logueado
+      if (usuarioActual) {
+        setUsuarioSeleccionado(usuarioActual.id);
+      } else {
+        setUsuarioSeleccionado(null);
+      }
       setTipoComprobanteSeleccionado(1); // Factura
       setIsClosing(false);
       // Limpiar búsqueda de cliente
@@ -339,7 +344,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
 
   // Estados para selects principales
   const [clienteSeleccionado, setClienteSeleccionado] = useState<number | null>(1); // Consumidor final
-  const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<number | null>(1); // Jony
+  const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<number | null>(null); // Se seteará con el usuario logueado
   const [tipoComprobanteSeleccionado, setTipoComprobanteSeleccionado] = useState<number | null>(1); // Factura
   const [loteAbierto, setLoteAbierto] = useState<number | null>(null); // Debe obtenerse del contexto o consulta
 
