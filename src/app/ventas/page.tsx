@@ -560,7 +560,7 @@ export default function VentasPage() {
                   <tr key={v.id} className={`border-b ${v.anulada ? 'text-red-600 bg-red-50' : 'hover:bg-blue-50 transition-colors'}`}>
                     {columnVisibility.id && <td className="px-2 py-1 text-left">{v.id}</td>}
                     {columnVisibility.fecha && <td className="px-2 py-1">{
-                      v.fecha ? new Date(v.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : ""
+                      v.fecha ? new Date(v.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short", timeZone: "UTC", hour12: false }) : ""
                     }</td>}
                     {columnVisibility.cliente && <td className="px-2 py-1">{getClienteNombre(v.fk_id_entidades)}</td>}
                     {columnVisibility.cajero && <td className="px-2 py-1">{getUsuarioNombre(v.fk_id_usuario)}</td>}
