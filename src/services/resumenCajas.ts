@@ -17,7 +17,7 @@ export async function getMovimientosGastos(filtros?: FiltrosFecha): Promise<Movi
           turno
         )
       ),
-      tipos_gastos!fk_tipo_gasto(
+      tipo_gasto:tipo_gasto!fk_tipo_gasto(
         id,
         descripcion,
         tipo_movimiento
@@ -72,9 +72,9 @@ export async function getMovimientosGastos(filtros?: FiltrosFecha): Promise<Movi
       }
     },
     tipo_gasto: {
-      id: item.tipos_gastos.id,
-      descripcion: item.tipos_gastos.descripcion,
-      tipo_movimiento: item.tipos_gastos.tipo_movimiento,
+      id: item.tipo_gasto.id,
+      descripcion: item.tipo_gasto.descripcion,
+      tipo_movimiento: item.tipo_gasto.tipo_movimiento,
     },
     empleado: item.empleados ? {
       id: item.empleados.id,
@@ -112,7 +112,7 @@ export async function getResumenPorTipos(filtros?: FiltrosFecha): Promise<Resume
 
   // Obtener tipos de gasto por separado
   const { data: tiposGasto, error: tiposError } = await supabase
-    .from("tipos_gastos")
+    .from("tipo_gasto")
     .select("id, descripcion, tipo_movimiento");
 
   if (tiposError) throw tiposError;
@@ -167,7 +167,7 @@ export async function getResumenGeneral(filtros?: FiltrosFecha): Promise<Resumen
 
   // Obtener tipos de gasto por separado
   const { data: tiposGasto, error: tiposError } = await supabase
-    .from("tipos_gastos")
+    .from("tipo_gasto")
     .select("id, tipo_movimiento");
 
   if (tiposError) throw tiposError;
