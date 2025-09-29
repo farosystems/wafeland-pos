@@ -12,6 +12,8 @@ export interface Article {
   marca_nombre?: string;
   mark_up?: number;
   precio_costo?: number;
+  es_combo: boolean;
+  componentes?: ArticleComboComponent[];
 }
 
 export interface CreateArticleData {
@@ -25,6 +27,8 @@ export interface CreateArticleData {
   equivalencia: number;
   mark_up?: number;
   precio_costo?: number;
+  es_combo: boolean;
+  componentes?: CreateComboComponentData[];
 }
 
 export interface UpdateArticleData {
@@ -38,4 +42,25 @@ export interface UpdateArticleData {
   equivalencia: number;
   mark_up?: number;
   precio_costo?: number;
+  es_combo?: boolean;
+  componentes?: CreateComboComponentData[];
+}
+
+export interface ArticleComboComponent {
+  id: number;
+  fk_articulo_combo: number;
+  fk_articulo_componente: number;
+  cantidad: number;
+  created_at: string;
+  articulo_componente?: {
+    id: number;
+    descripcion: string;
+    stock: number;
+    precio_unitario: number;
+  };
+}
+
+export interface CreateComboComponentData {
+  fk_articulo_componente: number;
+  cantidad: number;
 } 

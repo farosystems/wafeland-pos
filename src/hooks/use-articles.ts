@@ -4,7 +4,7 @@ import {
   createArticle,
   updateArticle,
   deleteArticle,
-} from "@/services/articles";
+} from "@/app/actions/articles";
 import { Article, CreateArticleData, UpdateArticleData } from "@/types/article";
 
 export function useArticles() {
@@ -36,6 +36,8 @@ export function useArticles() {
     try {
       const newArticle = await createArticle(data);
       setArticles((prev) => [newArticle, ...prev]);
+      // Refrescar la lista para obtener datos completos
+      await fetchArticles();
     } catch (error) {
       console.error("Error al crear artículo:", error);
       setError((error as Error).message);
@@ -48,10 +50,9 @@ export function useArticles() {
     setLoading(true);
     setError(null);
     try {
-      const updated = await updateArticle(id, data);
-      setArticles((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, ...updated } : a))
-      );
+      await updateArticle(id, data);
+      // Refrescar la lista para obtener datos completos
+      await fetchArticles();
     } catch (error) {
       console.error("Error al editar artículo:", error);
       setError((error as Error).message);

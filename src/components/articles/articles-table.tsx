@@ -58,6 +58,26 @@ export function ArticlesTable({ data, onEdit, onNewArticle }: ArticlesTableProps
       cell: ({ row }) => <div>{row.getValue("descripcion")}</div>,
     },
     {
+      accessorKey: "es_combo",
+      header: "Tipo",
+      cell: ({ row }) => {
+        const esCombo = row.getValue("es_combo") as boolean;
+        return (
+          <div className="flex items-center gap-2">
+            {esCombo ? (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                🧩 Combo
+              </span>
+            ) : (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                📦 Producto
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: "precio_costo",
       header: "Precio Costo",
       cell: ({ row }) => {
@@ -87,6 +107,52 @@ export function ArticlesTable({ data, onEdit, onNewArticle }: ArticlesTableProps
       cell: ({ row }) => <div>{row.getValue("agrupador_nombre")}</div>,
     },
     {
+      accessorKey: "componentes",
+      header: "Componentes",
+      cell: ({ row }) => {
+        const esCombo = row.getValue("es_combo") as boolean;
+        const componentes = row.original.componentes;
+
+        // Debug logging
+        if (esCombo) {
+          console.log('🔍 Combo detectado:', {
+            id: row.original.id,
+            descripcion: row.original.descripcion,
+            es_combo: esCombo,
+            componentes: componentes,
+            raw_data: row.original
+          });
+        }
+
+        if (!esCombo) {
+          return <div className="text-gray-400 text-sm">-</div>;
+        }
+
+        if (!componentes || componentes.length === 0) {
+          return (
+            <div className="text-orange-600 text-sm">
+              Sin componentes
+              <div className="text-xs text-gray-500">ID: {row.original.id}</div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="text-xs space-y-1 max-w-xs">
+            {componentes.slice(0, 2).map((comp, index) => (
+              <div key={index} className="flex items-center gap-1">
+                <span className="text-blue-600">{comp.cantidad}x</span>
+                <span className="truncate">{comp.articulo_componente?.descripcion || `ID: ${comp.fk_articulo_componente}`}</span>
+              </div>
+            ))}
+            {componentes.length > 2 && (
+              <div className="text-gray-500 text-xs">+{componentes.length - 2} más...</div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: "activo",
       header: "Activo",
       cell: ({ row }) => (
@@ -99,7 +165,27 @@ export function ArticlesTable({ data, onEdit, onNewArticle }: ArticlesTableProps
     {
       accessorKey: "stock",
       header: "Stock",
-      cell: ({ row }) => <div>{row.getValue("stock")}</div>,
+      cell: ({ row }) => {
+        const stock = row.getValue("stock") as number;
+        const esCombo = row.getValue("es_combo") as boolean;
+
+        return (
+          <div className="flex items-center gap-2">
+            <span className={`font-medium ${
+              stock === 0 ? 'text-red-600' :
+              stock < 5 ? 'text-orange-600' :
+              'text-green-600'
+            }`}>
+              {stock}
+            </span>
+            {esCombo && (
+              <span className="text-xs bg-blue-100 text-blue-700 px-1 py-0.5 rounded" title="Stock calculado automáticamente">
+                Auto
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       accessorKey: "stock_minimo",
@@ -181,6 +267,17 @@ export function ArticlesTable({ data, onEdit, onNewArticle }: ArticlesTableProps
             }
             className="max-w-sm"
           />
+          <select
+            className="px-3 py-2 border rounded-md max-w-32"
+            value={(table.getColumn("es_combo")?.getFilterValue() as string) ?? ""}
+            onChange={(event) =>
+              table.getColumn("es_combo")?.setFilterValue(event.target.value === "" ? undefined : event.target.value === "true")
+            }
+          >
+            <option value="">Todos los tipos</option>
+            <option value="false">Solo Productos</option>
+            <option value="true">Solo Combos</option>
+          </select>
         </div>
 
         {/* Botones de acción */}

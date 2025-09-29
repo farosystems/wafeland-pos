@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { getGastosEmpleados, createGastoEmpleado } from "@/services/gastosEmpleados";
+import { getGastosLoteActivo, createGastoEmpleado } from "@/services/gastosEmpleados";
 import { GastoEmpleado, CreateGastoEmpleadoData } from "@/types/gastoEmpleado";
 import { registrarMovimientoCaja } from "@/services/detalleLotesOperaciones";
 import { TipoGasto } from "@/types/tipoGasto";
@@ -13,7 +13,7 @@ export function useGastosEmpleados(tiposGasto: TipoGasto[]) {
     setLoading(true);
     setError(null);
     try {
-      const data = await getGastosEmpleados();
+      const data = await getGastosLoteActivo();
       setGastos(data);
     } catch (err: any) {
       setError(err.message);

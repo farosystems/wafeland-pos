@@ -4,6 +4,7 @@ export interface TipoGasto {
   descripcion: string | null;
   obliga_empleado: boolean | null;
   afecta_caja: boolean | null;
+  tipo_movimiento: 'ingreso' | 'egreso' | null;
 }
 
 export type CreateTipoGastoData = Omit<TipoGasto, "id" | "created_at">; 

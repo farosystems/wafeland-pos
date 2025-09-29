@@ -18,6 +18,8 @@ import { Input } from "@/components/ui/input";
 import { Article, CreateArticleData, UpdateArticleData } from "@/types/article";
 import { useAgrupadores } from "@/hooks/use-agrupadores";
 import { useMarcas } from "@/hooks/use-marcas";
+import { getArticles } from "@/services/articles";
+import { calcularStockComboFrontend, getDetalleStockCombo } from "@/services/combos";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useTrialCheck } from "@/hooks/use-trial-check";
 import { createMovimientoStock } from "@/services/movimientosStock";
@@ -33,6 +35,7 @@ const articleSchema = z.object({
   equivalencia: z.union([z.string(), z.number()]).transform(val => val === '' ? 0 : Number(val)).refine(val => !isNaN(val) && val >= 0, { message: "La equivalencia debe ser mayor o igual a 0" }),
   mark_up: z.union([z.string(), z.number()]).transform(val => val === '' ? 0 : Number(val)).refine(val => !isNaN(val) && val >= 0, { message: "El mark up debe ser mayor o igual a 0" }).optional(),
   precio_costo: z.union([z.string(), z.number()]).transform(val => val === '' ? 0 : Number(val)).refine(val => !isNaN(val) && val >= 0, { message: "El precio de costo debe ser mayor o igual a 0" }).optional(),
+  es_combo: z.boolean(),
   // Campos para ajuste de stock (solo en edición)
   stock_a_descontar: z.union([z.string(), z.number()]).transform(val => val === '' ? 0 : Number(val)).refine(val => !isNaN(val) && val >= 0, { message: "El stock a descontar debe ser mayor o igual a 0" }).optional(),
   stock_nuevo: z.union([z.string(), z.number()]).transform(val => val === '' ? 0 : Number(val)).refine(val => !isNaN(val) && val >= 0, { message: "El stock nuevo debe ser mayor o igual a 0" }).optional(),
@@ -50,6 +53,8 @@ interface ArticleFormProps {
 export function ArticleForm({ article, onSave, onCancel, isLoading = false }: ArticleFormProps) {
   const { agrupadores } = useAgrupadores();
   const { marcas } = useMarcas();
+  const [articulos, setArticulos] = React.useState<Article[]>([]);
+  const [componentesCombo, setComponentesCombo] = React.useState<{id: number, fk_articulo_componente: number, cantidad: number}[]>([]);
 
   const form = useForm({
     resolver: zodResolver(articleSchema),
@@ -64,6 +69,7 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
       equivalencia: article?.equivalencia ?? 0,
       mark_up: article?.mark_up ?? 0,
       precio_costo: article?.precio_costo ?? 0,
+      es_combo: article?.es_combo ?? false,
       stock_a_descontar: 0,
       stock_nuevo: 0,
       es_articulo_leche: false,
@@ -73,9 +79,59 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
   const { checkTrial } = useTrialCheck();
   const [showTrialEnded, setShowTrialEnded] = React.useState(false);
 
+  // Cargar artículos para el combo
+  React.useEffect(() => {
+    async function loadArticulos() {
+      try {
+        const data = await getArticles();
+        // Filtrar artículos activos y no combos (o el artículo actual si estamos editando)
+        const filtrados = data.filter(art =>
+          art.activo &&
+          !art.es_combo &&
+          (article ? art.id !== article.id : true)
+        );
+        setArticulos(filtrados);
+      } catch (error) {
+        console.error('Error al cargar artículos:', error);
+      }
+    }
+    loadArticulos();
+  }, [article]);
+
+  // Cargar componentes del combo si estamos editando
+  React.useEffect(() => {
+    if (article?.componentes) {
+      setComponentesCombo(article.componentes.map((comp, index) => ({
+        id: index,
+        fk_articulo_componente: comp.fk_articulo_componente,
+        cantidad: comp.cantidad
+      })));
+    }
+  }, [article]);
+
   const handleSubmit = async (values: Record<string, unknown>) => {
     const expired = await checkTrial(() => setShowTrialEnded(true));
     if (expired) return;
+
+    // Validar que si es combo, tenga componentes
+    if (values.es_combo && componentesCombo.length === 0) {
+      alert('Si el artículo es un combo, debe agregar al menos un componente.');
+      return;
+    }
+
+    // Validar que los componentes tengan artículo y cantidad válida
+    if (values.es_combo) {
+      for (const comp of componentesCombo) {
+        if (!comp.fk_articulo_componente || comp.fk_articulo_componente === 0) {
+          alert('Todos los componentes deben tener un artículo seleccionado.');
+          return;
+        }
+        if (!comp.cantidad || comp.cantidad <= 0) {
+          alert('Todos los componentes deben tener una cantidad mayor a 0.');
+          return;
+        }
+      }
+    }
 
     // Preparar los datos base del formulario (sin campos de ajuste de stock)
     const formData = {
@@ -89,7 +145,14 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
       equivalencia: Number(values.equivalencia),
       mark_up: Number(values.mark_up),
       precio_costo: Number(values.precio_costo),
+      es_combo: values.es_combo as boolean,
+      componentes: (values.es_combo as boolean) ? componentesCombo.map(comp => ({
+        fk_articulo_componente: comp.fk_articulo_componente,
+        cantidad: comp.cantidad
+      })) : []
     };
+
+    console.log('FormData enviada:', formData);
 
     // Si estamos editando un artículo y hay ajustes de stock
     if (article) {
@@ -188,6 +251,35 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
       }
     }
   }, [currentStock, esArticuloLeche, form]);
+
+  // Funciones para manejar componentes del combo
+  const agregarComponente = () => {
+    const nuevoId = Math.max(0, ...componentesCombo.map(c => c.id)) + 1;
+    setComponentesCombo([...componentesCombo, {
+      id: nuevoId,
+      fk_articulo_componente: 0,
+      cantidad: 1
+    }]);
+  };
+
+  const eliminarComponente = (id: number) => {
+    setComponentesCombo(componentesCombo.filter(c => c.id !== id));
+  };
+
+  const actualizarComponente = (id: number, campo: 'fk_articulo_componente' | 'cantidad', valor: number) => {
+    setComponentesCombo(componentesCombo.map(c =>
+      c.id === id ? { ...c, [campo]: valor } : c
+    ));
+  };
+
+  const esCombo = form.watch('es_combo');
+
+  // Limpiar componentes cuando se desactiva el combo
+  React.useEffect(() => {
+    if (!esCombo) {
+      setComponentesCombo([]);
+    }
+  }, [esCombo]);
 
   return (
     <Form {...form}>
@@ -313,7 +405,7 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
           </div>
 
           {/* Tercera fila */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
             <FormField
               control={form.control}
               name="activo"
@@ -330,14 +422,40 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
             />
             <FormField
               control={form.control}
+              name="es_combo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Es Combo</FormLabel>
+                  <FormControl>
+                    <input type="checkbox" checked={field.value} onChange={e => field.onChange(e.target.checked)} />
+                  </FormControl>
+                  <FormDescription>¿Es un combo de artículos?</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name="stock"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Stock</FormLabel>
                   <FormControl>
-                    <Input type="number" step="1" placeholder="0" {...field} />
+                    <Input
+                      type="number"
+                      step="1"
+                      placeholder="0"
+                      {...field}
+                      disabled={esCombo}
+                      className={esCombo ? 'bg-gray-100 cursor-not-allowed' : ''}
+                    />
                   </FormControl>
-                  <FormDescription>Cantidad de artículos en stock</FormDescription>
+                  <FormDescription>
+                    {esCombo
+                      ? 'El stock se calcula automáticamente basándose en los componentes'
+                      : 'Cantidad de artículos en stock'
+                    }
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -414,6 +532,181 @@ export function ArticleForm({ article, onSave, onCancel, isLoading = false }: Ar
               )}
             />
           </div>
+
+          {/* Sección de componentes del combo */}
+          {esCombo && (
+            <div className="border rounded-lg p-4 bg-green-50">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-green-900">Componentes del Combo</h3>
+                <Button
+                  type="button"
+                  onClick={agregarComponente}
+                  variant="outline"
+                  size="sm"
+                  className="bg-green-100 hover:bg-green-200 text-green-700"
+                >
+                  Agregar Componente
+                </Button>
+              </div>
+
+              {componentesCombo.length === 0 ? (
+                <div className="text-center py-8 text-green-600">
+                  <p>No hay componentes agregados.</p>
+                  <p className="text-sm">Haz clic en &quot;Agregar Componente&quot; para empezar.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {componentesCombo.map((componente) => {
+                    const articuloSeleccionado = articulos.find(a => a.id === componente.fk_articulo_componente);
+                    return (
+                      <div key={componente.id} className="flex items-center gap-4 p-3 bg-white border border-green-200 rounded-lg">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Artículo
+                          </label>
+                          <select
+                            className="w-full border rounded px-3 py-2"
+                            value={componente.fk_articulo_componente}
+                            onChange={(e) => actualizarComponente(componente.id, 'fk_articulo_componente', Number(e.target.value))}
+                          >
+                            <option value={0}>Seleccionar artículo...</option>
+                            {articulos.map((art) => (
+                              <option key={art.id} value={art.id}>
+                                {art.descripcion} (Stock: {art.stock})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="w-24">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Cantidad
+                          </label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={componente.cantidad}
+                            onChange={(e) => actualizarComponente(componente.id, 'cantidad', Number(e.target.value))}
+                            className="text-center"
+                          />
+                        </div>
+                        {articuloSeleccionado && (
+                          <div className="text-sm text-gray-600">
+                            <div>Precio: ${articuloSeleccionado.precio_unitario}</div>
+                            <div>Stock: {articuloSeleccionado.stock}</div>
+                          </div>
+                        )}
+                        <Button
+                          type="button"
+                          onClick={() => eliminarComponente(componente.id)}
+                          variant="destructive"
+                          size="sm"
+                        >
+                          Eliminar
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {componentesCombo.length > 0 && (() => {
+                const componentesConInfo = componentesCombo.map(comp => {
+                  const articulo = articulos.find(a => a.id === comp.fk_articulo_componente);
+                  return {
+                    ...comp,
+                    articulo_componente: articulo
+                  };
+                }).filter(comp => comp.articulo_componente);
+
+                const stockCalculado = calcularStockComboFrontend(componentesConInfo);
+                const detalleStock = getDetalleStockCombo(componentesConInfo);
+
+                return (
+                  <div className="mt-4 space-y-3">
+                    {/* Resumen del Combo */}
+                    <div className="p-3 bg-green-100 border border-green-200 rounded-lg">
+                      <h4 className="text-sm font-medium text-green-800 mb-2">Resumen del Combo:</h4>
+                      <div className="space-y-1 text-sm text-green-700">
+                        {componentesCombo.map((comp) => {
+                          const articulo = articulos.find(a => a.id === comp.fk_articulo_componente);
+                          if (!articulo) return null;
+                          return (
+                            <div key={comp.id} className="flex justify-between">
+                              <span>{comp.cantidad}x {articulo.descripcion}</span>
+                              <span>${(comp.cantidad * articulo.precio_unitario).toFixed(2)}</span>
+                            </div>
+                          );
+                        })}
+                        <div className="border-t border-green-300 pt-2 mt-2 font-medium">
+                          <div className="flex justify-between">
+                            <span>Total componentes:</span>
+                            <span>
+                              $
+                              {componentesCombo.reduce((total, comp) => {
+                                const articulo = articulos.find(a => a.id === comp.fk_articulo_componente);
+                                return total + (articulo ? comp.cantidad * articulo.precio_unitario : 0);
+                              }, 0).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-green-800">
+                            <span>Precio del combo:</span>
+                            <span>${form.watch('precio_unitario') || 0}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stock Calculado */}
+                    <div className={`p-3 border rounded-lg ${
+                      stockCalculado === 0 ? 'bg-red-50 border-red-200' :
+                      stockCalculado < 5 ? 'bg-orange-50 border-orange-200' :
+                      'bg-blue-50 border-blue-200'
+                    }`}>
+                      <h4 className={`text-sm font-medium mb-2 ${
+                        stockCalculado === 0 ? 'text-red-800' :
+                        stockCalculado < 5 ? 'text-orange-800' :
+                        'text-blue-800'
+                      }`}>
+                        Análisis de Stock Disponible
+                      </h4>
+                      <div className={`text-sm ${
+                        stockCalculado === 0 ? 'text-red-700' :
+                        stockCalculado < 5 ? 'text-orange-700' :
+                        'text-blue-700'
+                      }`}>
+                        <div className="flex justify-between items-center mb-2">
+                          <span>Combos que se pueden formar:</span>
+                          <span className="font-bold text-lg">{stockCalculado}</span>
+                        </div>
+                        {detalleStock.componenteLimitante && (
+                          <div className="text-xs">
+                            Limitado por: <strong>{detalleStock.componenteLimitante}</strong>
+                          </div>
+                        )}
+                        <div className="mt-2 space-y-1">
+                          {detalleStock.detalleComponentes.map((detalle, index) => (
+                            <div key={index} className="flex justify-between text-xs">
+                              <span>{detalle.nombre}</span>
+                              <span>
+                                {detalle.stockDisponible} ÷ {detalle.cantidadNecesaria} = {detalle.combosConEsteComponente} combos
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Nota:</strong> Cuando se venda este combo, se descontará automáticamente el stock de cada componente según las cantidades especificadas.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sección de ajuste de stock solo para edición */}

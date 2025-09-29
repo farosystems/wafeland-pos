@@ -38,6 +38,8 @@ import { getClientes } from "@/services/clientes";
 import { getPagosCuentaCorriente } from "@/services/pagosCuentaCorriente";
 import { LoteOperacion } from "@/types/loteOperacion";
 import { generateGastosPDF } from "@/utils/generateGastosPDF";
+import { getOrdenesVentaDetalle } from "@/services/ordenesVentaDetalle";
+import { getArticles } from "@/services/articles";
 
 interface AperturaCaja {
   caja: string;
@@ -536,6 +538,62 @@ export default function CajaPage() {
           fontSize: 8
         }
       });
+
+      // --- Tabla de detalles de artículos vendidos ---
+      const ordenesTableFinalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
+
+      // Obtener todos los artículos
+      const articulos = await getArticles();
+
+      // Crear nueva página si es necesario
+      if (ordenesTableFinalY > 240) {
+        doc.addPage();
+      }
+
+      const articulosY = ordenesTableFinalY > 240 ? 20 : ordenesTableFinalY;
+
+      doc.setFontSize(14);
+      doc.text("Detalle de artículos vendidos por orden", 20, articulosY);
+      doc.setFontSize(9);
+
+      const articulosHead = [
+        "ID Orden", "Artículo", "Cantidad", "Precio Unit.", "Subtotal"
+      ];
+      const articulosBody: string[][] = [];
+
+      for (const orden of ventasLote) {
+        const detalles = await getOrdenesVentaDetalle(orden.id);
+        for (const detalle of detalles) {
+          const articulo = articulos.find(a => a.id === detalle.fk_id_articulo);
+          articulosBody.push([
+            orden.id.toString(),
+            articulo?.descripcion || `ID: ${detalle.fk_id_articulo}`,
+            detalle.cantidad.toString(),
+            formatCurrency(detalle.precio_unitario, DEFAULT_CURRENCY, DEFAULT_LOCALE),
+            formatCurrency(detalle.cantidad * detalle.precio_unitario, DEFAULT_CURRENCY, DEFAULT_LOCALE)
+          ]);
+        }
+      }
+
+      autoTable(doc, {
+        startY: articulosY + 8,
+        head: [articulosHead],
+        body: articulosBody,
+        theme: "grid",
+        headStyles: {
+          fillColor: [66, 139, 202],
+          textColor: 255,
+          fontStyle: "bold"
+        },
+        styles: {
+          fontSize: 8
+        },
+        columnStyles: {
+          2: { halign: "center" },
+          3: { halign: "right" },
+          4: { halign: "right" }
+        }
+      });
     }
 
     
@@ -698,12 +756,12 @@ export default function CajaPage() {
       doc.setFontSize(14);
       doc.text("Órdenes de venta del lote", 20, resumenY2);
       doc.setFontSize(10);
-      
+
       const ordenesHead = [
         "ID", "Fecha", "Total", "Subtotal", "Cliente", "Doc", "Usuario", "Comprobante", "Medios de pago"
       ];
       const ordenesBody: string[][] = [];
-      
+
       for (const orden of ventasLote) {
         const usuarioObj = usuariosArr.find((u: Usuario) => u.id === orden.fk_id_usuario);
         const tipoCompObj = tiposComprobantes.find((t: TipoComprobante) => t.id === orden.fk_id_tipo_comprobante);
@@ -712,7 +770,7 @@ export default function CajaPage() {
           const cuenta = cuentasTesoreria.find((ct: CuentaTesoreria) => ct.id === m.fk_id_cuenta_tesoreria);
           return cuenta ? `${cuenta.descripcion}: ${formatCurrency(m.monto_pagado, DEFAULT_CURRENCY, DEFAULT_LOCALE)}` : `${formatCurrency(m.monto_pagado, DEFAULT_CURRENCY, DEFAULT_LOCALE)}`;
         }).join(" | ");
-        
+
         ordenesBody.push([
           orden.id.toString(),
           orden.fecha?.slice(0, 16) || "",
@@ -725,7 +783,7 @@ export default function CajaPage() {
           mediosStr
         ]);
       }
-      
+
       autoTable(doc, {
         startY: resumenY2 + 8,
         head: [ordenesHead],
@@ -738,6 +796,62 @@ export default function CajaPage() {
         },
         styles: {
           fontSize: 8
+        }
+      });
+
+      // --- Tabla de detalles de artículos vendidos ---
+      const ordenesTableFinalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
+
+      // Obtener todos los artículos
+      const articulos = await getArticles();
+
+      // Crear nueva página si es necesario
+      if (ordenesTableFinalY > 240) {
+        doc.addPage();
+      }
+
+      const articulosY = ordenesTableFinalY > 240 ? 20 : ordenesTableFinalY;
+
+      doc.setFontSize(14);
+      doc.text("Detalle de artículos vendidos por orden", 20, articulosY);
+      doc.setFontSize(9);
+
+      const articulosHead = [
+        "ID Orden", "Artículo", "Cantidad", "Precio Unit.", "Subtotal"
+      ];
+      const articulosBody: string[][] = [];
+
+      for (const orden of ventasLote) {
+        const detalles = await getOrdenesVentaDetalle(orden.id);
+        for (const detalle of detalles) {
+          const articulo = articulos.find(a => a.id === detalle.fk_id_articulo);
+          articulosBody.push([
+            orden.id.toString(),
+            articulo?.descripcion || `ID: ${detalle.fk_id_articulo}`,
+            detalle.cantidad.toString(),
+            formatCurrency(detalle.precio_unitario, DEFAULT_CURRENCY, DEFAULT_LOCALE),
+            formatCurrency(detalle.cantidad * detalle.precio_unitario, DEFAULT_CURRENCY, DEFAULT_LOCALE)
+          ]);
+        }
+      }
+
+      autoTable(doc, {
+        startY: articulosY + 8,
+        head: [articulosHead],
+        body: articulosBody,
+        theme: "grid",
+        headStyles: {
+          fillColor: [66, 139, 202],
+          textColor: 255,
+          fontStyle: "bold"
+        },
+        styles: {
+          fontSize: 8
+        },
+        columnStyles: {
+          2: { halign: "center" },
+          3: { halign: "right" },
+          4: { halign: "right" }
         }
       });
     }

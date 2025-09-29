@@ -64,7 +64,7 @@ export function AppSidebar() {
   const isStockActive = ["/articles", "/movimientos-stock", "/stock-faltante"].includes(pathname);
   const isContactosActive = ["/clientes", "/usuarios"].includes(pathname);
   const isVentasActive = ["/ventas"].includes(pathname);
-  const isTesoreriaActive = ["/caja", "/gastos-empleados"].includes(pathname);
+  const isTesoreriaActive = ["/caja", "/gastos-empleados", "/tipos-gasto", "/resumen-cajas"].includes(pathname);
   const isSueldosActive = ["/liquidaciones", "/empleados"].includes(pathname);
 
   const isImportacionesActive = ["/importacion-stock"].includes(pathname);
@@ -460,7 +460,7 @@ export function AppSidebar() {
             </li>
           )}
           {/* Menú Tesorería desplegable */}
-          {(isModuloPermitido('caja') || isModuloPermitido('gastos-empleados')) && (
+          {(isModuloPermitido('caja') || isModuloPermitido('gastos-empleados') || isModuloPermitido('tipos-gasto') || isModuloPermitido('resumen-cajas')) && (
             <li>
               <button
                 type="button"
@@ -485,6 +485,18 @@ export function AppSidebar() {
                       </Link>
                     </li>
                   )}
+                  {isModuloPermitido('tipos-gasto') && (
+                    <li className={`${pathname === "/tipos-gasto" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/tipos-gasto"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/tipos-gasto" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconReceipt className="w-4 h-4" />
+                        <span>Tipos de Movimientos</span>
+                      </Link>
+                    </li>
+                  )}
                   {isModuloPermitido('gastos-empleados') && (
                     <li className={`${pathname === "/gastos-empleados" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
                       <Link
@@ -493,7 +505,19 @@ export function AppSidebar() {
                         prefetch={false}
                       >
                         <IconCash className="w-4 h-4" />
-                        <span>Gastos de mi Comercio</span>
+                        <span>Movimientos del día</span>
+                      </Link>
+                    </li>
+                  )}
+                  {isModuloPermitido('resumen-cajas') && (
+                    <li className={`${pathname === "/resumen-cajas" ? "border-l-4 border-blue-600 bg-blue-50" : ""} pl-2`}>
+                      <Link
+                        href="/resumen-cajas"
+                        className={`flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${pathname === "/resumen-cajas" ? "text-blue-800 font-semibold" : "hover:bg-gray-100 text-black"}`}
+                        prefetch={false}
+                      >
+                        <IconChartBar className="w-4 h-4" />
+                        <span>Resumen de Cajas</span>
                       </Link>
                     </li>
                   )}

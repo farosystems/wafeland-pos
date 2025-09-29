@@ -48,15 +48,15 @@ export function CobroModal({
   totalMesa,
   onCobroCompletado,
 }: CobroModalProps) {
+  // Estados básicos para el cobro
   const [loading, setLoading] = React.useState(false);
   const [cobroCompletado, setCobroCompletado] = React.useState(false);
   const [ordenVentaId, setOrdenVentaId] = React.useState<number | null>(null);
-  
-  // Estados para medios de pago
+
+  // Estados para medios de pago y tipos de comprobante
+  const [tiposComprobantes, setTiposComprobantes] = React.useState<{ id: number; descripcion: string; activo: boolean }[]>([]);
   const [cuentasTesoreria, setCuentasTesoreria] = React.useState<CuentaTesoreria[]>([]);
   const [medioSeleccionado, setMedioSeleccionado] = React.useState<string>("");
-  
-  // Estados para tipos de comprobante
   const [tipoSeleccionado, setTipoSeleccionado] = React.useState<string>("");
 
   // Reset estado cuando se abre el modal
@@ -66,14 +66,14 @@ export function CobroModal({
       setOrdenVentaId(null);
       setMedioSeleccionado("");
       setTipoSeleccionado("");
-      
+
       // Cargar datos necesarios para el cobro
       const loadDatosCobro = async () => {
         try {
           // Cargar cuentas de tesorería
           const cuentas = await getCuentasTesoreria();
           setCuentasTesoreria(cuentas);
-          
+
           // Seleccionar "Efectivo" por defecto si existe
           const efectivo = cuentas.find(c => c.descripcion.toLowerCase().includes('efectivo'));
           if (efectivo) {
@@ -82,9 +82,10 @@ export function CobroModal({
 
           // Cargar tipos de comprobante
           const tipos = await getTiposComprobantes();
-          
+          setTiposComprobantes(tipos);
+
           // Seleccionar "FACTURA" por defecto si existe
-          const factura = tipos.find(t => t.descripcion.toUpperCase().includes('FACTURA'));
+          const factura = tipos.find(t => t.descripcion.toLowerCase().includes('factura'));
           if (factura) {
             setTipoSeleccionado(factura.id.toString());
           }
@@ -93,7 +94,7 @@ export function CobroModal({
           toast.error("Error al cargar información de cobro");
         }
       };
-      
+
       loadDatosCobro();
     }
   }, [isOpen]);
@@ -113,7 +114,7 @@ export function CobroModal({
     try {
       const ordenVenta = await procesarCobroMesa({
         sesionId: sesion.sesion_id,
-        detallePedidos,
+        detallePedidos: detallePedidos,
         total: totalMesa,
         mediopagoId: parseInt(medioSeleccionado),
         tipoComprobanteId: parseInt(tipoSeleccionado),
@@ -121,56 +122,56 @@ export function CobroModal({
 
       setOrdenVentaId(ordenVenta.id);
       setCobroCompletado(true);
-      toast.success(`Cobro procesado - Orden #${ordenVenta.id}`);
+      toast.success("¡Cobro procesado exitosamente!");
     } catch (error) {
       console.error("Error al procesar cobro:", error);
-      toast.error("Error al procesar el cobro");
+      toast.error("Error al procesar el cobro. Intenta nuevamente.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGenerarTicket = async () => {
+  const handleImprimir = async () => {
     if (!ordenVentaId) return;
 
     try {
-      const medioSeleccionadoNombre = cuentasTesoreria.find(c => c.id.toString() === medioSeleccionado)?.descripcion || 'Efectivo';
-      
-      await generarTicketPDF({
+      // Construir objeto TicketData
+      const ticketData = {
         ordenId: ordenVentaId,
-        mesa,
-        detallePedidos,
+        mesa: mesa,
+        detallePedidos: detallePedidos,
         total: totalMesa,
         fecha: new Date(),
-        medioPago: medioSeleccionadoNombre,
-      });
-      
-      toast.success("Ticket generado correctamente");
+        medioPago: cuentasTesoreria.find(c => c.id.toString() === medioSeleccionado)?.descripcion || 'Efectivo'
+      };
+
+      await imprimirTicketHTML(ticketData);
+      toast.success("Ticket enviado a impresión");
     } catch (error) {
-      console.error("Error al generar ticket:", error);
-      toast.error("Error al generar el ticket");
+      console.error("Error al imprimir:", error);
+      toast.error("Error al imprimir ticket");
     }
   };
 
-  const handleImprimir = () => {
+  const handleDescargarPDF = async () => {
     if (!ordenVentaId) return;
 
     try {
-      const medioSeleccionadoNombre = cuentasTesoreria.find(c => c.id.toString() === medioSeleccionado)?.descripcion || 'Efectivo';
-      
-      imprimirTicketHTML({
+      // Construir objeto TicketData
+      const ticketData = {
         ordenId: ordenVentaId,
-        mesa,
-        detallePedidos,
+        mesa: mesa,
+        detallePedidos: detallePedidos,
         total: totalMesa,
         fecha: new Date(),
-        medioPago: medioSeleccionadoNombre,
-      });
-      
-      toast.success("Enviando ticket a impresora...");
+        medioPago: cuentasTesoreria.find(c => c.id.toString() === medioSeleccionado)?.descripcion || 'Efectivo'
+      };
+
+      await generarTicketPDF(ticketData);
+      toast.success("PDF generado exitosamente");
     } catch (error) {
-      console.error("Error al imprimir:", error);
-      toast.error("Error al imprimir el ticket");
+      console.error("Error al generar PDF:", error);
+      toast.error("Error al generar PDF");
     }
   };
 
@@ -178,32 +179,32 @@ export function CobroModal({
     onCobroCompletado();
   };
 
-  // Formatear fecha/hora
+  // Formatear fecha y hora
   const fechaHora = new Date().toLocaleString('es-AR', {
-    year: 'numeric',
-    month: '2-digit',
     day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   });
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-lg max-h-[95vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <IconCurrencyDollar className="h-5 w-5" />
             {cobroCompletado ? "Cobro Completado" : `Cobrar Mesa ${mesa.numero}`}
           </DialogTitle>
           <DialogDescription>
-            {cobroCompletado 
+            {cobroCompletado
               ? `Orden de venta #${ordenVentaId} generada exitosamente`
               : "Confirma los detalles del cobro antes de procesar"
             }
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
           {/* Información de la mesa */}
           <Card>
             <CardHeader className="pb-3">
@@ -237,27 +238,36 @@ export function CobroModal({
               <CardTitle className="text-base">Productos Consumidos</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {detallePedidos.map((detalle) => (
-                  <div key={detalle.id} className="flex justify-between items-center text-sm">
-                    <div className="flex-1">
-                      <div className="font-medium">{detalle.articulo_descripcion}</div>
-                      <div className="text-xs text-muted-foreground">
-                        ${detalle.precio_unitario.toLocaleString()} × {detalle.cantidad}
+                  <div key={detalle.id} className="border rounded p-2">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="font-medium">{detalle.articulo_descripcion}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Cantidad: {detalle.cantidad} × ${detalle.precio_unitario.toLocaleString()}
+                        </div>
+                        {detalle.observaciones && (
+                          <div className="text-xs text-blue-600 italic">
+                            &quot;{detalle.observaciones}&quot;
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    <div className="font-medium">
-                      ${detalle.subtotal.toLocaleString()}
+                      <div className="text-right">
+                        <div className="font-medium text-sm">
+                          ${detalle.subtotal.toLocaleString()}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
-              </div>
 
-              <Separator className="my-3" />
+                <Separator />
 
-              <div className="flex justify-between items-center font-bold">
-                <span>TOTAL:</span>
-                <span className="text-lg">${totalMesa.toLocaleString()}</span>
+                <div className="flex justify-between items-center font-bold text-lg pt-2">
+                  <span>Total:</span>
+                  <span className="text-lg">${totalMesa.toLocaleString()}</span>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -273,7 +283,7 @@ export function CobroModal({
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="space-y-2">
-                  <Label htmlFor="medio-pago">Seleccionar método de pago *</Label>
+                  <Label>Selecciona el medio de pago</Label>
                   <Select value={medioSeleccionado} onValueChange={setMedioSeleccionado}>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar medio de pago" />
@@ -281,59 +291,81 @@ export function CobroModal({
                     <SelectContent>
                       {cuentasTesoreria.map((cuenta) => (
                         <SelectItem key={cuenta.id} value={cuenta.id.toString()}>
-                          <div className="flex items-center gap-2">
-                            <IconCurrencyDollar className="h-4 w-4" />
-                            {cuenta.descripcion}
-                          </div>
+                          {cuenta.descripcion}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-
-                <div className="bg-blue-50 p-3 rounded-lg text-sm">
-                  <h4 className="font-medium mb-2">Detalles del Comprobante:</h4>
                   <ul className="space-y-1 text-xs text-muted-foreground">
-                    <li>• Tipo: Factura</li>
-                    <li>• Cliente: Consumidor Final</li>
-                    <li>• Se generará orden de venta automáticamente</li>
-                    {medioSeleccionado && (
-                      <li>
-                        • Medio: {cuentasTesoreria.find(c => c.id.toString() === medioSeleccionado)?.descripcion || 'Seleccionado'}
-                      </li>
-                    )}
+                    <li>• Efectivo: Pago en billetes y monedas</li>
+                    <li>• Transferencia: Pago mediante transferencia bancaria</li>
+                    <li>• Tarjeta Débito: Pago con tarjeta de débito</li>
+                    <li>• Tarjeta Crédito: Pago con tarjeta de crédito</li>
+                    <li>• QR/Billetera: Pago con código QR o billetera digital</li>
                   </ul>
                 </div>
               </CardContent>
             </Card>
           )}
+
+          {/* Selección de tipo de comprobante */}
+          {!cobroCompletado && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <IconCheck className="h-4 w-4" />
+                  Tipo de Comprobante
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {tiposComprobantes.map((tipo) => (
+                  <div key={tipo.id} className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id={`tipo-${tipo.id}`}
+                      name="tipoComprobante"
+                      value={tipo.id.toString()}
+                      checked={tipoSeleccionado === tipo.id.toString()}
+                      onChange={(e) => setTipoSeleccionado(e.target.value)}
+                      className="h-4 w-4"
+                    />
+                    <Label htmlFor={`tipo-${tipo.id}`} className="text-sm">
+                      {tipo.descripcion}
+                    </Label>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
-        <DialogFooter className="flex gap-2">
+        <DialogFooter className="flex gap-2 flex-shrink-0">
           {!cobroCompletado ? (
             <>
               <Button variant="outline" onClick={onClose} disabled={loading}>
                 Cancelar
               </Button>
-              <Button 
-                onClick={handleProcesarCobro} 
-                disabled={loading || !medioSeleccionado}
+              <Button
+                onClick={handleProcesarCobro}
+                disabled={loading || !medioSeleccionado || !tipoSeleccionado}
+                className="gap-2"
               >
+                <IconCurrencyDollar className="h-4 w-4" />
                 {loading ? "Procesando..." : "Procesar Cobro"}
               </Button>
             </>
           ) : (
             <>
-              <Button 
-                variant="outline" 
-                onClick={handleGenerarTicket}
+              <Button
+                variant="outline"
+                onClick={handleDescargarPDF}
                 className="gap-2"
               >
                 <IconPrinter className="h-4 w-4" />
-                Generar Ticket
+                Descargar PDF
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={handleImprimir}
                 className="gap-2"
               >

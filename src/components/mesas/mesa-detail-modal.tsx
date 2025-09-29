@@ -15,6 +15,7 @@ import { EstadoMesaTablero } from "@/types/mesa";
 import { Article } from "@/types/article";
 import { useMesaDetail } from "@/hooks/use-mesa-detail";
 import { toast } from "sonner";
+import { getArticles } from "@/services/articles";
 
 interface MesaDetailModalProps {
   estadoMesa: EstadoMesaTablero | null;
@@ -45,10 +46,35 @@ export function MesaDetailModal({
   // Estados para el modal de cobro
   const [isCobroModalOpen, setIsCobroModalOpen] = React.useState(false);
 
+  // Estados para descuentos y artículos adicionales (solo cuando esPorCobrar)
+  const [descuentosIndividuales, setDescuentosIndividuales] = React.useState<Record<number, number>>({});
+  const [descuentoGeneral, setDescuentoGeneral] = React.useState<number>(0);
+  const [tipoDescuentoGeneral, setTipoDescuentoGeneral] = React.useState<'porcentaje' | 'fijo'>('porcentaje');
+  const [tiposDescuentoIndividual, setTiposDescuentoIndividual] = React.useState<Record<number, 'porcentaje' | 'fijo'>>({});
+  const [articulosAdicionales, setArticulosAdicionales] = React.useState<Array<{
+    id: string;
+    fk_id_articulo: number;
+    cantidad: number;
+    precio_unitario: number;
+    descripcion: string;
+  }>>([]);
+  const [articulos, setArticulos] = React.useState<Article[]>([]);
+
   // Reset estados cuando se abre/cierra el modal
   React.useEffect(() => {
     if (isOpen && estadoMesa?.sesion_activa) {
       refetchPedidos();
+      // Reset estados de descuentos y artículos adicionales
+      setDescuentosIndividuales({});
+      setDescuentoGeneral(0);
+      setTipoDescuentoGeneral('porcentaje');
+      setTiposDescuentoIndividual({});
+      setArticulosAdicionales([]);
+
+      // Cargar artículos si la mesa está por cobrar
+      if (estadoMesa.estado === 'por_cobrar') {
+        getArticles().then(setArticulos);
+      }
     }
   }, [isOpen, estadoMesa, refetchPedidos]);
 
@@ -95,6 +121,95 @@ export function MesaDetailModal({
     }
   };
 
+  // Funciones auxiliares para descuentos y artículos adicionales
+  const calcularTotalConDescuentos = () => {
+    if (!esPorCobrar) return totalMesa;
+
+    // Calcular subtotal de pedidos originales con descuentos individuales
+    const subtotalPedidos = detallePedidos.reduce((sum, detalle) => {
+      const descuento = descuentosIndividuales[detalle.id] || 0;
+      const tipoDescuento = tiposDescuentoIndividual[detalle.id] || 'fijo';
+
+      let precioConDescuento = detalle.precio_unitario;
+      if (descuento > 0) {
+        if (tipoDescuento === 'porcentaje') {
+          const descuentoMonto = (detalle.precio_unitario * descuento) / 100;
+          precioConDescuento = Math.max(0, detalle.precio_unitario - descuentoMonto);
+        } else {
+          precioConDescuento = Math.max(0, detalle.precio_unitario - descuento);
+        }
+      }
+
+      return sum + (precioConDescuento * detalle.cantidad);
+    }, 0);
+
+    // Calcular subtotal de artículos adicionales con descuentos
+    const subtotalAdicionales = articulosAdicionales.reduce((sum, articulo) => {
+      const articuloIdNum = parseInt(articulo.id);
+      const descuentoValor = descuentosIndividuales[articuloIdNum] || 0;
+      const tipoDescuento = tiposDescuentoIndividual[articuloIdNum] || 'fijo';
+
+      let precioConDescuento = articulo.precio_unitario;
+      if (descuentoValor > 0) {
+        if (tipoDescuento === 'porcentaje') {
+          const descuentoAplicado = (articulo.precio_unitario * descuentoValor) / 100;
+          precioConDescuento = Math.max(0, articulo.precio_unitario - descuentoAplicado);
+        } else {
+          precioConDescuento = Math.max(0, articulo.precio_unitario - descuentoValor);
+        }
+      }
+
+      return sum + (precioConDescuento * articulo.cantidad);
+    }, 0);
+
+    const subtotalTotal = subtotalPedidos + subtotalAdicionales;
+
+    // Aplicar descuento general
+    if (descuentoGeneral > 0) {
+      if (tipoDescuentoGeneral === 'porcentaje') {
+        const descuentoMonto = (subtotalTotal * descuentoGeneral) / 100;
+        return Math.max(0, subtotalTotal - descuentoMonto);
+      } else {
+        return Math.max(0, subtotalTotal - descuentoGeneral);
+      }
+    }
+
+    return subtotalTotal;
+  };
+
+  const agregarArticuloAdicional = () => {
+    const nuevoId = Date.now().toString();
+    setArticulosAdicionales(prev => [...prev, {
+      id: nuevoId,
+      fk_id_articulo: 0,
+      cantidad: 1,
+      precio_unitario: 0,
+      descripcion: ""
+    }]);
+  };
+
+  const eliminarArticuloAdicional = (id: string) => {
+    setArticulosAdicionales(prev => prev.filter(art => art.id !== id));
+  };
+
+  const actualizarArticuloAdicional = (id: string, campo: string, valor: any) => {
+    setArticulosAdicionales(prev => prev.map(art => {
+      if (art.id === id) {
+        if (campo === 'fk_id_articulo') {
+          const articuloSeleccionado = articulos.find(a => a.id === parseInt(valor));
+          return {
+            ...art,
+            fk_id_articulo: parseInt(valor),
+            descripcion: articuloSeleccionado?.descripcion || "",
+            precio_unitario: articuloSeleccionado?.precio_unitario || 0
+          };
+        }
+        return { ...art, [campo]: valor };
+      }
+      return art;
+    }));
+  };
+
   const handleCobrar = () => {
     setIsCobroModalOpen(true);
   };
@@ -106,16 +221,17 @@ export function MesaDetailModal({
     toast.success("Cobro procesado exitosamente");
   };
 
-  // Calcular totales
-  const totalMesa = detallePedidos.reduce((sum, item) => sum + item.subtotal, 0);
-  const totalProductos = detallePedidos.reduce((sum, item) => sum + item.cantidad, 0);
-
   if (!estadoMesa || !estadoMesa.sesion_activa) {
     return null;
   }
 
   const sesion = estadoMesa.sesion_activa;
   const esPorCobrar = estadoMesa.estado === 'por_cobrar';
+
+  // Calcular totales
+  const totalMesa = detallePedidos.reduce((sum, item) => sum + item.subtotal, 0);
+  const totalProductos = detallePedidos.reduce((sum, item) => sum + item.cantidad, 0);
+  const totalFinal = esPorCobrar ? calcularTotalConDescuentos() : totalMesa;
 
   return (
     <>
@@ -136,10 +252,10 @@ export function MesaDetailModal({
               </div>
               <div className="text-right">
                 <div className="text-lg font-semibold">
-                  Total: ${totalMesa.toLocaleString()}
+                  Total: ${totalFinal.toLocaleString()}
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  {totalProductos} productos
+                  {totalProductos + articulosAdicionales.reduce((sum, a) => sum + a.cantidad, 0)} productos
                 </div>
               </div>
             </DialogTitle>
@@ -188,6 +304,22 @@ export function MesaDetailModal({
                 onCerrarMesa={handleCerrarMesa}
                 onCobrar={handleCobrar}
                 esPorCobrar={esPorCobrar}
+                descuentosIndividuales={descuentosIndividuales}
+                descuentoGeneral={descuentoGeneral}
+                tipoDescuentoGeneral={tipoDescuentoGeneral}
+                tiposDescuentoIndividual={tiposDescuentoIndividual}
+                articulosAdicionales={articulosAdicionales}
+                onDescuentoIndividualChange={(detalleId, descuento) =>
+                  setDescuentosIndividuales(prev => ({ ...prev, [detalleId]: descuento }))
+                }
+                onDescuentoGeneralChange={setDescuentoGeneral}
+                onTipoDescuentoGeneralChange={setTipoDescuentoGeneral}
+                onTipoDescuentoIndividualChange={(detalleId, tipo) =>
+                  setTiposDescuentoIndividual(prev => ({ ...prev, [detalleId]: tipo }))
+                }
+                onAgregarArticulo={agregarArticuloAdicional}
+                onEliminarArticuloAdicional={eliminarArticuloAdicional}
+                onActualizarArticuloAdicional={actualizarArticuloAdicional}
               />
             </div>
           </div>
@@ -206,8 +338,105 @@ export function MesaDetailModal({
         onClose={() => setIsCobroModalOpen(false)}
         mesa={estadoMesa.mesa}
         sesion={sesion}
-        detallePedidos={detallePedidos}
-        totalMesa={totalMesa}
+        detallePedidos={[
+          // Pedidos originales con descuentos aplicados
+          ...detallePedidos.map(detalle => {
+            const descuento = descuentosIndividuales[detalle.id] || 0;
+            const tipoDescuento = tiposDescuentoIndividual[detalle.id] || 'fijo';
+
+            let precioConDescuento = detalle.precio_unitario;
+            if (descuento > 0) {
+              if (tipoDescuento === 'porcentaje') {
+                const descuentoMonto = (detalle.precio_unitario * descuento) / 100;
+                precioConDescuento = Math.max(0, detalle.precio_unitario - descuentoMonto);
+              } else {
+                precioConDescuento = Math.max(0, detalle.precio_unitario - descuento);
+              }
+            }
+
+            return {
+              ...detalle,
+              precio_unitario: precioConDescuento,
+              subtotal: precioConDescuento * detalle.cantidad
+            };
+          }),
+          // Artículos adicionales con descuentos aplicados
+          ...articulosAdicionales.map(articulo => {
+            const articuloIdNum = parseInt(articulo.id);
+            const descuentoValor = descuentosIndividuales[articuloIdNum] || 0;
+            const tipoDescuento = tiposDescuentoIndividual[articuloIdNum] || 'fijo';
+
+            let precioConDescuento = articulo.precio_unitario;
+            if (descuentoValor > 0) {
+              if (tipoDescuento === 'porcentaje') {
+                const descuentoAplicado = (articulo.precio_unitario * descuentoValor) / 100;
+                precioConDescuento = Math.max(0, articulo.precio_unitario - descuentoAplicado);
+              } else {
+                precioConDescuento = Math.max(0, articulo.precio_unitario - descuentoValor);
+              }
+            }
+
+            return {
+              id: 0,
+              fk_id_pedido_mesa: 0,
+              fk_id_articulo: articulo.fk_id_articulo,
+              cantidad: articulo.cantidad,
+              precio_unitario: precioConDescuento,
+              subtotal: articulo.cantidad * precioConDescuento,
+              observaciones: "Artículo adicional",
+              entregado: true,
+              fecha_creado: new Date().toISOString(),
+              articulo_descripcion: articulo.descripcion
+            };
+          })
+        ]}
+        totalMesa={(() => {
+          // Calcular el subtotal con todos los descuentos individuales aplicados
+          const subtotalConDescuentos = detallePedidos.reduce((sum, detalle) => {
+            const descuento = descuentosIndividuales[detalle.id] || 0;
+            const tipoDescuento = tiposDescuentoIndividual[detalle.id] || 'fijo';
+
+            let precioConDescuento = detalle.precio_unitario;
+            if (descuento > 0) {
+              if (tipoDescuento === 'porcentaje') {
+                const descuentoMonto = (detalle.precio_unitario * descuento) / 100;
+                precioConDescuento = Math.max(0, detalle.precio_unitario - descuentoMonto);
+              } else {
+                precioConDescuento = Math.max(0, detalle.precio_unitario - descuento);
+              }
+            }
+
+            return sum + (precioConDescuento * detalle.cantidad);
+          }, 0) + articulosAdicionales.reduce((sum, articulo) => {
+            const articuloIdNum = parseInt(articulo.id);
+            const descuentoValor = descuentosIndividuales[articuloIdNum] || 0;
+            const tipoDescuento = tiposDescuentoIndividual[articuloIdNum] || 'fijo';
+
+            let precioConDescuento = articulo.precio_unitario;
+            if (descuentoValor > 0) {
+              if (tipoDescuento === 'porcentaje') {
+                const descuentoAplicado = (articulo.precio_unitario * descuentoValor) / 100;
+                precioConDescuento = Math.max(0, articulo.precio_unitario - descuentoAplicado);
+              } else {
+                precioConDescuento = Math.max(0, articulo.precio_unitario - descuentoValor);
+              }
+            }
+
+            return sum + (precioConDescuento * articulo.cantidad);
+          }, 0);
+
+          // Aplicar descuento general
+          if (descuentoGeneral > 0) {
+            if (tipoDescuentoGeneral === 'porcentaje') {
+              const descuentoMonto = (subtotalConDescuentos * descuentoGeneral) / 100;
+              return Math.max(0, subtotalConDescuentos - descuentoMonto);
+            } else {
+              return Math.max(0, subtotalConDescuentos - descuentoGeneral);
+            }
+          }
+
+          return subtotalConDescuentos;
+        })()}
         onCobroCompletado={handleCobroCompletado}
       />
     </>

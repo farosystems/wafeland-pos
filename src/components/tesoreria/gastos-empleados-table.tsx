@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronDown, Eye, User, CreditCard, Calendar, FileText } from "lucide-react";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { getEmpleados } from "@/services/empleados";
@@ -24,10 +25,12 @@ const PAGE_SIZE = 10;
 export function GastosEmpleadosTable({ data }: GastosEmpleadosTableProps) {
   const [search, setSearch] = React.useState("");
   const [page, setPage] = React.useState(1);
+  const [tipoMovimientoFilter, setTipoMovimientoFilter] = React.useState<string>("todos");
   const [columnVisibility, setColumnVisibility] = React.useState({
     id: true,
     fecha: true,
     tipo: true,
+    tipoMovimiento: true,
     monto: true,
     descripcion: true,
     empleado: true,
@@ -61,12 +64,25 @@ export function GastosEmpleadosTable({ data }: GastosEmpleadosTableProps) {
     return cta ? cta.descripcion : id ?? "-";
   };
 
-  // Filtro de búsqueda (por descripción, tipo o empleado)
-  const filtered = data.filter(gasto =>
-    (gasto.descripcion?.toLowerCase().includes(search.toLowerCase()) || "") ||
-    (tiposGasto.find(t => t.id === gasto.fk_tipo_gasto)?.descripcion?.toLowerCase().includes(search.toLowerCase()) || "") ||
-    (gasto.fk_empleado?.toString().includes(search) || "")
-  );
+  const getTipoMovimiento = (fkTipoGasto: number | null) => {
+    const tipo = tiposGasto.find(t => t.id === fkTipoGasto);
+    return tipo?.tipo_movimiento || null;
+  };
+
+  // Filtro de búsqueda (por descripción, tipo o empleado) y por tipo de movimiento
+  const filtered = data.filter(gasto => {
+    // Filtro por texto de búsqueda
+    const matchesSearch = (gasto.descripcion?.toLowerCase().includes(search.toLowerCase()) || "") ||
+      (tiposGasto.find(t => t.id === gasto.fk_tipo_gasto)?.descripcion?.toLowerCase().includes(search.toLowerCase()) || "") ||
+      (gasto.fk_empleado?.toString().includes(search) || "");
+
+    // Filtro por tipo de movimiento (por nombre del tipo)
+    const matchesTipoMovimiento =
+      tipoMovimientoFilter === "todos" ||
+      (tipoMovimientoFilter === String(gasto.fk_tipo_gasto));
+
+    return matchesSearch && matchesTipoMovimiento;
+  });
 
   // Paginación
   const total = filtered.length;
@@ -78,7 +94,7 @@ export function GastosEmpleadosTable({ data }: GastosEmpleadosTableProps) {
       <div className="rounded-lg border bg-card p-4">
         <div className="flex items-center gap-2 mb-4">
           <Input
-            placeholder="Buscar gasto..."
+            placeholder="Buscar movimiento..."
             value={search}
             onChange={e => {
               setSearch(e.target.value);
@@ -86,6 +102,46 @@ export function GastosEmpleadosTable({ data }: GastosEmpleadosTableProps) {
             }}
             className="max-w-xs"
           />
+          <Select
+            value={tipoMovimientoFilter}
+            onValueChange={(value) => {
+              setTipoMovimientoFilter(value);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+                  <span>Todos los tipos</span>
+                </div>
+              </SelectItem>
+              {tiposGasto.map((tipo) => (
+                <SelectItem key={tipo.id} value={String(tipo.id)}>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full ${
+                      tipo.tipo_movimiento === 'ingreso' ? 'bg-green-500' :
+                      tipo.tipo_movimiento === 'egreso' ? 'bg-red-500' :
+                      'bg-gray-300'
+                    }`}></div>
+                    <span>{tipo.descripcion || "Sin descripción"}</span>
+                    {tipo.tipo_movimiento && (
+                      <span className={`px-1 py-0.5 rounded text-xs ${
+                        tipo.tipo_movimiento === 'ingreso'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {tipo.tipo_movimiento === 'ingreso' ? '↗️' : '↙️'}
+                      </span>
+                    )}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="ml-2">
@@ -103,6 +159,7 @@ export function GastosEmpleadosTable({ data }: GastosEmpleadosTableProps) {
                   {col === "id" ? "ID" :
                    col === "fecha" ? "Fecha" :
                    col === "tipo" ? "Tipo" :
+                   col === "tipoMovimiento" ? "Movimiento" :
                    col === "monto" ? "Monto" :
                    col === "descripcion" ? "Descripción" :
                    col === "empleado" ? "Empleado" :
@@ -115,12 +172,42 @@ export function GastosEmpleadosTable({ data }: GastosEmpleadosTableProps) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {/* Indicador de filtros activos */}
+        {(search || tipoMovimientoFilter !== "todos") && (
+          <div className="flex items-center gap-2 mb-4 p-2 bg-blue-50 border border-blue-200 rounded-md">
+            <span className="text-sm text-blue-700 font-medium">Filtros activos:</span>
+            {search && (
+              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                Búsqueda: &quot;{search}&quot;
+              </span>
+            )}
+            {tipoMovimientoFilter !== "todos" && (
+              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                Tipo: {tiposGasto.find(t => t.id === parseInt(tipoMovimientoFilter))?.descripcion || "Desconocido"}
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-blue-600 hover:text-blue-800"
+              onClick={() => {
+                setSearch("");
+                setTipoMovimientoFilter("todos");
+                setPage(1);
+              }}
+            >
+              Limpiar filtros
+            </Button>
+          </div>
+        )}
         <table className="min-w-full text-sm">
           <thead>
             <tr className="bg-gray-100">
               {columnVisibility.id && <th className="px-2 py-1 text-left">ID</th>}
               {columnVisibility.fecha && <th className="px-2 py-1 text-left">Fecha</th>}
               {columnVisibility.tipo && <th className="px-2 py-1 text-left">Tipo</th>}
+              {columnVisibility.tipoMovimiento && <th className="px-2 py-1 text-left">Movimiento</th>}
               {columnVisibility.monto && <th className="px-2 py-1 text-left">Monto</th>}
               {columnVisibility.descripcion && <th className="px-2 py-1 text-left">Descripción</th>}
               {columnVisibility.empleado && <th className="px-2 py-1 text-left">Empleado</th>}
@@ -133,29 +220,54 @@ export function GastosEmpleadosTable({ data }: GastosEmpleadosTableProps) {
           <tbody>
             {paginated.length === 0 ? (
               <tr>
-                <td colSpan={10} className="text-center py-8 text-muted-foreground">
-                  {data.length === 0 ? "No hay gastos registrados." : "No se encontraron gastos con los filtros aplicados."}
+                <td colSpan={11} className="text-center py-8 text-muted-foreground">
+                  {data.length === 0 ? "No hay movimientos registrados." : "No se encontraron movimientos con los filtros aplicados."}
                 </td>
               </tr>
             ) : (
-              paginated.map((gasto) => (
-                <tr key={gasto.id} className="border-b hover:bg-blue-50 transition-colors">
-                  {columnVisibility.id && <td className="px-2 py-1 text-left">{gasto.id}</td>}
-                  {columnVisibility.fecha && <td className="px-2 py-1">{gasto.creado_el ? new Date(gasto.creado_el).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : ""}</td>}
-                  {columnVisibility.tipo && <td className="px-2 py-1">{tiposGasto.find(t => t.id === gasto.fk_tipo_gasto)?.descripcion || "-"}</td>}
-                  {columnVisibility.monto && <td className="px-2 py-1">{gasto.monto != null ? formatCurrency(gasto.monto, "ARS", "es-AR") : ""}</td>}
-                  {columnVisibility.descripcion && <td className="px-2 py-1">{gasto.descripcion}</td>}
-                  {columnVisibility.empleado && <td className="px-2 py-1">{getEmpleadoNombre(gasto.fk_empleado)}</td>}
-                  {columnVisibility.lote && <td className="px-2 py-1">{gasto.fk_lote_operaciones}</td>}
-                  {columnVisibility.usuario && <td className="px-2 py-1">{usuarios.find(u => u.id === gasto.fk_usuario)?.nombre || gasto.fk_usuario}</td>}
-                  {columnVisibility.cuentaTesoreria && <td className="px-2 py-1">{getCuentaDescripcion(gasto.fk_cuenta_tesoreria)}</td>}
-                  {columnVisibility.acciones && <td className="px-2 py-1">
-                    <Button size="icon" variant="outline" onClick={() => setSelectedGasto(gasto)} title="Ver gasto">
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                  </td>}
-                </tr>
-              ))
+              paginated.map((gasto) => {
+                const tipoMovimiento = getTipoMovimiento(gasto.fk_tipo_gasto);
+                return (
+                  <tr key={gasto.id} className="border-b hover:bg-blue-50 transition-colors">
+                    {columnVisibility.id && <td className="px-2 py-1 text-left">{gasto.id}</td>}
+                    {columnVisibility.fecha && <td className="px-2 py-1">{gasto.creado_el ? new Date(gasto.creado_el).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : ""}</td>}
+                    {columnVisibility.tipo && <td className="px-2 py-1">{tiposGasto.find(t => t.id === gasto.fk_tipo_gasto)?.descripcion || "-"}</td>}
+                    {columnVisibility.tipoMovimiento && (
+                      <td className="px-2 py-1">
+                        {tipoMovimiento ? (
+                          <div className="flex items-center gap-2">
+                            <div className={`w-3 h-3 rounded-full ${
+                              tipoMovimiento === 'ingreso' ? 'bg-green-500' : 'bg-red-500'
+                            }`}></div>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              tipoMovimiento === 'ingreso'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {tipoMovimiento === 'ingreso' ? '↗️ Ingreso' : '↙️ Egreso'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                            ➖ Sin definir
+                          </span>
+                        )}
+                      </td>
+                    )}
+                    {columnVisibility.monto && <td className="px-2 py-1">{gasto.monto != null ? formatCurrency(gasto.monto, "ARS", "es-AR") : ""}</td>}
+                    {columnVisibility.descripcion && <td className="px-2 py-1">{gasto.descripcion}</td>}
+                    {columnVisibility.empleado && <td className="px-2 py-1">{getEmpleadoNombre(gasto.fk_empleado)}</td>}
+                    {columnVisibility.lote && <td className="px-2 py-1">{gasto.fk_lote_operaciones}</td>}
+                    {columnVisibility.usuario && <td className="px-2 py-1">{usuarios.find(u => u.id === gasto.fk_usuario)?.nombre || gasto.fk_usuario}</td>}
+                    {columnVisibility.cuentaTesoreria && <td className="px-2 py-1">{getCuentaDescripcion(gasto.fk_cuenta_tesoreria)}</td>}
+                    {columnVisibility.acciones && <td className="px-2 py-1">
+                      <Button size="icon" variant="outline" onClick={() => setSelectedGasto(gasto)} title="Ver gasto">
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </td>}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -163,9 +275,9 @@ export function GastosEmpleadosTable({ data }: GastosEmpleadosTableProps) {
         <div className="flex items-center justify-end space-x-2 py-4">
           <div className="flex-1 text-sm text-muted-foreground">
             {filtered.length === 0 ? (
-              "0 de 0 gastos."
+              "0 de 0 movimientos."
             ) : (
-              `${(page - 1) * PAGE_SIZE + 1} - ${Math.min(page * PAGE_SIZE, filtered.length)} de ${filtered.length} gasto(s).`
+              `${(page - 1) * PAGE_SIZE + 1} - ${Math.min(page * PAGE_SIZE, filtered.length)} de ${filtered.length} movimiento(s).`
             )}
           </div>
           <div className="space-x-2">
@@ -191,9 +303,9 @@ export function GastosEmpleadosTable({ data }: GastosEmpleadosTableProps) {
           <DialogHeader>
             <DialogTitle className="text-blue-700 flex items-center gap-2">
               <FileText className="w-6 h-6 text-blue-500" />
-              Gasto #{selectedGasto?.id}
+              Movimiento #{selectedGasto?.id}
             </DialogTitle>
-            <DialogDescription className="mb-2 text-gray-500">Detalle completo del gasto seleccionado.</DialogDescription>
+            <DialogDescription className="mb-2 text-gray-500">Detalle completo del movimiento seleccionado.</DialogDescription>
           </DialogHeader>
           {selectedGasto && (
             <div className="space-y-4">
@@ -209,11 +321,37 @@ export function GastosEmpleadosTable({ data }: GastosEmpleadosTableProps) {
               <div className="rounded-lg bg-gray-50 p-3">
                 <div className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
                   <CreditCard className="w-4 h-4 text-gray-500" />
-                  Detalles del Gasto
+                  Detalles del Movimiento
                 </div>
                 <div className="flex justify-between mb-1">
                   <span className="text-gray-600">Tipo</span>
                   <span className="font-semibold text-blue-700 capitalize">{tiposGasto.find(t => t.id === selectedGasto.fk_tipo_gasto)?.descripcion || "-"}</span>
+                </div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-gray-600">Movimiento</span>
+                  <div>
+                    {(() => {
+                      const tipoMovimiento = getTipoMovimiento(selectedGasto.fk_tipo_gasto);
+                      return tipoMovimiento ? (
+                        <div className="flex items-center gap-2">
+                          <div className={`w-3 h-3 rounded-full ${
+                            tipoMovimiento === 'ingreso' ? 'bg-green-500' : 'bg-red-500'
+                          }`}></div>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            tipoMovimiento === 'ingreso'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {tipoMovimiento === 'ingreso' ? '↗️ Ingreso' : '↙️ Egreso'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                          ➖ Sin definir
+                        </span>
+                      );
+                    })()}
+                  </div>
                 </div>
                 <div className="flex justify-between mb-1">
                   <span className="text-gray-600">Monto</span>

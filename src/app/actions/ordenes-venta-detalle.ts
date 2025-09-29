@@ -2,6 +2,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { createClient } from '@supabase/supabase-js';
+import { descontarStockArticulo } from '@/services/combos';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -54,6 +55,28 @@ export async function createOrdenVentaDetalle(detalle: any) {
     .single();
 
   if (error) throw error;
+
+  // Descontar stock (con soporte para combos)
+  try {
+    console.log('🔥 ORDEN DETALLE - INICIANDO DESCUENTO DE STOCK para artículo:', detalle.fk_id_articulo, 'cantidad:', detalle.cantidad);
+    await descontarStockArticulo(
+      detalle.fk_id_articulo,
+      detalle.cantidad,
+      detalle.fk_id_orden,
+      'venta'
+    );
+    console.log('✅ ORDEN DETALLE - STOCK DESCONTADO EXITOSAMENTE para artículo:', detalle.fk_id_articulo);
+  } catch (error) {
+    console.error('❌ ORDEN DETALLE - ERROR CRÍTICO al descontar stock:', error);
+    console.error('❌ Detalle del error:', {
+      articuloId: detalle.fk_id_articulo,
+      cantidad: detalle.cantidad,
+      ordenId: detalle.fk_id_orden,
+      error: error instanceof Error ? error.message : error
+    });
+    // TEMPORALMENTE: Lanzar el error para identificar el problema
+    throw new Error(`Error al descontar stock del artículo ${detalle.fk_id_articulo}: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+  }
 
   // Procesar consumo de leche si el artículo tiene equivalencia > 0
   try {

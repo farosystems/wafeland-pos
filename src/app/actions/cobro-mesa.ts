@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { createClient } from '@supabase/supabase-js';
 import { Mesa, DetallePedidoMesa } from '@/types/mesa';
 import { OrdenVenta, CreateOrdenVentaData } from '@/types/ordenVenta';
+import { descontarStockArticulo } from '@/services/combos';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -183,39 +184,28 @@ export async function procesarCobroMesa({
       throw new Error('Error al registrar el medio de pago');
     }
 
-    // 5. Actualizar movimientos de stock (descontar)
+    // 5. Actualizar movimientos de stock (descontar) - con soporte para combos
     for (const detalle of detallePedidos) {
-      // Obtener stock actual
-      const { data: articulo, error: articuloError } = await supabase
-        .from('articulos')
-        .select('stock')
-        .eq('id', detalle.fk_id_articulo)
-        .single();
-
-      if (articuloError || !articulo) {
-        console.warn(`No se pudo obtener stock del artículo ${detalle.fk_id_articulo}`);
-        continue;
-      }
-
-      const nuevoStock = articulo.stock - detalle.cantidad;
-
-      // Actualizar stock
-      await supabase
-        .from('articulos')
-        .update({ stock: Math.max(0, nuevoStock) })
-        .eq('id', detalle.fk_id_articulo);
-
-      // Registrar movimiento de stock
-      await supabase
-        .from('movimientos_stock')
-        .insert([{
-          fk_id_articulos: detalle.fk_id_articulo,
-          fk_id_orden: ordenVenta.id,
-          origen: 'venta_mesa',
-          tipo: 'salida',
+      try {
+        console.log('🔥 COBRO MESA - INICIANDO DESCUENTO DE STOCK para artículo:', detalle.fk_id_articulo, 'cantidad:', detalle.cantidad);
+        await descontarStockArticulo(
+          detalle.fk_id_articulo,
+          detalle.cantidad,
+          ordenVenta.id,
+          'venta_mesa'
+        );
+        console.log('✅ COBRO MESA - STOCK DESCONTADO EXITOSAMENTE para artículo:', detalle.fk_id_articulo);
+      } catch (error) {
+        console.error('❌ COBRO MESA - ERROR CRÍTICO al descontar stock del artículo', detalle.fk_id_articulo, ':', error);
+        console.error('❌ Detalle del error:', {
+          articuloId: detalle.fk_id_articulo,
           cantidad: detalle.cantidad,
-          stock_actual: Math.max(0, nuevoStock),
-        }]);
+          ordenId: ordenVenta.id,
+          error: error instanceof Error ? error.message : error
+        });
+        // TEMPORALMENTE: Lanzar el error para identificar el problema
+        throw new Error(`Error al descontar stock del artículo ${detalle.fk_id_articulo}: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      }
     }
 
     // 6. Registrar ingreso en detalle_lotes_operaciones

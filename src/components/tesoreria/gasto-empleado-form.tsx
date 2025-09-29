@@ -70,6 +70,7 @@ export function GastoEmpleadoForm({ onSubmit, onCancel, isLoading = false }: Gas
 
   const selectedTipoGasto = tiposGasto.find(t => t.id === form.fk_tipo_gasto);
   const isEmpleadoRequired = selectedTipoGasto?.obliga_empleado ?? false;
+  const tipoMovimiento = selectedTipoGasto?.tipo_movimiento;
 
   useEffect(() => {
     async function fetchData() {
@@ -184,11 +185,11 @@ export function GastoEmpleadoForm({ onSubmit, onCancel, isLoading = false }: Gas
       return;
     }
     if (!form.fk_tipo_gasto) {
-      setErrorModal({ open: true, message: "Debe seleccionar un tipo de gasto." });
+      setErrorModal({ open: true, message: "Debe seleccionar un tipo de movimiento." });
       return;
     }
     if (isEmpleadoRequired && !form.fk_empleado) {
-      setErrorModal({ open: true, message: "El campo empleado es obligatorio para este tipo de gasto." });
+      setErrorModal({ open: true, message: "El campo empleado es obligatorio para este tipo de movimiento." });
       return;
     }
     if (!form.fk_lote_operaciones) {
@@ -228,17 +229,41 @@ export function GastoEmpleadoForm({ onSubmit, onCancel, isLoading = false }: Gas
             <Input value={lote || "-"} readOnly className="bg-gray-100 cursor-not-allowed font-bold text-lg" />
           </div>
           <div>
-            <label className="block mb-1 font-medium">Tipo de Gasto *</label>
-            <Select onValueChange={(value) => handleSelectChange('fk_tipo_gasto', value)} value={String(form.fk_tipo_gasto || "")}> 
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccione un tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                {tiposGasto.map((t: TipoGasto) => (
-                  <SelectItem key={t.id} value={String(t.id)}>{t.descripcion || "Sin descripción"}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label className="block mb-1 font-medium">Tipo de Movimiento *</label>
+            <div className="space-y-2">
+              <Select onValueChange={(value) => handleSelectChange('fk_tipo_gasto', value)} value={String(form.fk_tipo_gasto || "")}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione un tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tiposGasto.map((t: TipoGasto) => (
+                    <SelectItem key={t.id} value={String(t.id)}>
+                      <div className="flex items-center gap-2">
+                        <span>{t.descripcion || "Sin descripción"}</span>
+                        {t.tipo_movimiento && (
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            t.tipo_movimiento === 'ingreso'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {t.tipo_movimiento === 'ingreso' ? 'Ingreso' : 'Egreso'}
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {tipoMovimiento && (
+                <div className={`p-2 rounded-md border text-sm font-medium ${
+                  tipoMovimiento === 'ingreso'
+                    ? 'bg-green-50 border-green-200 text-green-800'
+                    : 'bg-red-50 border-red-200 text-red-800'
+                }`}>
+                  💡 Este movimiento será registrado como: <strong>{tipoMovimiento === 'ingreso' ? 'INGRESO' : 'EGRESO'}</strong>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -337,7 +362,7 @@ export function GastoEmpleadoForm({ onSubmit, onCancel, isLoading = false }: Gas
         <div className="flex justify-end gap-2 pt-4">
           <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
           <Button type="submit" disabled={isLoading}>
-            {isLoading ? "Guardando..." : "Guardar Gasto"}
+            {isLoading ? "Guardando..." : `Guardar ${tipoMovimiento ? (tipoMovimiento === 'ingreso' ? 'Ingreso' : 'Egreso') : 'Movimiento'}`}
           </Button>
         </div>
       </form>

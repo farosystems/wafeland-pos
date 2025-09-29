@@ -10,6 +10,40 @@ export async function getGastosEmpleados() {
   return data as GastoEmpleado[];
 }
 
+export async function getGastosLoteActivo() {
+  // Primero obtener el lote activo del usuario actual
+  const { data: loteActivo, error: loteError } = await supabase
+    .from("lotes_operaciones")
+    .select("id_lote")
+    .eq("abierto", true)
+    .single();
+
+  if (loteError) {
+    console.error("Error al obtener lote activo:", loteError);
+    throw new Error("No hay un lote activo disponible");
+  }
+
+  if (!loteActivo) {
+    throw new Error("No se encontró un lote activo");
+  }
+
+  // Obtener gastos del lote activo con información relacionada
+  const { data, error } = await supabase
+    .from("gastos_empleados")
+    .select(`
+      *,
+      tipo_gasto:fk_tipo_gasto(id, descripcion),
+      empleado:fk_empleado(id, nombre, apellido),
+      usuario:fk_usuario(id, nombre),
+      cuenta_tesoreria:fk_cuenta_tesoreria(id, descripcion)
+    `)
+    .eq("fk_lote_operaciones", loteActivo.id_lote)
+    .order("creado_el", { ascending: false });
+
+  if (error) throw error;
+  return data;
+}
+
 export async function createGastoEmpleado(gasto: CreateGastoEmpleadoData) {
   const { data, error } = await supabase
     .from("gastos_empleados")
