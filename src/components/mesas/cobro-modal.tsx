@@ -189,8 +189,8 @@ export function CobroModal({
   });
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[95vh] flex flex-col overflow-hidden">
+    <Dialog open={isOpen} onOpenChange={cobroCompletado ? undefined : onClose}>
+      <DialogContent className="max-w-lg max-h-[95vh] flex flex-col overflow-hidden" onPointerDownOutside={(e) => cobroCompletado && e.preventDefault()} onEscapeKeyDown={(e) => cobroCompletado && e.preventDefault()}>
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <IconCurrencyDollar className="h-5 w-5" />
