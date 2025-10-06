@@ -260,7 +260,7 @@ export function VentaFormDialog({ open, onOpenChange, onVentaGuardada }: VentaFo
     if (!input) return [];
     return articulosActivos.filter(a =>
       a.descripcion.toLowerCase().includes(input.toLowerCase())
-    ).slice(0, 3);
+    ).slice(0, 10);
   }
 
   // Agregar línea
